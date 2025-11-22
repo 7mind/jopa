@@ -1364,6 +1364,63 @@ inline void Semantic::ProcessFieldMembers(AstClassBody* class_body)
 }
 
 
+//
+// Process enum constant declarations for enum types
+//
+inline void Semantic::ProcessEnumConstantMembers(AstClassBody* class_body)
+{
+    // Check if this class body belongs to an enum
+    if (! class_body -> owner)
+        return;
+
+    AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
+    if (! enum_decl)
+        return;
+
+    TypeSymbol* enum_type = ThisType();
+    assert(enum_type -> HeaderProcessed());
+    assert(enum_type -> ACC_ENUM());
+
+    // Process each enum constant
+    for (unsigned i = 0; i < enum_decl -> NumEnumConstants(); i++)
+    {
+        AstEnumConstant* enum_constant = enum_decl -> EnumConstant(i);
+
+        // Set the ordinal (sequential position)
+        enum_constant -> ordinal = i;
+
+        // Get the constant's name
+        NameSymbol* name_symbol =
+            lex_stream -> NameSymbol(enum_constant -> identifier_token);
+
+        // Check for duplicate constant names
+        if (enum_type -> FindVariableSymbol(name_symbol))
+        {
+            ReportSemError(SemanticError::DUPLICATE_FIELD,
+                           enum_constant -> identifier_token,
+                           name_symbol -> Name(),
+                           enum_type -> Name(),
+                           enum_type -> FindVariableSymbol(name_symbol) -> FileLoc());
+            continue;
+        }
+
+        // Create a static final field for this enum constant
+        VariableSymbol* field = enum_type -> InsertVariableSymbol(name_symbol);
+        field -> SetType(enum_type); // Type is the enum type itself
+        field -> SetFlags(ProcessEnumConstantModifiers(enum_constant));
+        field -> SetOwner(enum_type);
+        field -> SetLocation();
+
+        // Link the AST node to the symbol
+        enum_constant -> field_symbol = field;
+
+        // Mark as deprecated if needed
+        if (lex_stream -> IsDeprecated(enum_constant -> LeftToken()))
+            field -> MarkDeprecated();
+    }
+}
+
+
 void Semantic::ProcessClassBodyForEffectiveJavaChecks(AstClassBody* class_body)
 {
     TypeSymbol* this_type = ThisType();
