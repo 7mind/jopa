@@ -180,6 +180,10 @@ test_compile_only "${SCRIPT_DIR}/SimpleGeneric.java" || true
 test_compile_only "${SCRIPT_DIR}/TwoTypeParams.java" || true
 test_compile_only "${SCRIPT_DIR}/BoundedGeneric.java" || true
 
+echo -e "${BLUE}=== Testing Autoboxing/Unboxing ===${NC}"
+test_compile_and_run "${SCRIPT_DIR}/BasicBoxingTest.java" "BasicBoxingTest" || true
+test_compile_and_run "${SCRIPT_DIR}/AutoboxingTest.java" "AutoboxingTest" || true
+
 # Cleanup
 rm -f /tmp/jikes_*_$$.log
 
@@ -210,8 +214,8 @@ cat > "$RESULTS_FILE" << EOF
 - ✅ Enhanced For-Loop (Arrays)
 - ✅ Varargs
 - ✅ Enums (with synthetic methods)
+- ✅ Autoboxing/Unboxing (Variable assignments)
 - ⚠️  Static Imports (Partial - 25%)
-- ❌ Autoboxing/Unboxing (Not implemented)
 - ❌ Annotations (Not implemented)
 EOF
 
