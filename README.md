@@ -1,3 +1,10 @@
+# JOPA: Java Object Program Assembler
+
+A totally Claude'd effort in modernizing `jikes`, the historical `javac` implementation in C++.
+
+Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
+
+
 jikes
 =====
 
