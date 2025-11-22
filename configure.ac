@@ -342,7 +342,7 @@ AC_SUBST(JIKESPG)
 AC_ARG_ENABLE([source15],
               [AS_HELP_STRING([--enable-source15],
                               [Enable experimental 1.5 source features])],
-              [source15=$enableval], [source15=no])
+              [source15=$enableval], [source15=yes])
 AS_IF([test $source15 = yes],
       [AC_DEFINE([ENABLE_SOURCE_15], [1],
        [Define as nonzero to enable experimental `-source 1.5' features.])],

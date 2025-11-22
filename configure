@@ -22642,7 +22642,7 @@ if test "${enable_source15+set}" = set; then
   enableval="$enable_source15"
   source15=$enableval
 else
-  source15=no
+  source15=yes
 fi;
 if test $source15 = yes; then
 
