@@ -123,6 +123,25 @@ void ByteCode::GenerateCode()
     }
 
     //
+    // Generate bridge methods for generic covariant overrides
+    //
+    for (i = 0; i < unit_type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = unit_type -> MethodSym(i);
+        if (method -> NumGeneratedBridges() > 0)
+        {
+            for (unsigned j = 0; j < method -> NumGeneratedBridges(); j++)
+            {
+                MethodSymbol* bridge = method -> GeneratedBridge(j);
+                int method_index = methods.NextIndex();
+                BeginMethod(method_index, bridge);
+                GenerateBridgeMethod(bridge);
+                EndMethod(method_index, bridge);
+            }
+        }
+    }
+
+    //
     // Process the instance initializer.
     //
     bool has_instance_initializer = false;
@@ -458,6 +477,21 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
             exceptions_attribute ->
                 AddExceptionIndex(RegisterClass(msym -> Throws(i)));
         methods[method_index] -> AddAttribute(exceptions_attribute);
+    }
+
+    //
+    // Add Signature attribute for generic methods
+    //
+    if (msym -> NumTypeParameters() > 0)
+    {
+        msym -> SetGenericSignature(control);
+        if (msym -> GenericSignature())
+        {
+            SignatureAttribute* signature_attribute =
+                new SignatureAttribute(RegisterUtf8(control.Signature_literal),
+                                       RegisterUtf8(msym -> GenericSignature()));
+            methods[method_index] -> AddAttribute(signature_attribute);
+        }
     }
 
     //
@@ -3520,6 +3554,123 @@ void ByteCode::GenerateClassAccessMethod()
         PutU2(RegisterLibraryMethodref(control.Throwable_initCauseMethod()));
     }
     PutOp(OP_ATHROW);
+}
+
+
+//
+// Generate bytecode for a bridge method.
+//
+// Bridge methods are synthetic methods generated for generic covariant overrides.
+// They have the erased signature of the superclass method and simply delegate
+// to the actual method with the specialized signature.
+//
+// Example:
+//   class Box<T> { T get() {...} }
+//   class StringBox extends Box<String> { String get() {...} }
+//
+// Bridge generated in StringBox:
+//   /* bridge */ Object get() { return this.get(); }  // calls String version
+//
+void ByteCode::GenerateBridgeMethod(MethodSymbol* bridge)
+{
+    assert(bridge -> IsBridge());
+    MethodSymbol* target = bridge -> BridgeTarget();
+    assert(target);
+
+    // Add minimal line number info for debuggers
+    line_number_table_attribute -> AddLineNumber(0, 0);
+
+    // Load 'this' if not static
+    if (! bridge -> ACC_STATIC())
+    {
+        PutOp(OP_ALOAD_0);
+    }
+
+    // Load all parameters
+    u2 local_index = bridge -> ACC_STATIC() ? 0 : 1;
+    for (unsigned i = 0; i < bridge -> NumFormalParameters(); i++)
+    {
+        VariableSymbol* param = bridge -> FormalParameter(i);
+        TypeSymbol* param_type = param -> Type();
+
+        if (control.IsSimpleIntegerValueType(param_type) ||
+            param_type == control.boolean_type)
+        {
+            LoadLocal(local_index, param_type);
+            local_index++;
+        }
+        else if (param_type == control.long_type)
+        {
+            PutOp(OP_LLOAD);
+            PutU1(local_index);
+            local_index += 2;
+        }
+        else if (param_type == control.float_type)
+        {
+            PutOp(OP_FLOAD);
+            PutU1(local_index);
+            local_index++;
+        }
+        else if (param_type == control.double_type)
+        {
+            PutOp(OP_DLOAD);
+            PutU1(local_index);
+            local_index += 2;
+        }
+        else // reference type
+        {
+            LoadLocal(local_index, param_type);
+            local_index++;
+        }
+    }
+
+    // Invoke the actual method
+    if (bridge -> ACC_STATIC())
+    {
+        PutOp(OP_INVOKESTATIC);
+        PutU2(RegisterMethodref(target -> containing_type, target));
+    }
+    else if (target -> containing_type -> ACC_INTERFACE())
+    {
+        PutOp(OP_INVOKEINTERFACE);
+        PutU2(RegisterMethodref(target -> containing_type, target));
+        PutU1(target -> NumFormalParameters() + 1); // +1 for 'this'
+        PutU1(0);
+    }
+    else
+    {
+        PutOp(OP_INVOKEVIRTUAL);
+        PutU2(RegisterMethodref(target -> containing_type, target));
+    }
+
+    // Return the result
+    TypeSymbol* return_type = bridge -> Type();
+    if (return_type == control.void_type)
+    {
+        PutOp(OP_RETURN);
+    }
+    else if (control.IsSimpleIntegerValueType(return_type) ||
+             return_type == control.boolean_type)
+    {
+        PutOp(OP_IRETURN);
+    }
+    else if (return_type == control.long_type)
+    {
+        PutOp(OP_LRETURN);
+    }
+    else if (return_type == control.float_type)
+    {
+        PutOp(OP_FRETURN);
+    }
+    else if (return_type == control.double_type)
+    {
+        PutOp(OP_DRETURN);
+    }
+    else // reference type
+    {
+        // No explicit cast needed - the JVM handles covariant returns
+        PutOp(OP_ARETURN);
+    }
 }
 
 
@@ -6837,6 +6988,18 @@ void ByteCode::FinishCode()
     {
         MethodSymbol* enclosing = (MethodSymbol*) unit_type -> owner;
         AddAttribute(CreateEnclosingMethodAttribute(enclosing));
+    }
+
+    // Add Signature attribute for generic classes
+    if (unit_type -> IsGeneric())
+    {
+        unit_type -> SetGenericSignature(control);
+        if (unit_type -> GenericSignature())
+        {
+            AddAttribute(new SignatureAttribute(
+                RegisterUtf8(control.Signature_literal),
+                RegisterUtf8(unit_type -> GenericSignature())));
+        }
     }
     //
     // In case they weren't referenced elsewhere, make sure all nested types

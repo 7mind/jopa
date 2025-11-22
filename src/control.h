@@ -110,6 +110,7 @@ public:
     Utf8LiteralValue* Code_literal;
     Utf8LiteralValue* SourceFile_literal;
     Utf8LiteralValue* EnclosingMethod_literal;
+    Utf8LiteralValue* Signature_literal;
 
     //
     // The primitive types.

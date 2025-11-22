@@ -455,7 +455,8 @@ public:
           directory_symbol(file_symbol_ -> directory_symbol),
           return_code(0),
           error(NULL),
-          this_package(file_symbol_ -> package)
+          this_package(file_symbol_ -> package),
+          processing_type(NULL)
     {
 #ifdef JIKES_DEBUG
         int i;
@@ -828,6 +829,9 @@ private:
     TypeSymbol* ProcessTypeHeaders(AstClassBody*, TypeSymbol* = NULL);
     void ProcessSuperinterface(TypeSymbol*, AstTypeName*);
     void ProcessTypeParameters(TypeSymbol*, AstTypeParameters*);
+    void ProcessMethodTypeParameters(MethodSymbol*, AstTypeParameters*);
+    void ProcessTypeArguments(TypeSymbol*, AstTypeArguments*);
+    void GenerateBridgeMethods(TypeSymbol*);
     void ProcessConstructorMembers(AstClassBody*);
     void ProcessMethodMembers(AstClassBody*);
     void ProcessClassBodyForEffectiveJavaChecks(AstClassBody*);
@@ -851,6 +855,9 @@ private:
     //
     PackageSymbol* this_package;
 
+    // Track the type being processed during header phase (before state_stack is set up)
+    TypeSymbol* processing_type;
+
     // Look at state associated with the current type
     bool InDeprecatedContext()
     {
@@ -858,18 +865,26 @@ private:
             (ThisMethod() && ThisMethod() -> IsDeprecated()) ||
             (ThisVariable() && ThisVariable() -> IsDeprecated());
     }
-    TypeSymbol* ThisType() { return state_stack.Top() -> Type(); }
-    MethodSymbol*& ThisMethod() { return state_stack.Top() -> this_method; }
+    TypeSymbol* ThisType() {
+        return state_stack.Size() ? state_stack.Top() -> Type() : processing_type;
+    }
+    MethodSymbol*& ThisMethod() {
+        static MethodSymbol* null_method = NULL;
+        return state_stack.Size() ? state_stack.Top() -> this_method : null_method;
+    }
     VariableSymbol*& ThisVariable()
     {
-        return state_stack.Top() -> this_variable;
+        static VariableSymbol* null_variable = NULL;
+        return state_stack.Size() ? state_stack.Top() -> this_variable : null_variable;
     }
     AstStatement*& ExplicitConstructorInvocation()
     {
-        return state_stack.Top() -> explicit_constructor;
+        static AstStatement* null_statement = NULL;
+        return state_stack.Size() ? state_stack.Top() -> explicit_constructor : null_statement;
     }
     SymbolTableStack& LocalSymbolTable()
     {
+        assert(state_stack.Size()); // This should never be called during header processing
         return state_stack.Top() -> symbol_table;
     }
     SemanticStack<SymbolSet*>& TryExceptionTableStack()

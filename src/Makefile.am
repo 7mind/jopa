@@ -27,6 +27,7 @@ lpginput.cpp \
 modifier.cpp \
 op.cpp \
 option.cpp \
+paramtype.cpp \
 parser.cpp \
 platform.cpp \
 scanner.cpp \
@@ -36,6 +37,7 @@ stream.cpp \
 symbol.cpp \
 system.cpp \
 tab.cpp \
+typeparam.cpp \
 unparse.cpp \
 unzip.cpp \
 zip.cpp
@@ -66,6 +68,7 @@ lookup.h \
 lpginput.h \
 op.h \
 option.h \
+paramtype.h \
 parser.h \
 platform.h \
 scanner.h \
@@ -78,6 +81,7 @@ symbol.h \
 tab.h \
 table.h \
 tuple.h \
+typeparam.h \
 unzip.h \
 zip.h
 

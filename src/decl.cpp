@@ -7,6 +7,7 @@
 #include "spell.h"
 #include "option.h"
 #include "stream.h"
+#include "typeparam.h"
 
 #ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
@@ -517,8 +518,15 @@ void Semantic::ProcessTypeHeader(AstClassDeclaration* declaration)
         declaration -> class_body -> semantic_environment -> Type();
     assert(! type -> HeaderProcessed() || type -> Bad());
     type -> MarkHeaderProcessed();
+
+    // Set processing_type so ThisType() works during header processing
+    processing_type = type;
+
     if (type -> Bad())
+    {
+        processing_type = NULL;
         return;
+    }
 
     //
     // Special case certain classes in java.lang.  We can't use the
@@ -645,6 +653,9 @@ void Semantic::ProcessTypeHeader(AstClassDeclaration* declaration)
                        type -> ContainingPackageName(),
                        type -> ExternalName());
     }
+
+    // Clear processing_type after header processing
+    processing_type = NULL;
 }
 
 
@@ -654,6 +665,10 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
         declaration -> class_body -> semantic_environment -> Type();
     assert(! type -> HeaderProcessed() || type -> Bad());
     type -> MarkHeaderProcessed();
+
+    // Set processing_type so ThisType() works during header processing
+    processing_type = type;
+
     // TODO: Add enum support for 1.5.
 //      if (control.option.source < JikesOption::SDK1_5)
     {
@@ -663,7 +678,10 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
         type -> MarkBad();
     }
     if (type -> Bad())
+    {
+        processing_type = NULL;
         return;
+    }
 
     //
     // Process the supertypes.
@@ -677,6 +695,9 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
         ProcessSuperinterface(type, declaration -> Interface(i));
     // there will not be a cycle
     assert(! type -> supertypes_closure -> IsElement(type));
+
+    // Clear processing_type after header processing
+    processing_type = NULL;
 }
 
 
@@ -686,6 +707,10 @@ void Semantic::ProcessTypeHeader(AstInterfaceDeclaration* declaration)
         declaration -> class_body -> semantic_environment -> Type();
     assert(! type -> HeaderProcessed() || type -> Bad());
     type -> MarkHeaderProcessed();
+
+    // Set processing_type so ThisType() works during header processing
+    processing_type = type;
+
     if (declaration -> type_parameters_opt)
         ProcessTypeParameters(type, declaration -> type_parameters_opt);
 
@@ -711,6 +736,9 @@ void Semantic::ProcessTypeHeader(AstInterfaceDeclaration* declaration)
                        type -> ContainingPackageName(),
                        type -> ExternalName());
     }
+
+    // Clear processing_type after header processing
+    processing_type = NULL;
 }
 
 
@@ -720,6 +748,10 @@ void Semantic::ProcessTypeHeader(AstAnnotationDeclaration* declaration)
         declaration -> class_body -> semantic_environment -> Type();
     assert(! type -> HeaderProcessed() || type -> Bad());
     type -> MarkHeaderProcessed();
+
+    // Set processing_type so ThisType() works during header processing
+    processing_type = type;
+
     // TODO: Add annotation support for 1.5.
 //      if (control.option.source < JikesOption::SDK1_5)
     {
@@ -735,6 +767,9 @@ void Semantic::ProcessTypeHeader(AstAnnotationDeclaration* declaration)
     AddDependence(type, control.Object());
     type -> AddInterface(control.Annotation());
     AddDependence(type, control.Annotation());
+
+    // Clear processing_type after header processing
+    processing_type = NULL;
 }
 
 
@@ -797,11 +832,363 @@ void Semantic::ProcessSuperinterface(TypeSymbol* base_type, AstTypeName* name)
 //
 // Processes the type parameters of a class or interface.
 //
-void Semantic::ProcessTypeParameters(TypeSymbol* /*type*/,
+void Semantic::ProcessTypeParameters(TypeSymbol* type,
                                      AstTypeParameters* parameters)
 {
-    // TODO: Add generics support for 1.5.
-    ReportSemError(SemanticError::TYPE_PARAMETERS_UNSUPPORTED, parameters);
+    if (! parameters)
+        return;
+
+    // Process each type parameter declaration
+    for (unsigned i = 0; i < parameters -> NumTypeParameters(); i++)
+    {
+        AstTypeParameter* param_ast = parameters -> TypeParameter(i);
+
+        // Get the name of the type parameter
+        const NameSymbol* name_symbol =
+            lex_stream -> NameSymbol(param_ast -> identifier_token);
+
+        // Check for duplicate type parameter names
+        for (unsigned j = 0; j < i; j++)
+        {
+            AstTypeParameter* prev_param = parameters -> TypeParameter(j);
+            const NameSymbol* prev_name =
+                lex_stream -> NameSymbol(prev_param -> identifier_token);
+
+            if (name_symbol == prev_name)
+            {
+                // Duplicate type parameter - report error and skip
+                ReportSemError(SemanticError::DUPLICATE_TYPE_PARAMETER,
+                              param_ast -> identifier_token,
+                              name_symbol -> Name());
+                param_ast -> symbol = NULL;
+                continue;
+            }
+        }
+
+        // Create the TypeParameterSymbol
+        TypeParameterSymbol* type_param =
+            new TypeParameterSymbol(name_symbol, type, i);
+
+        // Store it in the AST node
+        param_ast -> symbol = type_param;
+
+        // Add to the containing type's type parameters
+        type -> AddTypeParameter(type_param);
+
+        // Process bounds (extends clauses)
+        // NOTE: We defer bound processing because FindType requires a semantic
+        // environment stack which isn't set up during header processing.
+        // Bounds will be validated later during semantic analysis.
+        // For now, we'll try a simple name lookup.
+        for (unsigned j = 0; j < param_ast -> NumBounds(); j++)
+        {
+            AstTypeName* bound_ast = param_ast -> Bound(j);
+            NameSymbol* bound_name = lex_stream -> NameSymbol(bound_ast -> name -> identifier_token);
+
+            // Simple lookup in current package or java.lang
+            TypeSymbol* bound_type = NULL;
+
+            // Try to find in the current package
+            PackageSymbol* package = type -> ContainingPackage();
+            if (package)
+            {
+                bound_type = package -> FindTypeSymbol(bound_name);
+            }
+
+            // If not found, try java.lang package
+            if (!bound_type)
+            {
+                PackageSymbol* java_lang = control.ProcessPackage(StringConstant::US_java_SL_lang);
+                if (java_lang)
+                {
+                    bound_type = java_lang -> FindTypeSymbol(bound_name);
+
+                    // If still not found, try to read the type from source
+                    if (!bound_type)
+                    {
+                        FileSymbol* file_symbol = Control::GetJavaFile(java_lang, bound_name);
+                        if (file_symbol)
+                        {
+                            ReadType(file_symbol, java_lang, bound_name, bound_ast -> name -> identifier_token);
+                            bound_type = java_lang -> FindTypeSymbol(bound_name);
+                        }
+                    }
+                }
+            }
+
+            if (bound_type)
+            {
+                // TODO: Add proper validation for final classes in bounds
+                // TODO: Validate that only first bound can be a class
+                type_param -> AddBound(bound_type);
+            }
+            // If bound_type is still NULL, we'll report an error later
+        }
+    }
+}
+
+
+//
+// Process type parameters for a generic method
+//
+void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
+                                           AstTypeParameters* parameters)
+{
+    if (! parameters)
+        return;
+
+    // Process each type parameter declaration
+    for (unsigned i = 0; i < parameters -> NumTypeParameters(); i++)
+    {
+        AstTypeParameter* param_ast = parameters -> TypeParameter(i);
+
+        // Get the name of the type parameter
+        const NameSymbol* name_symbol =
+            lex_stream -> NameSymbol(param_ast -> identifier_token);
+
+        // Check for duplicate type parameter names
+        for (unsigned j = 0; j < i; j++)
+        {
+            AstTypeParameter* prev_param = parameters -> TypeParameter(j);
+            const NameSymbol* prev_name =
+                lex_stream -> NameSymbol(prev_param -> identifier_token);
+
+            if (name_symbol == prev_name)
+            {
+                // Duplicate type parameter - report error and skip
+                ReportSemError(SemanticError::DUPLICATE_TYPE_PARAMETER,
+                              param_ast -> identifier_token,
+                              name_symbol -> Name());
+                param_ast -> symbol = NULL;
+                continue;
+            }
+        }
+
+        // Create the TypeParameterSymbol with method as owner
+        TypeParameterSymbol* type_param =
+            new TypeParameterSymbol(name_symbol, method, i);
+
+        // Store it in the AST node
+        param_ast -> symbol = type_param;
+
+        // Add to the containing method's type parameters
+        method -> AddTypeParameter(type_param);
+
+        // Process bounds (extends clauses)
+        // NOTE: Using simple name lookup to avoid semantic environment stack issues
+        for (unsigned j = 0; j < param_ast -> NumBounds(); j++)
+        {
+            AstTypeName* bound_ast = param_ast -> Bound(j);
+            NameSymbol* bound_name = lex_stream -> NameSymbol(bound_ast -> name -> identifier_token);
+
+            // Simple lookup in containing type's package or java.lang
+            TypeSymbol* bound_type = NULL;
+
+            // Try to find in the containing type's package
+            TypeSymbol* containing_type = method -> containing_type;
+            if (containing_type)
+            {
+                PackageSymbol* package = containing_type -> ContainingPackage();
+                if (package)
+                {
+                    bound_type = package -> FindTypeSymbol(bound_name);
+                }
+            }
+
+            // If not found, try java.lang package
+            if (!bound_type)
+            {
+                PackageSymbol* java_lang = control.ProcessPackage(StringConstant::US_java_SL_lang);
+                if (java_lang)
+                {
+                    bound_type = java_lang -> FindTypeSymbol(bound_name);
+                }
+            }
+
+            if (bound_type)
+            {
+                type_param -> AddBound(bound_type);
+            }
+        }
+    }
+}
+
+
+//
+// Process type arguments for a parameterized type (e.g., List<String>)
+//
+void Semantic::ProcessTypeArguments(TypeSymbol* base_type,
+                                    AstTypeArguments* type_arguments)
+{
+    if (! type_arguments)
+        return;
+
+    // Check if the base type is actually a generic type
+    if (! base_type -> IsGeneric())
+    {
+        ReportSemError(SemanticError::TYPE_MAY_NOT_HAVE_PARAMETERS,
+                      type_arguments,
+                      base_type -> ContainingPackageName(),
+                      base_type -> ExternalName());
+        return;
+    }
+
+    // Validate arity (number of type arguments matches number of type parameters)
+    unsigned num_args = type_arguments -> NumTypeArguments();
+    unsigned num_params = base_type -> NumTypeParameters();
+
+    if (num_args != num_params)
+    {
+        ReportSemError(SemanticError::MISMATCHED_TYPE_PARAMETER_COUNT,
+                      type_arguments,
+                      base_type -> ContainingPackageName(),
+                      base_type -> ExternalName());
+        return;
+    }
+
+    // Process each type argument
+    for (unsigned i = 0; i < num_args; i++)
+    {
+        AstType* type_arg_ast = type_arguments -> TypeArgument(i);
+
+        // Process the type argument (recursively handles nested type arguments)
+        ProcessType(type_arg_ast);
+
+        TypeSymbol* arg_type = type_arg_ast -> symbol;
+
+        if (! arg_type || arg_type -> Bad())
+            continue;
+
+        // Validate that type argument satisfies bounds of type parameter
+        TypeParameterSymbol* type_param = base_type -> TypeParameter(i);
+
+        // Wildcards have special handling - check their bounds separately
+        AstWildcard* wildcard = type_arg_ast -> WildcardCast();
+        if (wildcard)
+        {
+            // For unbounded wildcards (?), no validation needed
+            // For bounded wildcards (? extends T, ? super T), bounds are validated when parsing
+            continue;
+        }
+
+        // Check each bound of the type parameter
+        for (unsigned j = 0; j < type_param -> NumBounds(); j++)
+        {
+            TypeSymbol* bound = type_param -> Bound(j);
+
+            // Check if arg_type is a subtype of the bound
+            if (! arg_type -> IsSubtype(bound))
+            {
+                // Type argument doesn't satisfy bound
+                ReportSemError(SemanticError::TYPE_ARGUMENT_FAILS_BOUNDS,
+                              type_arg_ast,
+                              arg_type -> ContainingPackageName(),
+                              arg_type -> ExternalName(),
+                              type_param -> Name(),
+                              bound -> ContainingPackageName(),
+                              bound -> ExternalName());
+                break; // Only report first bound violation
+            }
+        }
+
+        // If no explicit bounds, default bound is Object - all reference types satisfy this
+        // Primitive types cannot be type arguments (enforced elsewhere)
+    }
+
+    // At this point, all type arguments are valid
+    // For type erasure, we continue to use base_type
+    // TODO: In later phase, create and store ParameterizedType instance
+    // ParameterizedType* param_type = new ParameterizedType(base_type, processed_args);
+}
+
+
+//
+// Generate bridge methods for generic method overrides
+//
+// Bridge methods are needed when a method in a subclass overrides a method
+// from a superclass, and the erased signatures differ. This happens with
+// covariant return types in generics.
+//
+// Example:
+//   class Box<T> { T get() {...} }
+//   class StringBox extends Box<String> { String get() {...} }
+//
+// After erasure, Box.get() returns Object, but StringBox.get() returns String.
+// We generate a bridge: Object get() { return (Object)this.get(); }
+//
+void Semantic::GenerateBridgeMethods(TypeSymbol* type)
+{
+    if (! type -> expanded_method_table)
+        return;
+
+    // Iterate through all methods in this type
+    for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = type -> MethodSym(i);
+
+        // Skip constructors, static methods, and private methods
+        if (method -> Identity() == control.init_name_symbol ||
+            method -> ACC_STATIC() ||
+            method -> ACC_PRIVATE())
+        {
+            continue;
+        }
+
+        // Look for overridden methods in superclasses
+        if (! type -> super)
+            continue;
+
+        // Search for method with same name in superclass
+        MethodShadowSymbol* shadow = type -> expanded_method_table ->
+            FindOverloadMethodShadow(method, this, type -> declaration -> identifier_token);
+
+        if (! shadow)
+            continue;
+
+        // Check all overridden methods for signature mismatches
+        for (unsigned j = 0; j < shadow -> NumConflicts(); j++)
+        {
+            MethodSymbol* super_method = shadow -> Conflict(j);
+
+            // Skip if same method or not from superclass
+            if (super_method == method ||
+                ! method -> containing_type -> IsSubclass(super_method -> containing_type))
+            {
+                continue;
+            }
+
+            // Check if erased signatures differ (covariant return type case)
+            if (method -> Type() != super_method -> Type())
+            {
+                // Need bridge method: super_method signature -> method
+                // Create bridge method with super_method's signature
+                MethodSymbol* bridge = new MethodSymbol(method -> Identity());
+                bridge -> SetContainingType(type);
+                bridge -> SetType(super_method -> Type());
+                bridge -> SetFlags(method -> Flags() | AccessFlags::ACCESS_SYNTHETIC | AccessFlags::ACCESS_BRIDGE);
+                bridge -> SetBridgeTarget(method);
+                bridge -> SetBlockSymbol(new BlockSymbol(1)); // Minimal block for bytecode generation
+
+                // Copy parameter types from super_method
+                for (unsigned k = 0; k < super_method -> NumFormalParameters(); k++)
+                {
+                    VariableSymbol* param = super_method -> FormalParameter(k);
+                    VariableSymbol* new_param = new VariableSymbol(param -> Identity());
+                    new_param -> SetType(param -> Type());
+                    new_param -> SetFlags(param -> Flags());
+                    new_param -> SetOwner(bridge);
+                    bridge -> AddFormalParameter(new_param);
+                }
+
+                // Set signature (erased signature from super_method)
+                bridge -> SetSignature(control);
+
+                // Add bridge to method table
+                type -> InsertMethodSymbol(bridge);
+                method -> AddGeneratedBridge(bridge);
+            }
+        }
+    }
 }
 
 
@@ -1397,6 +1784,11 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
     //
     ThisVariable() = NULL;
     ThisMethod() = NULL;
+
+    //
+    // Generate bridge methods for generic covariant overrides
+    //
+    GenerateBridgeMethods(this_type);
 
     //
     // Recursively process all inner types
@@ -2210,11 +2602,23 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
     if (this_type -> ACC_STRICTFP())
         access_flags.SetACC_STRICTFP();
 
+    // Process type parameters for generic constructors
+    // Generic constructors have their own type parameters separate from the class
+    // Example: <T> MyClass(T arg) { ... }
+    MethodSymbol* temp_constructor = NULL;
     if (constructor_declaration -> type_parameters_opt)
     {
-        // TODO: Add generics support for 1.5.
-        ReportSemError(SemanticError::TYPE_PARAMETERS_UNSUPPORTED,
-                       constructor_declaration -> type_parameters_opt);
+        // Create temporary constructor to hold type parameters during processing
+        temp_constructor = new MethodSymbol(control.init_name_symbol);
+        temp_constructor -> SetContainingType(this_type);
+
+        MethodSymbol* saved_method = ThisMethod();
+        ThisMethod() = temp_constructor;
+
+        ProcessMethodTypeParameters(temp_constructor,
+                                    constructor_declaration -> type_parameters_opt);
+
+        ThisMethod() = saved_method;
     }
 
     AstMethodDeclarator* constructor_declarator =
@@ -2322,6 +2726,19 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
         symbol -> SetLocation();
         constructor -> AddFormalParameter(symbol);
     }
+
+    // Transfer type parameters from temp constructor to actual constructor
+    if (temp_constructor && temp_constructor -> NumTypeParameters() > 0)
+    {
+        for (unsigned i = 0; i < temp_constructor -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = temp_constructor -> TypeParameter(i);
+            type_param -> owner = constructor;  // Update owner to actual constructor
+            constructor -> AddTypeParameter(type_param);
+        }
+        delete temp_constructor;  // Clean up temporary
+    }
+
     constructor -> SetSignature(control);
 
     for (unsigned k = 0; k < constructor_declaration -> NumThrows(); k++)
@@ -3323,12 +3740,6 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     if (this_type -> ACC_STRICTFP())
         access_flags.SetACC_STRICTFP();
 
-    if (method_declaration -> type_parameters_opt)
-    {
-        // TODO: Add generics support for 1.5.
-        ReportSemError(SemanticError::TYPE_PARAMETERS_UNSUPPORTED,
-                       method_declaration -> type_parameters_opt);
-    }
     //
     // A method enclosed in an inner type may not be declared static.
     //
@@ -3341,6 +3752,27 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
                        lex_stream -> NameString(method_declaration -> method_declarator -> identifier_token),
                        this_type -> Name(),
                        this_type -> FileLoc());
+    }
+
+    //
+    // For generic methods, we need to process type parameters BEFORE processing
+    // the return type, because the return type might reference the type parameters.
+    // We create a temporary method symbol just for this purpose.
+    //
+    AstMethodDeclarator* method_declarator =
+        method_declaration -> method_declarator;
+    NameSymbol* name_symbol =
+        lex_stream -> NameSymbol(method_declarator -> identifier_token);
+    MethodSymbol* temp_method = new MethodSymbol(name_symbol);
+    temp_method -> SetContainingType(this_type);
+
+    // Temporarily set ThisMethod so type parameter lookup works
+    MethodSymbol* saved_method = ThisMethod();
+    ThisMethod() = temp_method;
+
+    if (method_declaration -> type_parameters_opt)
+    {
+        ProcessMethodTypeParameters(temp_method, method_declaration -> type_parameters_opt);
     }
 
     //
@@ -3357,8 +3789,6 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     ProcessType(method_declaration -> type);
     TypeSymbol* method_type = method_declaration -> type -> symbol;
 
-    AstMethodDeclarator* method_declarator =
-        method_declaration -> method_declarator;
     if (method_declarator -> NumBrackets())
     {
         if (method_type == control.void_type)
@@ -3371,9 +3801,6 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         else ReportSemError(SemanticError::OBSOLESCENT_BRACKETS,
                             method_declarator);
     }
-
-    NameSymbol* name_symbol =
-        lex_stream -> NameSymbol(method_declarator -> identifier_token);
 
     if (name_symbol == this_type -> Identity())
     {
@@ -3402,6 +3829,10 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         new BlockSymbol(method_declarator -> NumFormalParameters());
     block_symbol -> max_variable_index = (access_flags.ACC_STATIC() ? 0 : 1);
     ProcessFormalParameters(block_symbol, method_declarator);
+
+    // Restore previous method context after processing return type and parameters
+    ThisMethod() = saved_method;
+
     if (! deprecated_type && deprecated_method)
         this_type -> ResetDeprecated();
 
@@ -3443,7 +3874,18 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         symbol -> SetLocation();
         method -> AddFormalParameter(symbol);
     }
+    // Transfer type parameters from temp_method to real method
+    for (unsigned i = 0; i < temp_method -> NumTypeParameters(); i++)
+    {
+        TypeParameterSymbol* type_param = temp_method -> TypeParameter(i);
+        type_param -> owner = method;  // Update owner from temp to real method
+        method -> AddTypeParameter(type_param);
+    }
+
     method -> SetSignature(control);
+
+    // Note: temp_method is not deleted to avoid issues with transferred type_parameters
+    // This is a small memory leak but acceptable for compilation phase
 
     for (unsigned k = 0; k < method_declaration -> NumThrows(); k++)
     {
@@ -3615,8 +4057,42 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
     SemanticEnvironment* env = NULL;
     if (state_stack.Size())
         env = state_stack.Top();
+
+    // First check method type parameters if we're in a method context
+    MethodSymbol* current_method = ThisMethod();
+    if (current_method)
+    {
+        for (unsigned i = 0; i < current_method -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = current_method -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+            {
+                // Found a method type parameter - return its erased type
+                TypeSymbol* erased = type_param -> ErasedType();
+                // If unbounded, default to Object
+                return erased ? erased : control.Object();
+            }
+        }
+    }
+
     for ( ; env; env = env -> previous)
     {
+        // Check if this name matches a type parameter of the enclosing type
+        TypeSymbol* enclosing_type = env -> Type();
+        for (unsigned i = 0; i < enclosing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = enclosing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+            {
+                // Found a type parameter - return its erased type
+                // TODO: We should return a Type wrapper with TYPE_PARAMETER kind
+                // For now, just return the erased type to keep things working
+                TypeSymbol* erased = type_param -> ErasedType();
+                // If unbounded, default to Object
+                return erased ? erased : control.Object();
+            }
+        }
+
         // Search for local types, which are always accessible.
         type = env -> symbol_table.FindTypeSymbol(name_symbol);
         if (type)
@@ -3914,8 +4390,31 @@ void Semantic::ProcessType(AstType* type_expr)
     AstWildcard* wildcard_type = actual_type -> WildcardCast();
     if (wildcard_type)
     {
-        ReportSemError(SemanticError::WILDCARD_UNSUPPORTED, type_expr);
-        type_expr -> symbol = control.no_type;
+        // Process wildcard bounds if present
+        if (wildcard_type -> bounds_opt)
+        {
+            ProcessType(wildcard_type -> bounds_opt);
+        }
+
+        // For type erasure, wildcards erase to their upper bound
+        // ? -> Object
+        // ? extends Number -> Number
+        // ? super Integer -> Object
+        TypeSymbol* wildcard_erasure;
+        if (wildcard_type -> extends_token_opt && wildcard_type -> bounds_opt)
+        {
+            // ? extends T -> erases to T
+            wildcard_erasure = wildcard_type -> bounds_opt -> symbol;
+        }
+        else
+        {
+            // ? or ? super T -> erases to Object
+            wildcard_erasure = control.Object();
+        }
+
+        if (array_type)
+            wildcard_erasure = wildcard_erasure -> GetArrayType(this, array_type -> NumBrackets());
+        type_expr -> symbol = wildcard_erasure;
         return;
     }
     assert(name || primitive_type);
@@ -3939,11 +4438,17 @@ void Semantic::ProcessType(AstType* type_expr)
         else type = MustFindType(name -> name);
         if (name -> type_arguments_opt)
         {
-            // TODO: Add generics support for 1.5.
-            ReportSemError(SemanticError::TYPE_ARGUMENTS_UNSUPPORTED,
-                           name -> type_arguments_opt,
-                           type -> ContainingPackageName(),
-                           type -> ExternalName());
+            ProcessTypeArguments(type, name -> type_arguments_opt);
+        }
+        else if (type -> IsGeneric() && control.option.source >= JikesOption::SDK1_5)
+        {
+            // Raw type usage: generic type used without type arguments
+            // This is legal but generates unchecked warnings
+            // Example: List instead of List<String>
+            ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
+                          name,
+                          type -> ContainingPackageName(),
+                          type -> ExternalName());
         }
     }
     if (type -> Bad() && NumErrors() == error_count)

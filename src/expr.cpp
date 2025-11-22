@@ -5033,6 +5033,39 @@ void Semantic::ProcessCastExpression(Ast* expr)
         cast_expression -> symbol = target_type;
         cast_expression -> value = CastValue(target_type,
                                              cast_expression -> expression);
+
+        // Check for unchecked casts to generic types
+        // Unchecked casts occur when casting to a parameterized type,
+        // because type arguments cannot be verified at runtime due to erasure
+        AstTypeName* target_name = cast_expression -> type -> TypeNameCast();
+        if (target_name && target_name -> type_arguments_opt)
+        {
+            // Casting to a parameterized type - this is unchecked
+            // Example: (List<String>) obj
+            if (control.option.source >= JikesOption::SDK1_5)
+            {
+                ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
+                              cast_expression,
+                              source_type -> ContainingPackageName(),
+                              source_type -> ExternalName(),
+                              target_type -> ContainingPackageName(),
+                              target_type -> ExternalName());
+            }
+        }
+        else if (target_type -> IsGeneric() && !target_name)
+        {
+            // Casting to raw generic type from non-generic source
+            // Example: (List) obj where List is generic
+            if (control.option.source >= JikesOption::SDK1_5)
+            {
+                ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
+                              cast_expression,
+                              source_type -> ContainingPackageName(),
+                              source_type -> ExternalName(),
+                              target_type -> ContainingPackageName(),
+                              target_type -> ExternalName());
+            }
+        }
     }
     else
     {
@@ -6629,7 +6662,38 @@ void Semantic::ProcessInstanceofExpression(Ast* expr)
                        left_type -> Name());
         instanceof -> symbol = control.no_type;
     }
-    // can left_type (source) be cast into right_type
+    // Check for illegal instanceof with parameterized types
+    // Due to type erasure, instanceof cannot check type arguments at runtime
+    // Example: obj instanceof List<String> is illegal
+    else if (control.option.source >= JikesOption::SDK1_5)
+    {
+        AstTypeName* type_name = instanceof -> type -> TypeNameCast();
+        if (type_name && type_name -> type_arguments_opt)
+        {
+            // instanceof with parameterized type is illegal due to type erasure
+            // Use instanceof with raw type and cast to parameterized type instead
+            ReportSemError(SemanticError::INVALID_INSTANCEOF_CONVERSION,
+                           instanceof -> type,
+                           left_type -> ContainingPackageName(),
+                           left_type -> ExternalName(),
+                           right_type -> ContainingPackageName(),
+                           right_type -> ExternalName());
+            instanceof -> symbol = control.no_type;
+        }
+        // can left_type (source) be cast into right_type
+        else if (! CanCastConvert(right_type, left_type,
+                                  instanceof -> instanceof_token))
+        {
+            ReportSemError(SemanticError::INVALID_INSTANCEOF_CONVERSION,
+                           expr, left_type -> ContainingPackageName(),
+                           left_type -> ExternalName(),
+                           right_type -> ContainingPackageName(),
+                           right_type -> ExternalName());
+            instanceof -> symbol = control.no_type;
+        }
+        else instanceof -> symbol = control.boolean_type;
+    }
+    // Pre-1.5 behavior
     else if (! CanCastConvert(right_type, left_type,
                               instanceof -> instanceof_token))
     {

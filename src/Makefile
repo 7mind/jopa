@@ -25,7 +25,7 @@ pkglibdir = $(libdir)/jikes
 pkgincludedir = $(includedir)/jikes
 top_builddir = ..
 am__cd = CDPATH="$${ZSH_VERSION+.}$(PATH_SEPARATOR)" && cd
-INSTALL = /usr/bin/install -c
+INSTALL = /nix/store/jbz6j4iwnrvki1zl34hwcyj2i0m6l2y1-coreutils-9.8/bin/install -c
 install_sh_DATA = $(install_sh) -c -m 644
 install_sh_PROGRAM = $(install_sh) -c
 install_sh_SCRIPT = $(install_sh) -c
@@ -83,10 +83,10 @@ am_jikes_OBJECTS = ast.$(OBJEXT) body.$(OBJEXT) bytecode.$(OBJEXT) \
 	incrmnt.$(OBJEXT) init.$(OBJEXT) javaact.$(OBJEXT) \
 	jikes.$(OBJEXT) jikesapi.$(OBJEXT) long.$(OBJEXT) \
 	lookup.$(OBJEXT) lpginput.$(OBJEXT) modifier.$(OBJEXT) \
-	op.$(OBJEXT) option.$(OBJEXT) parser.$(OBJEXT) \
+	op.$(OBJEXT) option.$(OBJEXT) paramtype.$(OBJEXT) parser.$(OBJEXT) \
 	platform.$(OBJEXT) scanner.$(OBJEXT) segment.$(OBJEXT) \
 	set.$(OBJEXT) stream.$(OBJEXT) symbol.$(OBJEXT) \
-	system.$(OBJEXT) tab.$(OBJEXT) unparse.$(OBJEXT) \
+	system.$(OBJEXT) tab.$(OBJEXT) typeparam.$(OBJEXT) unparse.$(OBJEXT) \
 	unzip.$(OBJEXT) zip.$(OBJEXT)
 jikes_OBJECTS = $(am_jikes_OBJECTS)
 jikes_LDADD = $(LDADD)
@@ -124,19 +124,19 @@ HEADERS = $(include_HEADERS) $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/dshields/jikes/missing --run aclocal-1.8
+ACLOCAL = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run aclocal-1.8
 AMDEP_FALSE = #
 AMDEP_TRUE = 
-AMTAR = ${SHELL} /home/dshields/jikes/missing --run tar
-AUTOCONF = ${SHELL} /home/dshields/jikes/missing --run autoconf
-AUTOHEADER = ${SHELL} /home/dshields/jikes/missing --run autoheader
-AUTOMAKE = ${SHELL} /home/dshields/jikes/missing --run automake-1.8
+AMTAR = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run tar
+AUTOCONF = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run autoconf
+AUTOHEADER = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run autoheader
+AUTOMAKE = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run automake-1.8
 AWK = gawk
 CPPFLAGS = 
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
-CXXFLAGS = -g -O2
+CXXFLAGS = -g -O0 -Wall -Wextra
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -157,7 +157,7 @@ LTLIBOBJS =
 MAINT = #
 MAINTAINER_MODE_FALSE = 
 MAINTAINER_MODE_TRUE = #
-MAKEINFO = ${SHELL} /home/dshields/jikes/missing --run makeinfo
+MAKEINFO = ${SHELL} /home/pavel/work/jexpl/jikes/missing --run makeinfo
 OBJEXT = o
 PACKAGE = jikes
 PACKAGE_BUGREPORT = 
@@ -167,11 +167,11 @@ PACKAGE_TARNAME = jikes
 PACKAGE_VERSION = 1.22
 PATH_SEPARATOR = :
 SET_MAKE = 
-SHELL = /bin/sh
+SHELL = /nix/store/qsydfxm1vq6q9jac2kq3r8kn0xdmsldf-bash-5.3p3/bin/bash
 STRIP = strip
-TOUCH = /usr/bin/touch
+TOUCH = /nix/store/jbz6j4iwnrvki1zl34hwcyj2i0m6l2y1-coreutils-9.8/bin/touch
 VERSION = 1.22
-ac_ct_CXX = g++
+ac_ct_CXX = 
 ac_ct_STRIP = strip
 am__fastdepCXX_FALSE = #
 am__fastdepCXX_TRUE = 
@@ -193,14 +193,14 @@ host_os = linux-gnu
 host_vendor = unknown
 includedir = ${prefix}/include
 infodir = ${prefix}/info
-install_sh = /home/dshields/jikes/install-sh
+install_sh = /home/pavel/work/jexpl/jikes/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localstatedir = ${prefix}/var
 mandir = ${prefix}/man
 mkdir_p = mkdir -p -- .
 oldincludedir = /usr/include
-prefix = /usr/local
+prefix = /home/pavel/work/jexpl/jikes-install
 program_transform_name = s,x,x,
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com

@@ -10,3 +10,85 @@
 *.lai
 *.la
 *.a
+
+# Build artifacts
+.libs/
+.deps/
+src/jikes
+jikes
+
+# Compiled Java classes
+*.class
+
+# Autotools generated files
+/autom4te.cache/
+/config.h
+/config.h.in~
+/config.log
+/config.status
+/configure~
+/stamp-h1
+Makefile
+Makefile.in
+.dirstamp
+
+# Libtool
+libtool
+
+# Editor and IDE files
+*~
+*.swp
+*.swo
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+*.kate-swp
+
+# Test output
+test-generics/*.class
+test-generics/runtime-classes/
+
+# Documentation builds
+*.pdf
+*.aux
+*.log
+*.toc
+
+# Backup files
+*.bak
+*.orig
+
+# Compiled binaries
+*.exe
+*.out
+
+# Core dumps
+core
+core.*
+
+# Debugging
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# OS-specific
+.directory
+*.dylib
+*.dll
+
+# Package files
+*.tar.gz
+*.tgz
+*.zip
+*.jar
+
+# Nix
+result
+result-*
+
+# Local environment
+.env
+.envrc.local

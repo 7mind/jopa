@@ -29,6 +29,11 @@ class SymbolSet;
 class SymbolMap;
 class Zip;
 
+// Forward declarations for generics support
+class TypeParameterSymbol;
+class ParameterizedType;
+class Type;
+
 template <typename Key, typename Value>
 class Map;
 
@@ -474,6 +479,10 @@ public:
         , formal_parameters(NULL)
         , throws(NULL)
         , throws_signatures(NULL)
+        , type_parameters(NULL)
+        , generic_signature(NULL)
+        , bridge_target(NULL)
+        , bridges_generated(NULL)
     {
         Symbol::_kind = METHOD;
     }
@@ -618,6 +627,99 @@ private:
     Tuple<VariableSymbol*>* formal_parameters;
     Tuple<TypeSymbol*>* throws;
     Tuple<char*>* throws_signatures;
+
+    //
+    // GENERICS SUPPORT - NEW FIELDS
+    //
+
+    // Type parameters declared on this method (e.g., <T, E>)
+    // For method <T> T identity(T arg), this contains the type parameter T
+    Tuple<TypeParameterSymbol*>* type_parameters;
+
+    // Generic signature for Signature attribute in class file
+    // Example: <T:Ljava/lang/Object;>(TT;)TT;
+    Utf8LiteralValue* generic_signature;
+
+    // If this is a bridge method, points to the target method
+    MethodSymbol* bridge_target;
+
+    // Bridge methods generated for this method
+    Tuple<MethodSymbol*>* bridges_generated;
+
+public:
+    //
+    // GENERICS SUPPORT - PUBLIC METHODS
+    //
+
+    // Get the number of type parameters
+    unsigned NumTypeParameters() const
+    {
+        return type_parameters ? type_parameters -> Length() : 0;
+    }
+
+    // Get the i-th type parameter
+    TypeParameterSymbol* TypeParameter(unsigned i) const
+    {
+        assert(type_parameters && i < type_parameters -> Length());
+        return (*type_parameters)[i];
+    }
+
+    // Add a type parameter to this method
+    void AddTypeParameter(TypeParameterSymbol* param)
+    {
+        if (! type_parameters)
+            type_parameters = new Tuple<TypeParameterSymbol*>(4);
+        type_parameters -> Next() = param;
+    }
+
+    // Check if this method is generic
+    bool IsGenericMethod() const
+    {
+        return type_parameters && type_parameters -> Length() > 0;
+    }
+
+    // Check if this is a bridge method
+    bool IsBridge() const { return bridge_target != NULL; }
+
+    // Get the bridge target
+    MethodSymbol* BridgeTarget() const { return bridge_target; }
+
+    // Set as a bridge method
+    void SetBridgeTarget(MethodSymbol* target) { bridge_target = target; }
+
+    // Add a generated bridge method
+    void AddGeneratedBridge(MethodSymbol* bridge)
+    {
+        if (! bridges_generated)
+            bridges_generated = new Tuple<MethodSymbol*>(4);
+        bridges_generated -> Next() = bridge;
+    }
+
+    // Get number of generated bridge methods
+    unsigned NumGeneratedBridges() const
+    {
+        return bridges_generated ? bridges_generated -> Length() : 0;
+    }
+
+    // Get the i-th generated bridge
+    MethodSymbol* GeneratedBridge(unsigned i) const
+    {
+        assert(bridges_generated && i < bridges_generated -> Length());
+        return (*bridges_generated)[i];
+    }
+
+    // Set the generic signature for Signature attribute
+    void SetGenericSignature(Control&);
+    void SetGenericSignature(Utf8LiteralValue* sig) { generic_signature = sig; }
+
+    // Get the generic signature as Utf8LiteralValue
+    Utf8LiteralValue* GenericSignature() const { return generic_signature; }
+
+    // Get the generic signature string
+    const char* GenericSignatureString() const
+    {
+        return generic_signature ? generic_signature -> value : NULL;
+    }
 };
 
 
@@ -1353,6 +1455,80 @@ private:
         if (! array)
             array = new Tuple<TypeSymbol*>(4);
         array -> Next() = type_symbol;
+    }
+
+    //
+    // GENERICS SUPPORT - NEW FIELDS
+    //
+
+    // Type parameters declared on this type (e.g., <T, E, K>)
+    // For class List<T>, this contains the type parameter T
+    Tuple<TypeParameterSymbol*>* type_parameters;
+
+    // If this is a parameterized type (e.g., List<String>), this points
+    // to the ParameterizedType representation. NULL for raw types.
+    ParameterizedType* parameterized_type;
+
+    // Generic signature for Signature attribute in class file
+    // Example: <T:Ljava/lang/Object;>Ljava/lang/Object;
+    Utf8LiteralValue* generic_signature;
+
+    // Flag indicating whether this type is generic (has type parameters)
+    bool is_generic;
+
+public:
+    //
+    // GENERICS SUPPORT - PUBLIC METHODS
+    //
+
+    // Get the number of type parameters
+    unsigned NumTypeParameters() const
+    {
+        return type_parameters ? type_parameters -> Length() : 0;
+    }
+
+    // Get the i-th type parameter
+    TypeParameterSymbol* TypeParameter(unsigned i) const
+    {
+        assert(type_parameters && i < type_parameters -> Length());
+        return (*type_parameters)[i];
+    }
+
+    // Add a type parameter to this type
+    void AddTypeParameter(TypeParameterSymbol* param)
+    {
+        if (! type_parameters)
+            type_parameters = new Tuple<TypeParameterSymbol*>(4);
+        type_parameters -> Next() = param;
+        is_generic = true;
+    }
+
+    // Check if this type is generic (has type parameters)
+    bool IsGeneric() const { return is_generic; }
+
+    // Check if this is a parameterized type (e.g., List<String>)
+    bool IsParameterized() const { return parameterized_type != NULL; }
+
+    // Check if this is a raw type (generic type used without type arguments)
+    bool IsRawType() const
+    {
+        return is_generic && ! IsParameterized();
+    }
+
+    // Get the erased type (for parameterized types, returns the raw type)
+    TypeSymbol* Erasure();
+
+    // Set the generic signature for Signature attribute
+    void SetGenericSignature(Control&);
+    void SetGenericSignature(Utf8LiteralValue* sig) { generic_signature = sig; }
+
+    // Get the generic signature as Utf8LiteralValue
+    Utf8LiteralValue* GenericSignature() const { return generic_signature; }
+
+    // Get the generic signature string
+    const char* GenericSignatureString() const
+    {
+        return generic_signature ? generic_signature -> value : NULL;
     }
 };
 

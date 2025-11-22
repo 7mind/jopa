@@ -18,6 +18,7 @@ class BlockSymbol;
 class VariableSymbol;
 class MethodSymbol;
 class TypeSymbol;
+class TypeParameterSymbol;
 class StoragePool;
 struct CaseElement;
 
@@ -1728,12 +1729,14 @@ class AstTypeParameter : public Ast
 public:
     TokenIndex identifier_token;
 
-    TypeSymbol* symbol;
+    // Changed from TypeSymbol* to TypeParameterSymbol* for generics support
+    TypeParameterSymbol* symbol;
 
     inline AstTypeParameter(StoragePool* p, TokenIndex token)
         : Ast(TYPE_PARAM)
         , pool(p)
         , identifier_token(token)
+        , symbol(NULL)
     {}
     ~AstTypeParameter() {}
 

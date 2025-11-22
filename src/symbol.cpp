@@ -8,6 +8,8 @@
 #include "set.h"
 #include "case.h"
 #include "option.h"
+#include "paramtype.h"
+#include "typeparam.h"
 
 #ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
@@ -449,6 +451,71 @@ void TypeSymbol::SetSignature(Control& control)
 }
 
 
+//
+// Generate the generic signature for a generic class (Signature attribute)
+// Format: TypeParameters? SuperclassSignature SuperinterfaceSignature*
+//
+void TypeSymbol::SetGenericSignature(Control& control)
+{
+    // Only generic types need a signature attribute
+    if (! IsGeneric())
+        return;
+
+    // Estimate size: type parameters + super + interfaces
+    unsigned estimated_size = 1000;  // Conservative estimate
+    char* buffer = new char[estimated_size];
+    unsigned length = 0;
+
+    // Add type parameters if present: <T:Ljava/lang/Object;>
+    if (NumTypeParameters() > 0)
+    {
+        buffer[length++] = '<';
+        for (unsigned i = 0; i < NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = TypeParameter(i);
+            type_param -> GenerateSignature(control);
+            const char* param_sig = type_param -> signature_string;
+            unsigned param_len = type_param -> signature_length;
+            for (unsigned j = 0; j < param_len; j++)
+                buffer[length++] = param_sig[j];
+        }
+        buffer[length++] = '>';
+    }
+
+    // Add superclass signature
+    if (super)
+    {
+        const char* super_sig = super -> SignatureString();
+        unsigned super_len = strlen(super_sig);
+        for (unsigned i = 0; i < super_len; i++)
+            buffer[length++] = super_sig[i];
+    }
+    else
+    {
+        // If no super (e.g., Object or interface), use java/lang/Object
+        const char* object_sig = "Ljava/lang/Object;";
+        unsigned object_len = strlen(object_sig);
+        for (unsigned i = 0; i < object_len; i++)
+            buffer[length++] = object_sig[i];
+    }
+
+    // Add interface signatures
+    for (unsigned i = 0; i < NumInterfaces(); i++)
+    {
+        TypeSymbol* interface = Interface(i);
+        const char* interface_sig = interface -> SignatureString();
+        unsigned interface_len = strlen(interface_sig);
+        for (unsigned j = 0; j < interface_len; j++)
+            buffer[length++] = interface_sig[j];
+    }
+
+    // Null terminate and store
+    buffer[length] = '\0';
+    generic_signature = control.Utf8_pool.FindOrInsert(buffer, length);
+    delete [] buffer;
+}
+
+
 unsigned SymbolTable::primes[] = {DEFAULT_HASH_SIZE, 101, 401, MAX_HASH_SIZE};
 
 void SymbolTable::Rehash()
@@ -623,7 +690,11 @@ TypeSymbol::TypeSymbol(const NameSymbol* name_symbol_)
     nested_types(NULL),
     interfaces(NULL),
     anonymous_types(NULL),
-    array(NULL)
+    array(NULL),
+    type_parameters(NULL),
+    parameterized_type(NULL),
+    generic_signature(NULL),
+    is_generic(false)
 {
     Symbol::_kind = TYPE;
 }
@@ -631,6 +702,14 @@ TypeSymbol::TypeSymbol(const NameSymbol* name_symbol_)
 unsigned TypeSymbol::NumLocalTypes()
 {
     return local ? local -> Size() : 0;
+}
+
+//
+// Get the erased type for this TypeSymbol
+//
+TypeSymbol* TypeSymbol::Erasure()
+{
+    return parameterized_type ? parameterized_type -> Erasure() : this;
 }
 
 
@@ -671,6 +750,15 @@ TypeSymbol::~TypeSymbol()
     delete interfaces;
     delete anonymous_types;
     delete array;
+
+    // Cleanup generics support fields
+    if (type_parameters)
+    {
+        for (i = 0; i < type_parameters -> Length(); i++)
+            delete (*type_parameters)[i];
+        delete type_parameters;
+    }
+    delete parameterized_type;
 }
 
 
@@ -703,6 +791,15 @@ MethodSymbol::~MethodSymbol()
 
     delete block_symbol; // overload(s)
     delete [] header;
+
+    // Cleanup generics support fields
+    if (type_parameters)
+    {
+        for (unsigned i = 0; i < type_parameters -> Length(); i++)
+            delete (*type_parameters)[i];
+        delete type_parameters;
+    }
+    delete bridges_generated;
 }
 
 
@@ -1252,6 +1349,73 @@ void MethodSymbol::SetSignature(Control& control, TypeSymbol* placeholder)
     signature = control.Utf8_pool.FindOrInsert(method_signature, len);
 
     delete [] method_signature;
+}
+
+
+//
+// Generate the generic signature for a generic method (Signature attribute)
+// Format: TypeParameters? (TypeSignature*) ReturnDescriptor ThrowsSignature*
+//
+void MethodSymbol::SetGenericSignature(Control& control)
+{
+    // Only generic methods or methods with generic return/param types need signature
+    if (NumTypeParameters() == 0)
+        return;  // For now, only handle methods with type parameters
+
+    // Estimate size: type parameters + parameters + return type
+    unsigned estimated_size = 500;
+    char* buffer = new char[estimated_size];
+    unsigned length = 0;
+
+    // Add type parameters if present: <T:Ljava/lang/Object;>
+    if (NumTypeParameters() > 0)
+    {
+        buffer[length++] = '<';
+        for (unsigned i = 0; i < NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = TypeParameter(i);
+            type_param -> GenerateSignature(control);
+            const char* param_sig = type_param -> signature_string;
+            unsigned param_len = type_param -> signature_length;
+            for (unsigned j = 0; j < param_len; j++)
+                buffer[length++] = param_sig[j];
+        }
+        buffer[length++] = '>';
+    }
+
+    // Add parameter types: (TypeSignature*)
+    buffer[length++] = '(';
+    for (unsigned i = 0; i < NumFormalParameters(); i++)
+    {
+        TypeSymbol* param_type = FormalParameter(i) -> Type();
+        const char* param_sig = param_type -> SignatureString();
+        unsigned param_len = strlen(param_sig);
+        for (unsigned j = 0; j < param_len; j++)
+            buffer[length++] = param_sig[j];
+    }
+    buffer[length++] = ')';
+
+    // Add return type
+    bool is_constructor = Identity() == control.init_name_symbol;
+    if (is_constructor)
+    {
+        buffer[length++] = 'V';
+    }
+    else
+    {
+        TypeSymbol* return_type = Type();
+        const char* return_sig = return_type -> SignatureString();
+        unsigned return_len = strlen(return_sig);
+        for (unsigned i = 0; i < return_len; i++)
+            buffer[length++] = return_sig[i];
+    }
+
+    // TODO: Add throws signatures
+
+    // Null terminate and store
+    buffer[length] = '\0';
+    generic_signature = control.Utf8_pool.FindOrInsert(buffer, length);
+    delete [] buffer;
 }
 
 
