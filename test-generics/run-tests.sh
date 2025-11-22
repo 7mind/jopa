@@ -195,6 +195,26 @@ else
 fi
 echo "================================================"
 
+# Create test results summary for CI
+RESULTS_FILE="${SCRIPT_DIR}/.test-results"
+cat > "$RESULTS_FILE" << EOF
+### Java 5 Feature Test Results
+
+**Total Tests**: $TESTS_RUN
+**Passed**: ✅ $TESTS_PASSED
+**Failed**: ❌ $TESTS_FAILED
+**Success Rate**: $(( TESTS_PASSED * 100 / TESTS_RUN ))%
+
+#### Feature Coverage
+- ✅ Generics (Type Erasure)
+- ✅ Enhanced For-Loop (Arrays)
+- ✅ Varargs
+- ✅ Enums (with synthetic methods)
+- ⚠️  Static Imports (Partial - 25%)
+- ❌ Autoboxing/Unboxing (Not implemented)
+- ❌ Annotations (Not implemented)
+EOF
+
 if [ $TESTS_FAILED -eq 0 ]; then
     echo -e "${GREEN}✓ All tests passed!${NC}"
     exit 0

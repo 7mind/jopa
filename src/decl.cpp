@@ -4152,6 +4152,170 @@ TypeSymbol* Semantic::FindPrimitiveType(AstPrimitiveType* primitive_type)
 
 
 //
+// Return the wrapper type for a primitive type, or NULL if not primitive.
+// Used for autoboxing conversions (JSR 201).
+//
+TypeSymbol* Semantic::GetWrapperType(TypeSymbol* type)
+{
+    if (!type || !type -> Primitive())
+        return NULL;
+
+    if (type == control.int_type)
+        return control.Integer();
+    if (type == control.boolean_type)
+        return control.Boolean();
+    if (type == control.byte_type)
+        return control.Byte();
+    if (type == control.char_type)
+        return control.Character();
+    if (type == control.short_type)
+        return control.Short();
+    if (type == control.long_type)
+        return control.Long();
+    if (type == control.float_type)
+        return control.Float();
+    if (type == control.double_type)
+        return control.Double();
+
+    return NULL;
+}
+
+
+//
+// Return the primitive type for a wrapper type, or NULL if not a wrapper.
+// Used for unboxing conversions (JSR 201).
+//
+TypeSymbol* Semantic::GetPrimitiveType(TypeSymbol* type)
+{
+    if (!type)
+        return NULL;
+
+    if (type == control.Integer())
+        return control.int_type;
+    if (type == control.Boolean())
+        return control.boolean_type;
+    if (type == control.Byte())
+        return control.byte_type;
+    if (type == control.Character())
+        return control.char_type;
+    if (type == control.Short())
+        return control.short_type;
+    if (type == control.Long())
+        return control.long_type;
+    if (type == control.Float())
+        return control.float_type;
+    if (type == control.Double())
+        return control.double_type;
+
+    return NULL;
+}
+
+
+//
+// Check if a boxing conversion exists from source to target type.
+// Boxing: primitive → wrapper (e.g., int → Integer)
+//
+bool Semantic::IsBoxingConversion(TypeSymbol* source, TypeSymbol* target)
+{
+    if (!source || !target)
+        return false;
+
+    return source -> Primitive() && GetWrapperType(source) == target;
+}
+
+
+//
+// Check if an unboxing conversion exists from source to target type.
+// Unboxing: wrapper → primitive (e.g., Integer → int)
+//
+bool Semantic::IsUnboxingConversion(TypeSymbol* source, TypeSymbol* target)
+{
+    if (!source || !target)
+        return false;
+
+    return target -> Primitive() && GetPrimitiveType(source) == target;
+}
+
+
+//
+// Get the valueOf(primitive) method for boxing a primitive type.
+// Returns the static valueOf method from the wrapper class.
+//
+MethodSymbol* Semantic::GetBoxingMethod(TypeSymbol* primitive_type)
+{
+    TypeSymbol* wrapper_type = GetWrapperType(primitive_type);
+    if (!wrapper_type)
+        return NULL;
+
+    // Find valueOf(primitive) method
+    NameSymbol* valueOf_name = control.FindOrInsertName(L"valueOf", 7);
+
+    for (unsigned i = 0; i < wrapper_type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = wrapper_type -> MethodSym(i);
+        if (method -> Identity() == valueOf_name &&
+            method -> ACC_STATIC() &&
+            method -> NumFormalParameters() == 1 &&
+            method -> FormalParameter(0) -> Type() == primitive_type)
+        {
+            return method;
+        }
+    }
+
+    return NULL;
+}
+
+
+//
+// Get the primitiveValue() method for unboxing a wrapper type.
+// Returns the instance method that extracts the primitive value.
+//
+MethodSymbol* Semantic::GetUnboxingMethod(TypeSymbol* wrapper_type)
+{
+    TypeSymbol* primitive_type = GetPrimitiveType(wrapper_type);
+    if (!primitive_type)
+        return NULL;
+
+    // Determine the method name (e.g., intValue, booleanValue)
+    const wchar_t* method_name = NULL;
+    if (primitive_type == control.int_type)
+        method_name = L"intValue";
+    else if (primitive_type == control.boolean_type)
+        method_name = L"booleanValue";
+    else if (primitive_type == control.byte_type)
+        method_name = L"byteValue";
+    else if (primitive_type == control.char_type)
+        method_name = L"charValue";
+    else if (primitive_type == control.short_type)
+        method_name = L"shortValue";
+    else if (primitive_type == control.long_type)
+        method_name = L"longValue";
+    else if (primitive_type == control.float_type)
+        method_name = L"floatValue";
+    else if (primitive_type == control.double_type)
+        method_name = L"doubleValue";
+    else
+        return NULL;
+
+    NameSymbol* unbox_name = control.FindOrInsertName(method_name, wcslen(method_name));
+
+    for (unsigned i = 0; i < wrapper_type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = wrapper_type -> MethodSym(i);
+        if (method -> Identity() == unbox_name &&
+            !method -> ACC_STATIC() &&
+            method -> NumFormalParameters() == 0 &&
+            method -> Type() == primitive_type)
+        {
+            return method;
+        }
+    }
+
+    return NULL;
+}
+
+
+//
 // Search the import-on-demand locations for a type with the given name. This
 // returns inaccessible types if found, with no error message, but favors
 // accessible ones. It will issue an error if the only way an accessible type

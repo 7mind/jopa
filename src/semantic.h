@@ -1006,6 +1006,14 @@ private:
     TypeSymbol* MustFindType(AstName*);
     void ProcessType(AstType*);
 
+    // Boxing/Unboxing utilities for Java 5 autoboxing
+    TypeSymbol* GetWrapperType(TypeSymbol*);
+    TypeSymbol* GetPrimitiveType(TypeSymbol*);
+    bool IsBoxingConversion(TypeSymbol*, TypeSymbol*);
+    bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
+    MethodSymbol* GetBoxingMethod(TypeSymbol*);
+    MethodSymbol* GetUnboxingMethod(TypeSymbol*);
+
     // Implemented in decl.cpp - process initializers
     void InitializeVariable(AstFieldDeclaration*, MethodSymbol*);
     void ProcessInitializer(AstInitializerDeclaration*, MethodSymbol*);

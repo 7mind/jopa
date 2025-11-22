@@ -4719,8 +4719,23 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
 bool Semantic::CanAssignmentConvertReference(const TypeSymbol* target_type,
                                              const TypeSymbol* source_type)
 {
-    return target_type == control.no_type ||
-        CanMethodInvocationConvert(target_type, source_type);
+    if (target_type == control.no_type)
+        return true;
+
+    if (CanMethodInvocationConvert(target_type, source_type))
+        return true;
+
+    // Java 5: Boxing conversion (primitive → wrapper)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+        return true;
+
+    // Java 5: Unboxing conversion (wrapper → primitive)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+        return true;
+
+    return false;
 }
 
 
@@ -4732,10 +4747,28 @@ bool Semantic::CanAssignmentConvertReference(const TypeSymbol* target_type,
 bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
                                     AstExpression* expr)
 {
-    return target_type == control.no_type ||
-        expr -> symbol == control.no_type ||
-        CanMethodInvocationConvert(target_type, expr -> Type()) ||
-        IsIntValueRepresentableInType(expr, target_type);
+    if (target_type == control.no_type || expr -> symbol == control.no_type)
+        return true;
+
+    TypeSymbol* source_type = expr -> Type();
+
+    if (CanMethodInvocationConvert(target_type, source_type))
+        return true;
+
+    if (IsIntValueRepresentableInType(expr, target_type))
+        return true;
+
+    // Java 5: Boxing conversion (primitive → wrapper)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+        return true;
+
+    // Java 5: Unboxing conversion (wrapper → primitive)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+        return true;
+
+    return false;
 }
 
 
@@ -4844,6 +4877,14 @@ LiteralValue* Semantic::CastValue(const TypeSymbol* target_type,
     }
     if (source_type == control.String())
         return NULL; // A string cast to a supertype is not constant.
+
+    // Java 5: Boxing/unboxing conversions are not constant expressions
+    if (control.option.source >= JikesOption::SDK1_5)
+    {
+        if (IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type) ||
+            IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+            return NULL;
+    }
 
     LiteralValue* literal_value = NULL;
     if (target_type == control.String())
