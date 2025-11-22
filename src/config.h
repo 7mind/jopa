@@ -8,7 +8,7 @@ Copyright (C) 1996, 2004 IBM Corporation and others.  All Rights Reserved.
 You must accept the terms of that agreement to use this software. */
 
 /* Define as nonzero to enable experimental `-source 1.5' features. */
-#define ENABLE_SOURCE_15 0
+#define ENABLE_SOURCE_15 1
 
 /* Defined when the compiler supports 64 bit integer math */
 #define HAVE_64BIT_TYPES 1

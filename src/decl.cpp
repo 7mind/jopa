@@ -3707,8 +3707,7 @@ void Semantic::ProcessFormalParameters(BlockSymbol* block,
             assert(i == method_declarator -> NumFormalParameters() - 1);
             dims++;
             access_flags.SetACC_VARARGS();
-            // TODO: Add varargs support for 1.5.
-            //            if (control.option.source < JikesOption::SDK1_5)
+            if (control.option.source < JikesOption::SDK1_5)
             {
                 ReportSemError(SemanticError::VARARGS_UNSUPPORTED,
                                parameter -> ellipsis_token_opt);
