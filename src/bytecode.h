@@ -888,6 +888,8 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
     int GenerateClassAccess(AstClassLiteral*, bool);
     void GenerateClassAccessMethod();
     void GenerateBridgeMethod(MethodSymbol*);
+    void GenerateEnumValuesMethod();
+    void GenerateEnumValueOfMethod();
     void GenerateAssertVariableInitializer(TypeSymbol*, VariableSymbol*);
     void EmitCheckForNull(AstExpression* expr, bool = true);
 

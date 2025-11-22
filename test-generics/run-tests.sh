@@ -56,6 +56,23 @@ compile_test() {
     fi
 }
 
+# Function to compile multiple files together
+compile_multi() {
+    local files="$@"
+    local test_name=$(basename "$1" .java)
+
+    echo -n "  Compiling $test_name... "
+    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME" -d "$OUTPUT" $files 2>&1 > /tmp/jikes_compile_$$.log; then
+        echo -e "${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}    Compilation failed:${NC}"
+        cat /tmp/jikes_compile_$$.log | sed 's/^/    /'
+        return 1
+    fi
+}
+
 # Function to run a test class
 run_test() {
     local test_class="$1"
@@ -130,8 +147,23 @@ echo ""
 
 # Run tests
 echo -e "${BLUE}=== Testing Enums ===${NC}"
-test_compile_and_run "${SCRIPT_DIR}/ColorTest.java" "ColorTest" || true
 test_compile_only "${SCRIPT_DIR}/Color.java" || true
+test_compile_and_run "${SCRIPT_DIR}/ColorTest.java" "ColorTest" || true
+# EnumMethodsTest needs to be compiled with Color.java to access synthetic methods
+echo -e "${CYAN}Testing: EnumMethodsTest (compile + run)${NC}"
+TESTS_RUN=$((TESTS_RUN + 1))
+if compile_multi "${SCRIPT_DIR}/Color.java" "${SCRIPT_DIR}/EnumMethodsTest.java"; then
+    if run_test "EnumMethodsTest"; then
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+        echo ""
+    else
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        echo ""
+    fi
+else
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    echo ""
+fi
 
 echo -e "${BLUE}=== Testing Varargs ===${NC}"
 test_compile_and_run "${SCRIPT_DIR}/VarargsTest.java" "VarargsTest" || true

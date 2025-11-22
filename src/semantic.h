@@ -991,6 +991,7 @@ private:
 
     // Implemented in decl.cpp - process declarations
     void AddDefaultConstructor(TypeSymbol*);
+    void AddEnumSyntheticMethods(TypeSymbol*);
     void ProcessConstructorDeclaration(AstConstructorDeclaration*);
     void ProcessMethodDeclaration(AstMethodDeclaration*);
     void ProcessFieldDeclaration(AstFieldDeclaration*);

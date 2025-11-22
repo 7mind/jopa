@@ -156,6 +156,40 @@ void ByteCode::GenerateCode()
     }
 
     //
+    // Generate enum synthetic methods (values(), valueOf())
+    //
+    if (unit_type -> IsEnum())
+    {
+        // Find values() method
+        NameSymbol* values_name = control.FindOrInsertName(L"values", 6);
+        MethodSymbol* values_method = unit_type -> FindMethodSymbol(values_name);
+        if (values_method)
+        {
+            int method_index = methods.NextIndex();
+            BeginMethod(method_index, values_method);
+            GenerateEnumValuesMethod();
+            EndMethod(method_index, values_method);
+        }
+
+        // Find valueOf(String) method
+        NameSymbol* valueOf_name = control.FindOrInsertName(L"valueOf", 7);
+        for (i = 0; i < unit_type -> NumMethodSymbols(); i++)
+        {
+            MethodSymbol* method = unit_type -> MethodSym(i);
+            if (method -> Identity() == valueOf_name &&
+                method -> NumFormalParameters() == 1 &&
+                method -> FormalParameter(0) -> Type() == control.String())
+            {
+                int method_index = methods.NextIndex();
+                BeginMethod(method_index, method);
+                GenerateEnumValueOfMethod();
+                EndMethod(method_index, method);
+                break;
+            }
+        }
+    }
+
+    //
     // Process the instance initializer.
     //
     bool has_instance_initializer = false;
@@ -3685,6 +3719,124 @@ void ByteCode::GenerateBridgeMethod(MethodSymbol* bridge)
         // No explicit cast needed - the JVM handles covariant returns
         PutOp(OP_ARETURN);
     }
+}
+
+
+//
+// Generate enum values() method:
+// public static EnumType[] values() {
+//     EnumType[] arr = new EnumType[N];
+//     arr[0] = CONSTANT0;
+//     arr[1] = CONSTANT1;
+//     ...
+//     return arr;
+// }
+//
+void ByteCode::GenerateEnumValuesMethod()
+{
+    line_number_table_attribute -> AddLineNumber(0, 0);
+
+    // Find enum declaration to get enum constants
+    AstClassBody* class_body = unit_type -> declaration;
+    if (!class_body || !class_body -> owner)
+    {
+        PutOp(OP_ACONST_NULL);  // Auto-tracked: +1
+        PutOp(OP_ARETURN);       // Auto-tracked: -1
+        return;
+    }
+
+    AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
+    if (!enum_decl)
+    {
+        PutOp(OP_ACONST_NULL);  // Auto-tracked: +1
+        PutOp(OP_ARETURN);       // Auto-tracked: -1
+        return;
+    }
+
+    unsigned num_constants = enum_decl -> NumEnumConstants();
+
+    // Create array: new EnumType[N]
+    LoadImmediateInteger(num_constants);  // Auto-tracked: +1
+    PutOp(OP_ANEWARRAY);  // Auto-tracked: 0 (pops 1, pushes 1)
+    PutU2(RegisterClass(unit_type));
+
+    // Populate array with enum constants
+    for (unsigned i = 0; i < num_constants; i++)
+    {
+        AstEnumConstant* enum_constant = enum_decl -> EnumConstant(i);
+        VariableSymbol* field = enum_constant -> field_symbol;
+
+        if (field)
+        {
+            PutOp(OP_DUP);  // Auto-tracked: +1
+            LoadImmediateInteger(i);  // Auto-tracked: +1
+            PutOp(OP_GETSTATIC);  // Auto-tracked: +1
+            PutU2(RegisterFieldref(field));
+            PutOp(OP_AASTORE);  // Auto-tracked: -3
+        }
+    }
+
+    // Stack now has just the array
+    PutOp(OP_ARETURN);  // Auto-tracked: -1
+}
+
+
+//
+// Generate enum valueOf(String) method:
+// public static EnumType valueOf(String name) {
+//     return (EnumType) Enum.valueOf(EnumType.class, name);
+// }
+//
+void ByteCode::GenerateEnumValueOfMethod()
+{
+    line_number_table_attribute -> AddLineNumber(0, 0);
+
+    // ldc EnumType.class (load class literal)
+    LoadConstantAtIndex(RegisterClass(unit_type));  // Auto-tracked: +1
+
+    // aload_0 (load String parameter)
+    PutOp(OP_ALOAD_0);  // Auto-tracked: +1
+
+    // invokestatic Enum.valueOf(Class, String)
+    TypeSymbol* enum_class = control.Enum();
+    NameSymbol* valueOf_name = control.FindOrInsertName(L"valueOf", 7);
+
+    // Find valueOf method in Enum class
+    MethodSymbol* enum_valueOf = NULL;
+    for (unsigned i = 0; i < enum_class -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = enum_class -> MethodSym(i);
+        if (method -> Identity() == valueOf_name &&
+            method -> NumFormalParameters() == 2 &&
+            method -> ACC_STATIC())
+        {
+            enum_valueOf = method;
+            break;
+        }
+    }
+
+    if (enum_valueOf)
+    {
+        // INVOKESTATIC doesn't auto-track properly for static methods with returns
+        ChangeStack(-2); // Pop 2 arguments (Class, String)
+        PutOp(OP_INVOKESTATIC);
+        PutU2(RegisterMethodref(enum_class, enum_valueOf));
+        ChangeStack(1); // Push return value (Enum)
+    }
+    else
+    {
+        // If valueOf not found, just return null
+        PutOp(OP_POP);  // Auto-tracked: -1
+        PutOp(OP_POP);  // Auto-tracked: -1
+        PutOp(OP_ACONST_NULL);  // Auto-tracked: +1
+    }
+
+    // checkcast to EnumType
+    PutOp(OP_CHECKCAST);  // Auto-tracked: 0 (pops 1, pushes 1)
+    PutU2(RegisterClass(unit_type));
+
+    // areturn
+    PutOp(OP_ARETURN);  // Auto-tracked: -1
 }
 
 

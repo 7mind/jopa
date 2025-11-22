@@ -1057,10 +1057,18 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
     MethodSymbol* method = method_set[0] -> method_symbol;
     if (method -> ACC_SYNTHETIC())
     {
-        ReportSemError(SemanticError::SYNTHETIC_METHOD_INVOCATION,
-                       method_call, method -> Header(),
-                       method -> containing_type -> ContainingPackageName(),
-                       method -> containing_type -> ExternalName());
+        // Allow enum synthetic methods (values, valueOf) to be called
+        bool is_enum_synthetic = method -> containing_type -> IsEnum() &&
+            (wcscmp(method -> Name(), L"values") == 0 ||
+             wcscmp(method -> Name(), L"valueOf") == 0);
+
+        if (!is_enum_synthetic)
+        {
+            ReportSemError(SemanticError::SYNTHETIC_METHOD_INVOCATION,
+                           method_call, method -> Header(),
+                           method -> containing_type -> ContainingPackageName(),
+                           method -> containing_type -> ExternalName());
+        }
     }
 
     //
@@ -1215,10 +1223,18 @@ MethodShadowSymbol* Semantic::FindMethodInEnvironment(SemanticEnvironment*& wher
         //
         if (method_symbol -> ACC_SYNTHETIC())
         {
-            ReportSemError(SemanticError::SYNTHETIC_METHOD_INVOCATION,
-                           method_call, method_symbol -> Header(),
-                           method_symbol -> containing_type -> ContainingPackageName(),
-                           method_symbol -> containing_type -> ExternalName());
+            // Allow enum synthetic methods (values, valueOf) to be called
+            bool is_enum_synthetic = method_symbol -> containing_type -> IsEnum() &&
+                (wcscmp(method_symbol -> Name(), L"values") == 0 ||
+                 wcscmp(method_symbol -> Name(), L"valueOf") == 0);
+
+            if (!is_enum_synthetic)
+            {
+                ReportSemError(SemanticError::SYNTHETIC_METHOD_INVOCATION,
+                               method_call, method_symbol -> Header(),
+                               method_symbol -> containing_type -> ContainingPackageName(),
+                               method_symbol -> containing_type -> ExternalName());
+            }
         }
         else if (control.option.pedantic)
         {

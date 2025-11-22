@@ -686,7 +686,8 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
     //
     type -> super = control.Enum();
     type -> supertypes_closure -> AddElement(control.Enum());
-    type -> MarkEnum(); // Since ACC_ENUM is only for enum constants.
+    type -> MarkEnum();
+    type -> SetACC_ENUM(); // JVM spec requires ACC_ENUM flag for enum types
     control.Enum() -> subtypes -> AddElement(type);
     AddDependence(type, type -> super);
     for (unsigned i = 0; i < declaration -> NumInterfaces(); i++)
@@ -1628,6 +1629,11 @@ void Semantic::ProcessMembers(AstClassBody* class_body)
     ProcessMethodMembers(class_body);
     ProcessFieldMembers(class_body);
     ProcessEnumConstantMembers(class_body); // Process enum constants if this is an enum
+
+    // Add synthetic methods for enums (values(), valueOf())
+    if (this_type -> IsEnum())
+        AddEnumSyntheticMethods(this_type);
+
     ProcessClassBodyForEffectiveJavaChecks(class_body);
 
     delete this_type -> innertypes_closure; // save some space !!!
@@ -2988,6 +2994,49 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         constructor -> declaration = constructor_declaration;
         class_body -> default_constructor = constructor_declaration;
     }
+}
+
+
+void Semantic::AddEnumSyntheticMethods(TypeSymbol* enum_type)
+{
+    assert(enum_type -> IsEnum());
+
+    // Add synthetic values() method: public static EnumType[] values()
+    NameSymbol* values_name = control.FindOrInsertName(L"values", 6);
+    MethodSymbol* values_method = enum_type -> InsertMethodSymbol(values_name);
+
+    // Create array type for return value: EnumType[]
+    TypeSymbol* array_type = enum_type -> GetArrayType((Semantic*) this, 1);
+
+    values_method -> SetType(array_type);
+    values_method -> SetContainingType(enum_type);
+    values_method -> SetACC_PUBLIC();
+    values_method -> SetACC_STATIC();
+    values_method -> SetACC_SYNTHETIC();
+    values_method -> SetBlockSymbol(new BlockSymbol(0));
+    values_method -> SetSignature(control);
+
+    // Add synthetic valueOf(String) method: public static EnumType valueOf(String name)
+    NameSymbol* valueOf_name = control.FindOrInsertName(L"valueOf", 7);
+    MethodSymbol* valueOf_method = enum_type -> InsertMethodSymbol(valueOf_name);
+
+    valueOf_method -> SetType(enum_type);
+    valueOf_method -> SetContainingType(enum_type);
+    valueOf_method -> SetACC_PUBLIC();
+    valueOf_method -> SetACC_STATIC();
+    valueOf_method -> SetACC_SYNTHETIC();
+
+    // Create parameter: String name
+    BlockSymbol* block_symbol = new BlockSymbol(1);
+    NameSymbol* name_param_name = control.FindOrInsertName(L"name", 4);
+    VariableSymbol* name_param = block_symbol -> InsertVariableSymbol(name_param_name);
+    name_param -> SetType(control.String());
+    name_param -> SetLocalVariableIndex(0);
+    name_param -> MarkComplete();
+    valueOf_method -> AddFormalParameter(name_param);
+
+    valueOf_method -> SetBlockSymbol(block_symbol);
+    valueOf_method -> SetSignature(control);
 }
 
 
