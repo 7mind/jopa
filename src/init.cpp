@@ -163,6 +163,14 @@ void Semantic::ProcessArrayInitializer(AstArrayInitializer* array_initializer,
 void Semantic::ComputeFinalValue(VariableSymbol* variable)
 {
     AstVariableDeclarator* variable_declarator = variable -> declarator;
+
+    // Enum constants are final but don't have declarators
+    if (variable -> ACC_ENUM())
+    {
+        variable -> MarkInitialized();
+        return;
+    }
+
     assert(variable_declarator && variable -> ACC_FINAL());
     if (! variable -> IsInitialized())
     {

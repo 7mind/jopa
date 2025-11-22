@@ -24,12 +24,12 @@ jobs:
       if: runner.os == 'Linux'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential autoconf automake libtool
+        sudo apt-get install -y build-essential autoconf automake libtool openjdk-8-jdk
 
     - name: Install dependencies (macOS)
       if: runner.os == 'macOS'
       run: |
-        brew install autoconf automake libtool
+        brew install autoconf automake libtool openjdk@8
 
     - name: Configure build
       run: |
@@ -56,65 +56,20 @@ jobs:
         ./src/jikes -version || ./src/jikes -help || echo "Jikes binary created"
         ls -lh src/jikes
 
-    - name: Test generics - Simple generic class
+    - name: Run comprehensive test suite (Compilation + Runtime)
       run: |
         cd test-generics
-        ../src/jikes -sourcepath runtime -d . SimpleGeneric.java
-        test -f SimpleGeneric.class && echo "✓ SimpleGeneric compiled successfully"
+        chmod +x run-tests.sh
+        ./run-tests.sh
 
-    - name: Test generics - Multiple type parameters
+    - name: Test quick compilation checks
       run: |
         cd test-generics
-        ../src/jikes -sourcepath runtime -d . TwoTypeParams.java
-        test -f TwoTypeParams.class && echo "✓ TwoTypeParams compiled successfully"
-
-    - name: Test generics - Bounded type parameters
-      run: |
-        cd test-generics
-        ../src/jikes -sourcepath runtime -d . BoundedGeneric.java
-        test -f BoundedGeneric.class && echo "✓ BoundedGeneric compiled successfully"
-
-    - name: Test enhanced for-loop
-      run: |
-        cd test-generics
-        ../src/jikes -source 1.5 -sourcepath runtime -d . ForEachArrayTest.java
-        test -f ForEachArrayTest.class && echo "✓ Enhanced for-loop compiled successfully"
-
-    - name: Test varargs (explicit array)
-      run: |
-        cd test-generics
-        ../src/jikes -source 1.5 -sourcepath runtime -d . VarargsSimpleTest.java
-        test -f VarargsSimpleTest.class && echo "✓ Varargs (explicit array) compiled successfully"
-
-    - name: Compile Java 5 runtime classes
-      run: |
-        cd test-generics
-        ../src/jikes -source 1.5 -d runtime runtime/java/lang/Comparable.java runtime/java/lang/Enum.java
-        echo "✓ Java 5 runtime classes compiled"
-
-    - name: Run comprehensive test suite
-      run: |
-        cd test-generics
-        if [ -f run-tests.sh ]; then
-          chmod +x run-tests.sh
-          ./run-tests.sh || echo "Some tests may have failed, continuing..."
-        fi
-
-    - name: Test all generics features
-      run: |
-        cd test-generics
-        rm -f *.class
-        ../src/jikes -sourcepath runtime -d . SimpleGeneric.java TwoTypeParams.java BoundedGeneric.java 2>&1 | tee build.log || true
-        compiled=$(ls -1 *.class 2>/dev/null | wc -l)
-        echo "Successfully compiled $compiled test files"
-        if [ "$compiled" -ge 3 ]; then
-          echo "✓ Generics implementation working!"
-          exit 0
-        else
-          echo "⚠ Some tests failed"
-          cat build.log
-          exit 1
-        fi
+        echo "Testing individual Java 5 features..."
+        ../src/jikes -source 1.5 -sourcepath runtime -d . Color.java && echo "✓ Enums compile"
+        ../src/jikes -source 1.5 -sourcepath runtime -d . VarargsImplicitTest.java && echo "✓ Varargs compile"
+        ../src/jikes -source 1.5 -sourcepath runtime -d . ForEachArrayTest.java && echo "✓ Enhanced for-loop compiles"
+        ../src/jikes -source 1.5 -sourcepath runtime -d . SimpleGeneric.java && echo "✓ Generics compile"
 
     - name: Upload artifacts
       if: always()

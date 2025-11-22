@@ -26,4 +26,17 @@ public final class String {
     public String toString() {
         return this;
     }
+
+    // Static valueOf methods
+    public static String valueOf(int i) {
+        return null;  // Stub
+    }
+
+    public static String valueOf(Object obj) {
+        return null;  // Stub
+    }
+
+    public static String valueOf(boolean b) {
+        return null;  // Stub
+    }
 }

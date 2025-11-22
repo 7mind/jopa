@@ -1,112 +1,172 @@
 #!/usr/bin/env bash
-# Test script for Jikes Java 5 Generics Implementation
+# Comprehensive test script for Jikes Java 5 features
+# Tests both compilation AND runtime execution with real JVM
 
-set -e
+set -e  # Exit on error unless explicitly handled
 
-JIKES="../src/jikes"
-RUNTIME_PATH="runtime"
-OUTPUT_DIR="."
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JIKES="${SCRIPT_DIR}/../src/jikes"
+RUNTIME="${SCRIPT_DIR}/runtime"
+OUTPUT="${SCRIPT_DIR}"
 
 # Colors for output
-GREEN='\033[0;32m'
 RED='\033[0;31m'
+GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# Test counter
-TOTAL_TESTS=0
-PASSED_TESTS=0
-FAILED_TESTS=0
+# Counters
+TESTS_RUN=0
+TESTS_PASSED=0
+TESTS_FAILED=0
 
-echo "========================================="
-echo "Jikes Java 5 Generics Test Suite"
-echo "========================================="
-echo ""
-
-# Function to run a test
-run_test() {
-    local test_name="$1"
-    local test_file="$2"
-
-    TOTAL_TESTS=$((TOTAL_TESTS + 1))
-
-    echo -n "Testing $test_name... "
-
-    if $JIKES -sourcepath $RUNTIME_PATH -d $OUTPUT_DIR "$test_file" 2>&1 | grep -q "error"; then
-        echo -e "${RED}FAILED${NC}"
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-        $JIKES -sourcepath $RUNTIME_PATH -d $OUTPUT_DIR "$test_file" 2>&1 | head -20
-        return 1
-    else
-        echo -e "${GREEN}PASSED${NC}"
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-        return 0
-    fi
-}
-
-# Clean previous builds
-echo "Cleaning previous builds..."
-rm -f *.class
+echo "================================================"
+echo "  Jikes Java 5 Feature Test Suite"
+echo "  Compilation + Runtime Execution Tests"
+echo "================================================"
 echo ""
 
 # Check if jikes exists
 if [ ! -f "$JIKES" ]; then
-    echo -e "${RED}ERROR: Jikes binary not found at $JIKES${NC}"
-    echo "Please build Jikes first: cd ../src && make"
+    echo -e "${RED}ERROR: Jikes compiler not found at $JIKES${NC}"
+    echo "Please build it first: make -C ../src"
     exit 1
 fi
 
 echo "Using Jikes: $JIKES"
+echo "Using Java:  $(java -version 2>&1 | head -1)"
+echo ""
+
+# Function to compile a test file
+compile_test() {
+    local test_file="$1"
+    local test_name=$(basename "$test_file" .java)
+
+    echo -n "  Compiling $test_name... "
+    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME" -d "$OUTPUT" "$test_file" 2>&1 > /tmp/jikes_compile_$$.log; then
+        echo -e "${GREEN}✓${NC}"
+        return 0
+    else
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}    Compilation failed:${NC}"
+        cat /tmp/jikes_compile_$$.log | sed 's/^/    /'
+        return 1
+    fi
+}
+
+# Function to run a test class
+run_test() {
+    local test_class="$1"
+    local test_name="$test_class"
+
+    echo -n "  Running $test_name... "
+
+    if java -cp "$OUTPUT" "$test_class" 2>&1 > /tmp/jikes_run_$$.log; then
+        echo -e "${GREEN}✓${NC}"
+        # Show output if any
+        if [ -s /tmp/jikes_run_$$.log ]; then
+            cat /tmp/jikes_run_$$.log | sed 's/^/    Output: /'
+        fi
+        return 0
+    else
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}    Runtime error:${NC}"
+        cat /tmp/jikes_run_$$.log | sed 's/^/    /'
+        return 1
+    fi
+}
+
+# Function to test compilation only (no main method)
+test_compile_only() {
+    local test_file="$1"
+    local test_name=$(basename "$test_file" .java)
+
+    echo -e "${CYAN}Testing: $test_name (compile only)${NC}"
+    TESTS_RUN=$((TESTS_RUN + 1))
+
+    if compile_test "$test_file"; then
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+        echo ""
+        return 0
+    else
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        echo ""
+        return 1
+    fi
+}
+
+# Function to test compilation and execution
+test_compile_and_run() {
+    local test_file="$1"
+    local test_class="$2"
+    local test_name=$(basename "$test_file" .java)
+
+    echo -e "${CYAN}Testing: $test_name (compile + run)${NC}"
+    TESTS_RUN=$((TESTS_RUN + 1))
+
+    if compile_test "$test_file"; then
+        if run_test "$test_class"; then
+            TESTS_PASSED=$((TESTS_PASSED + 1))
+            echo ""
+            return 0
+        else
+            TESTS_FAILED=$((TESTS_FAILED + 1))
+            echo ""
+            return 1
+        fi
+    else
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        echo ""
+        return 1
+    fi
+}
+
+# Clean previous builds
+echo "Cleaning previous test outputs..."
+rm -f "${OUTPUT}"/*.class /tmp/jikes_*_$$.log
 echo ""
 
 # Run tests
-echo "Running tests..."
-echo "----------------------------------------"
+echo -e "${BLUE}=== Testing Enums ===${NC}"
+test_compile_and_run "${SCRIPT_DIR}/ColorTest.java" "ColorTest" || true
+test_compile_only "${SCRIPT_DIR}/Color.java" || true
 
-run_test "Simple Generic Class" "SimpleGeneric.java"
-run_test "Multiple Type Parameters" "TwoTypeParams.java"
-run_test "Bounded Type Parameters" "BoundedGeneric.java"
+echo -e "${BLUE}=== Testing Varargs ===${NC}"
+test_compile_and_run "${SCRIPT_DIR}/VarargsTest.java" "VarargsTest" || true
+test_compile_only "${SCRIPT_DIR}/VarargsImplicitTest.java" || true
 
-# Test compilation of all files together
-echo ""
-echo "Testing batch compilation..."
-rm -f *.class
-if $JIKES -sourcepath $RUNTIME_PATH -d $OUTPUT_DIR SimpleGeneric.java TwoTypeParams.java BoundedGeneric.java 2>&1 | grep -q "error"; then
-    echo -e "${RED}Batch compilation FAILED${NC}"
-    FAILED_TESTS=$((FAILED_TESTS + 1))
+echo -e "${BLUE}=== Testing Enhanced For-Loops ===${NC}"
+test_compile_and_run "${SCRIPT_DIR}/ForEachTest.java" "ForEachTest" || true
+test_compile_only "${SCRIPT_DIR}/ForEachArrayTest.java" || true
+
+echo -e "${BLUE}=== Testing Generics ===${NC}"
+test_compile_only "${SCRIPT_DIR}/GenericBox.java" || true
+test_compile_and_run "${SCRIPT_DIR}/GenericTest.java" "GenericTest" || true
+test_compile_only "${SCRIPT_DIR}/SimpleGeneric.java" || true
+test_compile_only "${SCRIPT_DIR}/TwoTypeParams.java" || true
+test_compile_only "${SCRIPT_DIR}/BoundedGeneric.java" || true
+
+# Cleanup
+rm -f /tmp/jikes_*_$$.log
+
+echo "================================================"
+echo "  Test Summary"
+echo "================================================"
+echo -e "Total tests:  $TESTS_RUN"
+echo -e "${GREEN}Passed:       $TESTS_PASSED${NC}"
+if [ $TESTS_FAILED -gt 0 ]; then
+    echo -e "${RED}Failed:       $TESTS_FAILED${NC}"
 else
-    echo -e "${GREEN}Batch compilation PASSED${NC}"
-    PASSED_TESTS=$((PASSED_TESTS + 1))
+    echo -e "Failed:       $TESTS_FAILED"
 fi
-TOTAL_TESTS=$((TOTAL_TESTS + 1))
+echo "================================================"
 
-# Summary
-echo ""
-echo "========================================="
-echo "Test Summary"
-echo "========================================="
-echo "Total tests:  $TOTAL_TESTS"
-echo -e "Passed:       ${GREEN}$PASSED_TESTS${NC}"
-if [ $FAILED_TESTS -gt 0 ]; then
-    echo -e "Failed:       ${RED}$FAILED_TESTS${NC}"
-else
-    echo -e "Failed:       $FAILED_TESTS"
-fi
-echo ""
-
-# Verify bytecode if any class compiled
-if [ -f "SimpleGeneric.class" ]; then
-    echo "Verifying bytecode..."
-    echo "SimpleGeneric.class signature:"
-    od -c SimpleGeneric.class | grep -A 2 "Signature" | head -5 || echo "(no javap available, using od)"
-fi
-
-echo ""
-
-if [ $FAILED_TESTS -eq 0 ]; then
+if [ $TESTS_FAILED -eq 0 ]; then
     echo -e "${GREEN}✓ All tests passed!${NC}"
     exit 0
 else
-    echo -e "${RED}✗ Some tests failed${NC}"
+    echo -e "${YELLOW}⚠ Some tests failed (this is okay if test files don't exist yet)${NC}"
     exit 1
 fi
