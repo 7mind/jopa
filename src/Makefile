@@ -83,11 +83,12 @@ am_jikes_OBJECTS = ast.$(OBJEXT) body.$(OBJEXT) bytecode.$(OBJEXT) \
 	incrmnt.$(OBJEXT) init.$(OBJEXT) javaact.$(OBJEXT) \
 	jikes.$(OBJEXT) jikesapi.$(OBJEXT) long.$(OBJEXT) \
 	lookup.$(OBJEXT) lpginput.$(OBJEXT) modifier.$(OBJEXT) \
-	op.$(OBJEXT) option.$(OBJEXT) paramtype.$(OBJEXT) parser.$(OBJEXT) \
-	platform.$(OBJEXT) scanner.$(OBJEXT) segment.$(OBJEXT) \
-	set.$(OBJEXT) stream.$(OBJEXT) symbol.$(OBJEXT) \
-	system.$(OBJEXT) tab.$(OBJEXT) typeparam.$(OBJEXT) unparse.$(OBJEXT) \
-	unzip.$(OBJEXT) zip.$(OBJEXT)
+	op.$(OBJEXT) option.$(OBJEXT) paramtype.$(OBJEXT) \
+	parser.$(OBJEXT) platform.$(OBJEXT) scanner.$(OBJEXT) \
+	segment.$(OBJEXT) set.$(OBJEXT) stream.$(OBJEXT) \
+	symbol.$(OBJEXT) system.$(OBJEXT) tab.$(OBJEXT) \
+	typeparam.$(OBJEXT) unparse.$(OBJEXT) unzip.$(OBJEXT) \
+	zip.$(OBJEXT)
 jikes_OBJECTS = $(am_jikes_OBJECTS)
 jikes_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I.
@@ -136,7 +137,7 @@ CPPFLAGS =
 CXX = g++
 CXXCPP = g++ -E
 CXXDEPMODE = depmode=gcc3
-CXXFLAGS = -g -O0 -Wall -Wextra
+CXXFLAGS = -g -O2
 CYGPATH_W = echo
 DEFS = -DHAVE_CONFIG_H
 DEPDIR = .deps
@@ -200,7 +201,7 @@ localstatedir = ${prefix}/var
 mandir = ${prefix}/man
 mkdir_p = mkdir -p -- .
 oldincludedir = /usr/include
-prefix = /home/pavel/work/jexpl/jikes-install
+prefix = /usr/local
 program_transform_name = s,x,x,
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
@@ -233,6 +234,7 @@ lpginput.cpp \
 modifier.cpp \
 op.cpp \
 option.cpp \
+paramtype.cpp \
 parser.cpp \
 platform.cpp \
 scanner.cpp \
@@ -242,6 +244,7 @@ stream.cpp \
 symbol.cpp \
 system.cpp \
 tab.cpp \
+typeparam.cpp \
 unparse.cpp \
 unzip.cpp \
 zip.cpp
