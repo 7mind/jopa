@@ -32,6 +32,20 @@ void ByteCode::GenerateCode()
     }
 
     //
+    // Process enum constants as static final fields.
+    //
+    if (class_body -> owner && class_body -> owner -> EnumDeclarationCast())
+    {
+        AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
+        for (i = 0; i < enum_decl -> NumEnumConstants(); i++)
+        {
+            AstEnumConstant* enum_constant = enum_decl -> EnumConstant(i);
+            if (enum_constant -> field_symbol)
+                DeclareField(enum_constant -> field_symbol);
+        }
+    }
+
+    //
     // Process instance variables.  We separate constant fields from others,
     // because in 1.4 or later, constant fields are initialized before the
     // call to super() in order to obey semantics of JLS 13.1.
@@ -5285,6 +5299,7 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             TypeSymbol* varargs_type = msym -> FormalParameter(num_formals - 1) -> Type();
             assert(varargs_type -> IsArray());
             TypeSymbol* component_type = varargs_type -> ArraySubtype();
+            assert(component_type && "component_type is null for varargs array");
 
             // Generate: anewarray <component_type> with count 0
             PutOp(OP_ICONST_0);

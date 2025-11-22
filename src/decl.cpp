@@ -2723,6 +2723,30 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
     // All types need a spot for "this".
     block_symbol -> max_variable_index = 1;
 
+    // Enum constructors have two implicit parameters: String name, int ordinal
+    // These must be added before user-defined parameters
+    // But NOT for java.lang.Enum itself - it declares them explicitly
+    VariableSymbol* enum_name_param = NULL;
+    VariableSymbol* enum_ordinal_param = NULL;
+    if (this_type -> IsEnum() && this_type != control.Enum())
+    {
+        // Add name parameter (String)
+        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        enum_name_param = block_symbol -> InsertVariableSymbol(name_sym);
+        enum_name_param -> SetType(control.String());
+        enum_name_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
+        enum_name_param -> MarkComplete();
+        enum_name_param -> SetACC_SYNTHETIC();
+
+        // Add ordinal parameter (int)
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        enum_ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
+        enum_ordinal_param -> SetType(control.int_type);
+        enum_ordinal_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
+        enum_ordinal_param -> MarkComplete();
+        enum_ordinal_param -> SetACC_SYNTHETIC();
+    }
+
     ProcessFormalParameters(block_symbol, constructor_declarator);
 
     //
@@ -2763,6 +2787,18 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
                                                 max_variable_index++);
         this0_variable -> MarkComplete();
         this0_variable -> SetACC_SYNTHETIC();
+    }
+
+    // Add enum implicit parameters to constructor first
+    if (enum_name_param)
+    {
+        enum_name_param -> SetOwner(constructor);
+        constructor -> AddFormalParameter(enum_name_param);
+    }
+    if (enum_ordinal_param)
+    {
+        enum_ordinal_param -> SetOwner(constructor);
+        constructor -> AddFormalParameter(enum_ordinal_param);
     }
 
     for (unsigned i = 0;
@@ -2838,7 +2874,8 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         constructor -> SetACC_STRICTFP();
 
     // Enum constructors have two implicit parameters: String name, int ordinal
-    if (type -> IsEnum())
+    // But NOT for java.lang.Enum itself - it declares them explicitly
+    if (type -> IsEnum() && type != control.Enum())
     {
         // Add name parameter (String)
         NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
@@ -2848,6 +2885,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         name_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
         name_param -> MarkComplete();
         name_param -> SetACC_SYNTHETIC();
+        constructor -> AddFormalParameter(name_param);
 
         // Add ordinal parameter (int)
         NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
@@ -2857,6 +2895,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         ordinal_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
         ordinal_param -> MarkComplete();
         ordinal_param -> SetACC_SYNTHETIC();
+        constructor -> AddFormalParameter(ordinal_param);
     }
 
     if (type -> EnclosingType())
@@ -4769,13 +4808,20 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
     // is magically implemented by bytecode.cpp, rather than adding all the AST
     // structure to the block of the static initializer.
     //
+    TypeSymbol* this_type = ThisType();
+
+    // Enum types need static initializers for enum constants even if there
+    // are no explicit static initializers or class variables
+    bool is_enum_with_constants = this_type -> IsEnum() && class_body -> owner &&
+                                   class_body -> owner -> EnumDeclarationCast();
+
     if (class_body -> NumStaticInitializers() == 0 &&
-        class_body -> NumClassVariables() == 0)
+        class_body -> NumClassVariables() == 0 &&
+        !is_enum_with_constants)
     {
         return;
     }
 
-    TypeSymbol* this_type = ThisType();
     LocalBlockStack().max_size = 1;
     assert(FinalFields());
 
@@ -4787,6 +4833,17 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
     {
         estimate += class_body -> ClassVariable(i) -> NumVariableDeclarators();
     }
+
+    // For enums, add space for enum constant initializations
+    if (this_type -> IsEnum() && class_body -> owner)
+    {
+        AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
+        if (enum_decl)
+        {
+            estimate += enum_decl -> NumEnumConstants();
+        }
+    }
+
     MethodSymbol* init_method = GetStaticInitializerMethod(estimate);
 
     //
@@ -4795,12 +4852,15 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
     if (this_type -> IsEnum() && class_body -> owner)
     {
         AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
-        if (enum_decl)
+        if (enum_decl && enum_decl -> NumEnumConstants() > 0)
         {
             StoragePool* ast_pool = compilation_unit -> ast_pool;
             TokenIndex loc = class_body -> identifier_token;
             AstMethodDeclaration* declaration =
                 (AstMethodDeclaration*) init_method -> declaration;
+
+            assert(declaration && "init_method declaration is null");
+            assert(declaration -> method_body_opt && "method_body_opt is null");
 
             for (unsigned i = 0; i < enum_decl -> NumEnumConstants(); i++)
             {
@@ -4840,7 +4900,21 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
                     ordinal_arg -> symbol = control.int_type;
                     creation -> arguments -> AddArgument(ordinal_arg);
 
-                    creation -> symbol = this_type;
+                    // Set the constructor symbol (not the type!)
+                    // For enums, we need the private constructor with (String, int) parameters
+                    // Find it by iterating through all methods in the type
+                    MethodSymbol* constructor = NULL;
+                    for (unsigned m = 0; m < this_type -> NumMethodSymbols(); m++)
+                    {
+                        MethodSymbol* method = this_type -> MethodSym(m);
+                        if (method -> Identity() == control.init_name_symbol &&
+                            method -> NumFormalParameters() == 2)
+                        {
+                            constructor = method;
+                            break;
+                        }
+                    }
+                    creation -> symbol = constructor;
 
                     // Create assignment: field = creation
                     AstAssignmentExpression* assignment = ast_pool -> GenAssignmentExpression(
@@ -4902,6 +4976,11 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
     for (unsigned l = 0; l < FinalFields() -> Length(); l++)
     {
         VariableSymbol* final_var = (*FinalFields())[l];
+
+        // Enum constants are static final but initialized in <clinit>
+        if (final_var -> ACC_ENUM())
+            continue;
+
         if (final_var -> ACC_STATIC() &&
             ! DefinitelyAssignedVariables() -> da_set[l])
         {
