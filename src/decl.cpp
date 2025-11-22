@@ -494,8 +494,7 @@ void Semantic::ProcessImports()
             compilation_unit -> ImportDeclaration(i);
         if (import_declaration -> static_token_opt)
         {
-            // TODO: Add static import support for 1.5.
-            //      if (control.option.source < JikesOption::SDK1_5)
+            if (control.option.source < JikesOption::SDK1_5)
             {
                 ReportSemError(SemanticError::STATIC_IMPORT_UNSUPPORTED,
                                import_declaration -> static_token_opt);
@@ -669,8 +668,7 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
     // Set processing_type so ThisType() works during header processing
     processing_type = type;
 
-    // TODO: Add enum support for 1.5.
-//      if (control.option.source < JikesOption::SDK1_5)
+    if (control.option.source < JikesOption::SDK1_5)
     {
         ReportSemError(SemanticError::ENUM_TYPE_UNSUPPORTED,
                        declaration -> enum_token);
@@ -752,8 +750,7 @@ void Semantic::ProcessTypeHeader(AstAnnotationDeclaration* declaration)
     // Set processing_type so ThisType() works during header processing
     processing_type = type;
 
-    // TODO: Add annotation support for 1.5.
-//      if (control.option.source < JikesOption::SDK1_5)
+    if (control.option.source < JikesOption::SDK1_5)
     {
         ReportSemError(SemanticError::ANNOTATION_TYPE_UNSUPPORTED,
                        declaration -> interface_token - 1,

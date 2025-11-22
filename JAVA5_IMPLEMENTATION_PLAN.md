@@ -151,53 +151,52 @@ Varargs is **PARTIALLY IMPLEMENTED** - declarations work, but call-site handling
 
 ---
 
-### 2.3: Static Imports ⏳
+### 2.3: Static Imports ⏳ NEEDS IMPLEMENTATION
 **Priority**: MEDIUM - Nice to have
 **Estimated Time**: 3-4 hours
 **Difficulty**: ⭐⭐⭐☆☆ (Medium)
+**Status**: Parser works, but import processing treats them as type imports
 
-#### Feature Description
-```java
-import static java.lang.Math.PI;
-import static java.lang.Math.*;
+#### Discovery
+Static imports are **PARTIALLY PARSED** but need full implementation!
 
-double area = PI * r * r;  // No Math. prefix needed
+**Found**:
+- ✅ Parser recognizes `import static` syntax
+- ✅ `AstImportDeclaration` has `static_token_opt` field
+- ✅ Enabled declaration (changed `src/decl.cpp:497`)
+- ❌ Currently processes static imports as type imports (fails)
+- ❌ No static import table
+- ❌ No name resolution for static members
+
+**Test Results** (`StaticImportTest.java`):
 ```
+import static java.lang.Math.PI;   // Parsed OK
+```
+But errors: "does not name a type in a package" - treats `Math.PI` as a type path.
 
-#### Implementation Plan
-1. **Parser Changes** (30 min)
-   - Recognize `import static` syntax
-   - Distinguish from regular imports
+**Remaining Work** (3-4 hours):
+1. **Import Processing** (`src/decl.cpp`)
+   - Create `ProcessStaticSingleTypeImport` function
+   - Create `ProcessStaticTypeImportOnDemand` function
+   - Store static imports in separate table
 
-2. **Import Processing** (90-120 min)
-   - Process static imports separately
-   - Handle single static import
-   - Handle static on-demand import (*)
-   - Store in separate table
-
-3. **Name Resolution** (60-90 min)
+2. **Name Resolution** (`src/lookup.cpp`)
    - Check static imports when resolving simple names
-   - Handle ambiguity (multiple static imports of same name)
+   - Handle field vs. method distinction
    - Proper shadowing rules
 
-4. **Testing** (30 min)
-   - Test static field imports
-   - Test static method imports
-   - Test on-demand imports
-   - Test shadowing and ambiguity
+3. **Symbol Table** (`src/semantic.h`)
+   - Add static import table/storage
 
-#### Files to Modify
-- `src/parser.g` - Import syntax
-- `src/decl.cpp` - Import processing
-- `src/lookup.cpp` - Name resolution
-- `src/semantic.h` - Static import tables
+**Status**: Parser ready, needs semantic implementation
 
 ---
 
-### 2.4: Enums ⏳
+### 2.4: Enums ⏳ EXTENSIVE INFRASTRUCTURE, NEEDS DEBUG
 **Priority**: MEDIUM - Important but complex
-**Estimated Time**: 6-8 hours
+**Estimated Time**: 4-6 hours (less than expected due to existing code!)
 **Difficulty**: ⭐⭐⭐⭐☆ (Hard)
+**Status**: Complete AST + parser, crashes during semantic processing
 
 #### Feature Description
 ```java
@@ -223,55 +222,60 @@ enum Planet {
 }
 ```
 
-#### Implementation Plan
-1. **Parser Changes** (60 min)
-   - Recognize `enum` keyword
-   - Parse enum constants
-   - Parse enum body (fields, methods, constructors)
-   - Handle enum constant arguments
+#### Discovery
+Enums have **EXTENSIVE INFRASTRUCTURE** already implemented!
 
-2. **Type System** (90-120 min)
-   - Create enum as special class extending `java.lang.Enum`
-   - Mark with ACC_ENUM flag
-   - Each constant is `public static final` field
+**Found** - Complete AST Structure:
+- ✅ `AstEnumDeclaration` class fully defined (`src/ast.h:2432-2485`)
+- ✅ `AstEnumConstant` class fully defined (`src/ast.h:2487-2516`)
+- ✅ Integration with `AstClassBody` (enum nesting support)
+- ✅ Factory methods in AST pool
+- ✅ `ACC_ENUM` flag fully defined (`src/access.h:57,78,98`)
+- ✅ Parser recognizes `enum` keyword
+- ✅ Enabled declaration (changed `src/decl.cpp:671`)
 
-3. **Synthetic Method Generation** (120-150 min)
-   - Generate `values()` method returning array
+**Test Results** (`EnumTest.java`):
+```
+public enum Color { RED, GREEN, BLUE; }
+```
+Result: **Segmentation fault (core dumped)**
+
+This means:
+- ✅ Parser successfully creates AST
+- ❌ Semantic processing has incomplete implementation or bugs
+
+**Remaining Work** (4-6 hours):
+1. **Debug Segfault** (1-2 hours)
+   - Run with gdb to find crash location
+   - Likely missing initialization or null pointer
+   - May be incomplete semantic processing
+
+2. **Complete Semantic Processing** (2-3 hours)
+   - Ensure enum extends `java.lang.Enum`
+   - Set ACC_ENUM flag
+   - Process enum constants as static final fields
+   - Validate enum restrictions
+
+3. **Synthetic Methods** (1-2 hours)
+   - Generate `values()` method
    - Generate `valueOf(String)` method
-   - Handle constructor rewriting (must call super)
-   - Generate static initializer for constants
+   - Static initializer for constants
+   - Constructor handling
 
-4. **Switch Statement Integration** (60 min)
-   - Allow enums in switch expressions
-   - Generate switch with ordinal() values
-   - Proper constant case handling
-
-5. **Semantic Validation** (60 min)
-   - No public constructors
-   - No abstract methods (unless all constants override)
-   - Proper constant initialization
-   - Inheritance restrictions
-
-6. **Testing** (45 min)
+4. **Testing** (30 min)
    - Simple enums
-   - Enums with fields/methods
-   - Enums in switch statements
-   - Enum constant-specific methods
+   - Enums with methods
+   - Switch statements (if time permits)
 
-#### Files to Modify
-- `src/parser.g` - Enum syntax
-- `src/ast.h` - Enum AST nodes
-- `src/decl.cpp` - Enum processing
-- `src/symbol.h` - Enum flags
-- `src/body.cpp` - Switch with enums
-- `src/bytecode.cpp` - Synthetic methods
+**Status**: Much infrastructure exists, needs debugging + completion
 
 ---
 
-### 2.5: Annotations ⏳
+### 2.5: Annotations ⏳ COMPLEX, LOWER PRIORITY
 **Priority**: LOW - Complex, less critical for basic Java 5
 **Estimated Time**: 8-12 hours
 **Difficulty**: ⭐⭐⭐⭐⭐ (Very Hard)
+**Status**: Parser exists, two disable points, needs full implementation
 
 #### Feature Description
 ```java
@@ -289,8 +293,36 @@ public String toString() { ... }
 public void myTest() { ... }
 ```
 
+#### Discovery
+Annotations have **SOME INFRASTRUCTURE** but need most implementation!
+
+**Found**:
+- ✅ Parser recognizes `@interface` syntax
+- ✅ Parser recognizes annotation modifiers (`@Override`, `@Deprecated`)
+- ✅ `ACC_ANNOTATION` flag defined (`src/access.h:62,83,103`)
+- ✅ `AstAnnotation` AST node exists
+- ✅ Enabled `@interface` declarations (changed `src/decl.cpp:753`)
+- ❌ Annotation modifiers still disabled (`src/modifier.cpp:47`)
+- ❌ No annotation processing implementation
+- ❌ No bytecode attribute generation
+
+**Test Results** (`AnnotationTest.java`):
+```java
+@Override
+public String toString() { ... }
+```
+Result: "Annotation modifiers are only supported for `-source 1.5' or greater.(not yet implemented)"
+
+**Note**: Annotation type declarations (`@interface Foo {}`) are enabled, but *using* annotations (`@Override`) requires fixing `src/modifier.cpp:46` - needs access to `control.option.source` which isn't available in that context.
+
+**Status**: Most work still needed, lowest priority
+
 #### Implementation Plan
-1. **Parser Changes** (90 min)
+1. **Fix Modifier Processing** (30-60 min)
+   - Make source level accessible in `ProcessModifiers`
+   - Enable annotation modifiers for 1.5+
+
+2. **Parser/AST** (60-90 min)
    - Recognize `@interface` for annotation declarations
    - Parse annotation usage syntax
    - Parse annotation elements (methods)
