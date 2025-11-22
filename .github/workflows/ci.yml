@@ -31,7 +31,7 @@ jobs:
       - name: Build Jikes
         run: |
           nix develop --command bash -c "
-            ./configure
+            ./configure --enable-source15
             make -j$(nproc)
           "
 
@@ -95,7 +95,7 @@ jobs:
       - name: Build Jikes
         run: |
           nix develop --command bash -c "
-            ./configure
+            ./configure --enable-source15
             make -j$(nproc)
           "
 
