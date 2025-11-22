@@ -735,7 +735,13 @@ public:
 #endif // JIKES_DEBUG
     }
 
-    ~Semantic() { delete error; }
+    ~Semantic()
+    {
+        delete error;
+        // Clean up static import method shadows
+        for (unsigned i = 0; i < static_import_method_shadows.Length(); i++)
+            delete static_import_method_shadows[i];
+    }
 
     // Report a multi-token semantic warning or error.
     void ReportSemError(SemanticError::SemanticErrorKind kind,
@@ -862,6 +868,7 @@ private:
     // Java 5: Static imports
     Tuple<Symbol*> single_static_imports;  // MethodSymbol or VariableSymbol
     Tuple<TypeSymbol*> static_on_demand_imports;  // Types for wildcard static imports
+    Tuple<MethodShadowSymbol*> static_import_method_shadows;  // Storage for method shadows
 
     //
     // Where am I?

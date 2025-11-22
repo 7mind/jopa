@@ -1189,6 +1189,71 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
             break;
         }
     }
+
+    // Java 5: If not found in environment, check single static imports
+    if (methods_found.Length() == 0 &&
+        control.option.source >= JikesOption::SDK1_5)
+    {
+        for (unsigned i = 0; i < single_static_imports.Length(); i++)
+        {
+            Symbol* imported_member = single_static_imports[i];
+            MethodSymbol* method = imported_member -> MethodCast();
+            if (method && method -> Identity() == name_symbol)
+            {
+                // Process method signature if needed
+                if (! method -> IsTyped())
+                    method -> ProcessMethodSignature(this, id_token);
+
+                // Check if method is applicable
+                unsigned num_args = method_call -> arguments -> NumArguments();
+                if (MethodApplicableByArity(method, num_args))
+                {
+                    unsigned j;
+                    unsigned num_formals = method -> NumFormalParameters();
+                    bool is_varargs = method -> ACC_VARARGS();
+
+                    // Check fixed parameters
+                    unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
+                    for (j = 0; j < num_fixed && j < num_args; j++)
+                    {
+                        AstExpression* expr = method_call -> arguments -> Argument(j);
+                        if (! CanMethodInvocationConvert(method -> FormalParameter(j) -> Type(),
+                                                         expr -> Type()))
+                        {
+                            break;
+                        }
+                    }
+
+                    // Check varargs parameters
+                    if (j == num_fixed && is_varargs && num_formals > 0)
+                    {
+                        TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+                        TypeSymbol* component_type = varargs_type -> IsArray() ?
+                            varargs_type -> ArraySubtype() : varargs_type;
+
+                        for ( ; j < num_args; j++)
+                        {
+                            AstExpression* expr = method_call -> arguments -> Argument(j);
+                            if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (j == num_args)
+                    {
+                        // Create a method shadow for this static import
+                        MethodShadowSymbol* shadow = new MethodShadowSymbol(method);
+                        shadow -> next_method = NULL;
+                        static_import_method_shadows.Next() = shadow;  // Store for lifetime management
+                        methods_found.Next() = shadow;
+                        // where_found remains NULL to indicate static import
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -1551,6 +1616,23 @@ void Semantic::FindVariableInEnvironment(Tuple<VariableSymbol*>& variables_found
                 variables_found.Next() = variable_shadow -> Conflict(i);
             where_found = env;
             break;
+        }
+    }
+
+    // Java 5: If not found in environment, check single static imports
+    if (variables_found.Length() == 0 &&
+        control.option.source >= JikesOption::SDK1_5)
+    {
+        for (unsigned i = 0; i < single_static_imports.Length(); i++)
+        {
+            Symbol* imported_member = single_static_imports[i];
+            VariableSymbol* var = imported_member -> VariableCast();
+            if (var && var -> Identity() == name_symbol)
+            {
+                variables_found.Next() = var;
+                // where_found remains NULL to indicate static import
+                break;
+            }
         }
     }
 }
