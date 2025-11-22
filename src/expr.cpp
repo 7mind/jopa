@@ -237,6 +237,29 @@ inline bool Semantic::NoMethodMoreSpecific(Tuple<MethodShadowSymbol*>& maximally
 
 
 //
+// Returns true if a method is applicable by arity (parameter count) for the
+// given number of arguments. For varargs methods, the argument count must be
+// at least (num_formals - 1), otherwise it must be exactly num_formals.
+//
+inline bool Semantic::MethodApplicableByArity(MethodSymbol* method,
+                                               unsigned num_arguments)
+{
+    unsigned num_formals = method -> NumFormalParameters();
+    if (method -> ACC_VARARGS())
+    {
+        // Varargs: need at least (num_formals - 1) arguments
+        // e.g., method(String... args) has 1 formal, accepts 0+ arguments
+        return (num_formals == 0) || (num_arguments >= num_formals - 1);
+    }
+    else
+    {
+        // Non-varargs: need exact match
+        return num_arguments == num_formals;
+    }
+}
+
+
+//
 // Creates a new wchar_t[] containing the type of the method or constructor
 // overload for printing in Report*NotFound. Caller is responsible for
 // calling delete[] on the result.
@@ -963,13 +986,18 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
         // abstract methods inherited from interfaces; and we can skip the
         // member access check because we can always invoke the public version.
         //
-        if ((method_call -> arguments -> NumArguments() ==
-             method -> NumFormalParameters()) &&
+        unsigned num_args = method_call -> arguments -> NumArguments();
+        if (MethodApplicableByArity(method, num_args) &&
             (MemberAccessCheck(type, method, base) ||
              method_shadow -> NumConflicts() > 0))
         {
             unsigned i;
-            for (i = 0; i < method_call -> arguments -> NumArguments(); i++)
+            unsigned num_formals = method -> NumFormalParameters();
+            bool is_varargs = method -> ACC_VARARGS();
+
+            // Check fixed parameters
+            unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
+            for (i = 0; i < num_fixed && i < num_args; i++)
             {
                 AstExpression* expr = method_call -> arguments -> Argument(i);
                 if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
@@ -978,7 +1006,25 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
                     break;
                 }
             }
-            if (i == method_call -> arguments -> NumArguments())
+
+            // Check varargs parameters against component type
+            if (i == num_fixed && is_varargs && num_formals > 0)
+            {
+                TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+                TypeSymbol* component_type = varargs_type -> IsArray() ?
+                    varargs_type -> ArraySubtype() : varargs_type;
+
+                for ( ; i < num_args; i++)
+                {
+                    AstExpression* expr = method_call -> arguments -> Argument(i);
+                    if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                    {
+                        break;
+                    }
+                }
+            }
+
+            if (i == num_args)
             {
                 if (MoreSpecific(method, method_set))
                 {
@@ -1078,11 +1124,16 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
                 // Since type -> IsOwner(this_type()), i.e., type encloses
                 // this_type(), method is accessible, even if it is private.
                 //
-                if (method_call -> arguments -> NumArguments() ==
-                    method -> NumFormalParameters())
+                unsigned num_args = method_call -> arguments -> NumArguments();
+                if (MethodApplicableByArity(method, num_args))
                 {
                     unsigned i;
-                    for (i = 0; i < method_call -> arguments -> NumArguments(); i++)
+                    unsigned num_formals = method -> NumFormalParameters();
+                    bool is_varargs = method -> ACC_VARARGS();
+
+                    // Check fixed parameters
+                    unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
+                    for (i = 0; i < num_fixed && i < num_args; i++)
                     {
                         AstExpression* expr = method_call -> arguments -> Argument(i);
                         if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
@@ -1091,7 +1142,25 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
                             break;
                         }
                     }
-                    if (i == method_call -> arguments -> NumArguments())
+
+                    // Check varargs parameters against component type
+                    if (i == num_fixed && is_varargs && num_formals > 0)
+                    {
+                        TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+                        TypeSymbol* component_type = varargs_type -> IsArray() ?
+                            varargs_type -> ArraySubtype() : varargs_type;
+
+                        for ( ; i < num_args; i++)
+                        {
+                            AstExpression* expr = method_call -> arguments -> Argument(i);
+                            if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (i == num_args)
                     {
                         if (MoreSpecific(method, methods_found))
                         {
@@ -5218,8 +5287,34 @@ TypeSymbol* Semantic::BinaryNumericPromotion(AstExpression*& left_expr,
 void Semantic::MethodInvocationConversion(AstArguments* args,
                                           MethodSymbol* method)
 {
-    assert(args -> NumArguments() == method -> NumFormalParameters());
-    for (unsigned i = 0; i < args -> NumArguments(); i++)
+    bool is_varargs = method -> ACC_VARARGS();
+    unsigned num_formals = method -> NumFormalParameters();
+    unsigned num_args = args -> NumArguments();
+
+    if (! is_varargs)
+    {
+        assert(num_args == num_formals);
+        for (unsigned i = 0; i < num_args; i++)
+        {
+            AstExpression* expr = args -> Argument(i);
+            if (expr -> Type() != method -> FormalParameter(i) -> Type())
+            {
+                args -> Argument(i) =
+                    ConvertToType(expr, method -> FormalParameter(i) -> Type());
+            }
+        }
+        return;
+    }
+
+    // Varargs method - need to handle variable arguments
+    assert(num_formals > 0);
+    TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+    assert(varargs_type -> IsArray());
+    TypeSymbol* component_type = varargs_type -> ArraySubtype();
+
+    // Convert non-varargs parameters normally
+    unsigned num_fixed = num_formals - 1;
+    for (unsigned i = 0; i < num_fixed && i < num_args; i++)
     {
         AstExpression* expr = args -> Argument(i);
         if (expr -> Type() != method -> FormalParameter(i) -> Type())
@@ -5228,6 +5323,67 @@ void Semantic::MethodInvocationConversion(AstArguments* args,
                 ConvertToType(expr, method -> FormalParameter(i) -> Type());
         }
     }
+
+    // Handle varargs parameter
+    if (num_args == num_formals)
+    {
+        // Exact match - last argument might be an array or single element
+        AstExpression* last_arg = args -> Argument(num_args - 1);
+        if (last_arg -> Type() == varargs_type)
+        {
+            // Already an array of correct type - no wrapping needed
+            return;
+        }
+        // Fall through to wrap single element in array
+    }
+
+    // Need to wrap varargs arguments in an array
+    // Create: new ComponentType[] { arg1, arg2, ... }
+    StoragePool* ast_pool = compilation_unit -> ast_pool;
+    TokenIndex loc = args -> left_parenthesis_token;
+
+    AstArrayCreationExpression* array_creation = ast_pool -> GenArrayCreationExpression();
+    array_creation -> new_token = loc;
+
+    // Create array type
+    AstName* component_name = ast_pool -> GenName(loc);
+    component_name -> symbol = component_type;
+    AstTypeName* type_name = ast_pool -> GenTypeName(component_name);
+    AstBrackets* brackets = ast_pool -> GenBrackets(loc, loc);
+    brackets -> dims = 1;
+    AstArrayType* array_type = ast_pool -> GenArrayType(type_name, brackets);
+    array_type -> symbol = varargs_type;
+    array_creation -> array_type = array_type;
+
+    // Create array initializer with varargs arguments
+    unsigned num_varargs = (num_args >= num_fixed) ? (num_args - num_fixed) : 0;
+    AstArrayInitializer* initializer = ast_pool -> GenArrayInitializer();
+    initializer -> left_brace_token = loc;
+    initializer -> right_brace_token = loc;
+    initializer -> AllocateVariableInitializers(num_varargs);
+
+    for (unsigned i = num_fixed; i < num_args; i++)
+    {
+        AstExpression* vararg = args -> Argument(i);
+        // Convert to component type if needed
+        if (vararg -> Type() != component_type)
+            vararg = ConvertToType(vararg, component_type);
+        initializer -> AddVariableInitializer(vararg);
+    }
+
+    array_creation -> array_initializer_opt = initializer;
+    array_creation -> symbol = varargs_type;
+
+    // Replace varargs arguments with the single array expression
+    // Note: We can't resize the arguments array, so we replace in place
+    // The extra arguments will remain but the method signature expects only num_formals
+    // Special case: if num_args < num_formals, we can't modify arguments here
+    // The bytecode generator will handle this case
+    if (num_args >= num_formals)
+    {
+        args -> Argument(num_fixed) = array_creation;
+    }
+    // else: bytecode generator will create empty array when needed
 }
 
 

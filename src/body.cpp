@@ -2514,6 +2514,9 @@ void Semantic::ProcessExecutableBodies(AstClassBody* class_body)
             VariableSymbol* variable_symbol = (*FinalFields())[i];
             if (! DefinitelyAssignedVariables() -> da_set[i])
             {
+                // Enum constants are static final, initialized in static initializer
+                if (variable_symbol -> ACC_ENUM())
+                    continue;
                 assert(! variable_symbol -> ACC_STATIC());
                 unassigned.Next() = variable_symbol;
             }

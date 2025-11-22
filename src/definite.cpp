@@ -1736,7 +1736,9 @@ void Semantic::DefiniteSetup()
     for (int j = 0; j < size; j++)
     {
         VariableSymbol* final_var = (*FinalFields())[j];
-        if (! final_var -> declarator -> variable_initializer_opt)
+        // Enum constants don't have declarators, but they're initialized in static initializer
+        if (! final_var -> declarator ||
+            ! final_var -> declarator -> variable_initializer_opt)
             BlankFinals() -> AddElement(j);
     }
 }

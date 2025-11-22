@@ -5261,8 +5261,45 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
     }
 
     int stack_words = 0; // words on stack needed for arguments
-    for (unsigned i = 0; i < method_call -> arguments -> NumArguments(); i++)
-        stack_words += EmitExpression(method_call -> arguments -> Argument(i));
+    unsigned num_args = method_call -> arguments -> NumArguments();
+    unsigned num_formals = msym -> NumFormalParameters();
+
+    if (msym -> ACC_VARARGS())
+    {
+        // Varargs method - emit fixed args, then create array for varargs
+        unsigned num_fixed = num_formals > 0 ? num_formals - 1 : 0;
+
+        // Emit fixed arguments
+        for (unsigned i = 0; i < num_fixed && i < num_args; i++)
+            stack_words += EmitExpression(method_call -> arguments -> Argument(i));
+
+        // Emit or create the varargs array
+        if (num_args >= num_formals)
+        {
+            // Array was already created by MethodInvocationConversion
+            stack_words += EmitExpression(method_call -> arguments -> Argument(num_fixed));
+        }
+        else
+        {
+            // Create empty array for missing varargs
+            TypeSymbol* varargs_type = msym -> FormalParameter(num_formals - 1) -> Type();
+            assert(varargs_type -> IsArray());
+            TypeSymbol* component_type = varargs_type -> ArraySubtype();
+
+            // Generate: anewarray <component_type> with count 0
+            PutOp(OP_ICONST_0);
+            PutOp(OP_ANEWARRAY);
+            PutU2(RegisterClass(component_type));
+            ChangeStack(0); // iconst_0 (+1), anewarray uses it and produces array (+0 net)
+            stack_words++;
+        }
+    }
+    else
+    {
+        // Non-varargs method - emit all arguments
+        for (unsigned i = 0; i < num_args; i++)
+            stack_words += EmitExpression(method_call -> arguments -> Argument(i));
+    }
 
     TypeSymbol* type = MethodTypeResolution(method_call -> base_opt, msym);
     PutOp(msym -> ACC_STATIC() ? OP_INVOKESTATIC

@@ -837,6 +837,7 @@ private:
     void ProcessClassBodyForEffectiveJavaChecks(AstClassBody*);
     void CheckForSerializationMistakes(AstClassBody*);
     void ProcessFieldMembers(AstClassBody*);
+    void ProcessEnumConstantMembers(AstClassBody*);
     void ProcessMembers(AstClassBody*);
     void CompleteSymbolTable(AstClassBody*);
 
@@ -1154,6 +1155,7 @@ private:
     inline bool MoreSpecific(MethodSymbol*, Tuple<MethodShadowSymbol*>&);
     inline bool NoMethodMoreSpecific(Tuple<MethodShadowSymbol*>&,
                                      MethodSymbol*);
+    inline bool MethodApplicableByArity(MethodSymbol*, unsigned);
     void FindMethodInEnvironment(Tuple<MethodShadowSymbol*>&,
                                  SemanticEnvironment*&,
                                  SemanticEnvironment*, AstMethodInvocation*);

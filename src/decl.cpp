@@ -1379,7 +1379,7 @@ inline void Semantic::ProcessEnumConstantMembers(AstClassBody* class_body)
 
     TypeSymbol* enum_type = ThisType();
     assert(enum_type -> HeaderProcessed());
-    assert(enum_type -> ACC_ENUM());
+    assert(enum_type -> IsEnum());
 
     // Process each enum constant
     for (unsigned i = 0; i < enum_decl -> NumEnumConstants(); i++)
@@ -1627,6 +1627,7 @@ void Semantic::ProcessMembers(AstClassBody* class_body)
     ProcessConstructorMembers(class_body);
     ProcessMethodMembers(class_body);
     ProcessFieldMembers(class_body);
+    ProcessEnumConstantMembers(class_body); // Process enum constants if this is an enum
     ProcessClassBodyForEffectiveJavaChecks(class_body);
 
     delete this_type -> innertypes_closure; // save some space !!!
@@ -2822,7 +2823,11 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
     constructor -> SetType(type);
     constructor -> SetContainingType(type);
     constructor -> SetBlockSymbol(block_symbol);
-    if (type -> ACC_PUBLIC())
+
+    // Enum constructors must be private
+    if (type -> IsEnum())
+        constructor -> SetACC_PRIVATE();
+    else if (type -> ACC_PUBLIC())
         constructor -> SetACC_PUBLIC();
     else if (type -> ACC_PROTECTED())
         constructor -> SetACC_PROTECTED();
@@ -2831,6 +2836,28 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
 
     if (type -> ACC_STRICTFP())
         constructor -> SetACC_STRICTFP();
+
+    // Enum constructors have two implicit parameters: String name, int ordinal
+    if (type -> IsEnum())
+    {
+        // Add name parameter (String)
+        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        VariableSymbol* name_param = block_symbol -> InsertVariableSymbol(name_sym);
+        name_param -> SetType(control.String());
+        name_param -> SetOwner(constructor);
+        name_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
+        name_param -> MarkComplete();
+        name_param -> SetACC_SYNTHETIC();
+
+        // Add ordinal parameter (int)
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        VariableSymbol* ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
+        ordinal_param -> SetType(control.int_type);
+        ordinal_param -> SetOwner(constructor);
+        ordinal_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
+        ordinal_param -> MarkComplete();
+        ordinal_param -> SetACC_SYNTHETIC();
+    }
 
     if (type -> EnclosingType())
     {
@@ -2857,6 +2884,9 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         method_declarator -> left_parenthesis_token = left_loc;
         method_declarator -> right_parenthesis_token = right_loc;
 
+        // Enum AST formal parameters are created implicitly - the signature
+        // is set from the block symbol's variables above
+
         AstSuperCall* super_call = NULL;
         if (type != control.Object())
         {
@@ -2864,6 +2894,33 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
             super_call -> super_token = left_loc;
             super_call -> arguments = compilation_unit -> ast_pool ->
                 GenArguments(left_loc, right_loc);
+
+            // For enums, pass name and ordinal parameters to super (Enum) constructor
+            if (type -> IsEnum())
+            {
+                super_call -> arguments -> AllocateArguments(2);
+
+                // Get the parameter symbols from the constructor's block symbol
+                // They were added earlier: name (index 1) and ordinal (index 2)
+                // (index 0 is 'this')
+                VariableSymbol* name_param = constructor -> block_symbol -> FindVariableSymbol(
+                    control.FindOrInsertName(L"name", 4));
+                VariableSymbol* ordinal_param = constructor -> block_symbol -> FindVariableSymbol(
+                    control.FindOrInsertName(L"ordinal", 7));
+
+                // Create name argument reference
+                AstName* name_ref = compilation_unit -> ast_pool -> GenName(left_loc);
+                if (name_param)
+                    name_ref -> symbol = name_param;
+                super_call -> arguments -> AddArgument(name_ref);
+
+                // Create ordinal argument reference
+                AstName* ordinal_ref = compilation_unit -> ast_pool -> GenName(left_loc);
+                if (ordinal_param)
+                    ordinal_ref -> symbol = ordinal_param;
+                super_call -> arguments -> AddArgument(ordinal_ref);
+            }
+
             super_call -> semicolon_token = right_loc;
         }
 
@@ -3935,6 +3992,17 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         method -> AddTypeParameter(type_param);
     }
 
+    // Propagate varargs flag from last parameter to method
+    if (method -> NumFormalParameters() > 0)
+    {
+        VariableSymbol* last_param =
+            method -> FormalParameter(method -> NumFormalParameters() - 1);
+        if (last_param -> ACC_VARARGS())
+        {
+            method -> SetACC_VARARGS();
+        }
+    }
+
     method -> SetSignature(control);
 
     // Note: temp_method is not deleted to avoid issues with transferred type_parameters
@@ -4720,6 +4788,78 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
         estimate += class_body -> ClassVariable(i) -> NumVariableDeclarators();
     }
     MethodSymbol* init_method = GetStaticInitializerMethod(estimate);
+
+    //
+    // For enum types, initialize enum constants first
+    //
+    if (this_type -> IsEnum() && class_body -> owner)
+    {
+        AstEnumDeclaration* enum_decl = class_body -> owner -> EnumDeclarationCast();
+        if (enum_decl)
+        {
+            StoragePool* ast_pool = compilation_unit -> ast_pool;
+            TokenIndex loc = class_body -> identifier_token;
+            AstMethodDeclaration* declaration =
+                (AstMethodDeclaration*) init_method -> declaration;
+
+            for (unsigned i = 0; i < enum_decl -> NumEnumConstants(); i++)
+            {
+                AstEnumConstant* enum_constant = enum_decl -> EnumConstant(i);
+                VariableSymbol* field_symbol = enum_constant -> field_symbol;
+
+                if (field_symbol)
+                {
+                    // Create: CONSTANT_NAME = new EnumType("CONSTANT_NAME", ordinal)
+
+                    // Left side: field reference
+                    AstName* field_ref = ast_pool -> GenName(enum_constant -> identifier_token);
+                    field_ref -> symbol = field_symbol;
+
+                    // Right side: new EnumType("name", ordinal)
+                    AstClassCreationExpression* creation = ast_pool -> GenClassCreationExpression();
+                    creation -> new_token = loc;
+                    AstName* type_name = ast_pool -> GenName(loc);
+                    type_name -> symbol = this_type;
+                    creation -> class_type = ast_pool -> GenTypeName(type_name);
+                    creation -> class_type -> symbol = this_type;
+
+                    // Arguments: ("CONSTANT_NAME", ordinal)
+                    creation -> arguments = ast_pool -> GenArguments(loc, loc);
+                    creation -> arguments -> AllocateArguments(2);
+
+                    // String name argument - create string literal
+                    const NameSymbol* name_symbol = field_symbol -> Identity();
+                    AstStringLiteral* name_arg = ast_pool -> GenStringLiteral(loc);
+                    name_arg -> value = name_symbol -> Utf8_literal;
+                    name_arg -> symbol = control.String();
+                    creation -> arguments -> AddArgument(name_arg);
+
+                    // int ordinal argument - create integer literal
+                    AstIntegerLiteral* ordinal_arg = ast_pool -> GenIntegerLiteral(loc);
+                    ordinal_arg -> value = control.int_pool.FindOrInsert(enum_constant -> ordinal);
+                    ordinal_arg -> symbol = control.int_type;
+                    creation -> arguments -> AddArgument(ordinal_arg);
+
+                    creation -> symbol = this_type;
+
+                    // Create assignment: field = creation
+                    AstAssignmentExpression* assignment = ast_pool -> GenAssignmentExpression(
+                        AstAssignmentExpression::SIMPLE_EQUAL, loc);
+                    assignment -> left_hand_side = field_ref;
+                    assignment -> expression = creation;
+                    assignment -> symbol = this_type;
+
+                    // Wrap in expression statement
+                    AstExpressionStatement* stmt = ast_pool -> GenExpressionStatement();
+                    stmt -> expression = assignment;
+                    stmt -> semicolon_token_opt = loc;
+
+                    // Add to static initializer
+                    declaration -> method_body_opt -> AddStatement(stmt);
+                }
+            }
+        }
+    }
 
     //
     // The static initializers and class variable initializers are executed
