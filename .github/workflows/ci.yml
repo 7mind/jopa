@@ -102,6 +102,6 @@ jobs:
       - name: Test ${{ matrix.feature.name }}
         run: |
           nix develop --command bash -c "
-            ./src/jikes -source 1.5 -sourcepath test-generics/runtime -d test-generics ${{ matrix.feature.test }}
+            ./src/jikes -source 1.5 -sourcepath test-generics/runtime:test-generics -d test-generics ${{ matrix.feature.test }}
             java -cp test-generics $(basename ${{ matrix.feature.test }} .java)
           "
