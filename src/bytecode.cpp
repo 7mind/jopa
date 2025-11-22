@@ -861,6 +861,12 @@ void ByteCode::DeclareLocalVariable(AstVariableDeclarator* declarator)
                 (AstExpression*) declarator -> variable_initializer_opt;
             assert(declarator -> variable_initializer_opt -> ExpressionCast());
             EmitExpression(expr);
+
+            // Java 5: Insert boxing/unboxing conversion if needed
+            TypeSymbol* expr_type = expr -> Type();
+            if (expr_type != type)
+                EmitCast(type, expr_type);
+
             //
             // Prior to JDK 1.5, VMs incorrectly complained if assigning an
             // array type into an element of a null expression (in other
@@ -3841,6 +3847,67 @@ void ByteCode::GenerateEnumValueOfMethod()
 
 
 //
+// Emit boxing conversion: primitive → wrapper
+// Call: WrapperClass.valueOf(primitive)
+// Stack: primitive → wrapper
+//
+void ByteCode::EmitBoxingConversion(TypeSymbol* source_type, TypeSymbol* target_type)
+{
+    // Verify this is actually a boxing conversion
+    if (!source_type || !target_type || !source_type -> Primitive())
+        return;
+
+    // Find the wrapper type and valueOf method
+    TypeSymbol* wrapper_type = semantic.GetWrapperType(source_type);
+    if (!wrapper_type || wrapper_type != target_type)
+        return;
+
+    MethodSymbol* valueOf_method = semantic.GetBoxingMethod(source_type);
+    if (!valueOf_method)
+        return;
+
+    // Call WrapperClass.valueOf(primitive)
+    // Primitive value is already on stack
+    // INVOKESTATIC doesn't auto-track stack, so we manually manage it
+    int arg_words = GetTypeWords(source_type);
+    ChangeStack(-arg_words); // Pop the primitive argument
+    PutOp(OP_INVOKESTATIC);
+    PutU2(RegisterMethodref(wrapper_type, valueOf_method));
+    ChangeStack(1); // Push the wrapper object reference (always 1 word)
+}
+
+
+//
+// Emit unboxing conversion: wrapper → primitive
+// Call: wrapper.primitiveValue()
+// Stack: wrapper → primitive
+//
+void ByteCode::EmitUnboxingConversion(TypeSymbol* source_type, TypeSymbol* target_type)
+{
+    // Verify this is actually an unboxing conversion
+    if (!source_type || !target_type || !target_type -> Primitive())
+        return;
+
+    // Find the primitive type and unboxing method
+    TypeSymbol* primitive_type = semantic.GetPrimitiveType(source_type);
+    if (!primitive_type || primitive_type != target_type)
+        return;
+
+    MethodSymbol* unbox_method = semantic.GetUnboxingMethod(source_type);
+    if (!unbox_method)
+        return;
+
+    // Call wrapper.primitiveValue()
+    // Wrapper object is already on stack
+    // INVOKEVIRTUAL automatically pops 'this' (-1), so we only adjust for return value
+    PutOp(OP_INVOKEVIRTUAL);
+    PutU2(RegisterMethodref(source_type, unbox_method));
+    int result_words = GetTypeWords(target_type);
+    ChangeStack(result_words); // Push the primitive result
+}
+
+
+//
 // Generate code to dymanically initialize the field for a class literal, and
 // return its value. Only generated for older VMs (since newer ones support
 // ldc class).
@@ -5027,6 +5094,22 @@ void ByteCode::EmitCast(TypeSymbol* dest_type, TypeSymbol* source_type)
         source_type == control.null_type)
     {
         return; // done if nothing to do
+    }
+
+    // Java 5: Handle boxing conversion (primitive → wrapper)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        semantic.IsBoxingConversion(source_type, dest_type))
+    {
+        EmitBoxingConversion(source_type, dest_type);
+        return;
+    }
+
+    // Java 5: Handle unboxing conversion (wrapper → primitive)
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        semantic.IsUnboxingConversion(source_type, dest_type))
+    {
+        EmitUnboxingConversion(source_type, dest_type);
+        return;
     }
 
     if (control.IsSimpleIntegerValueType(source_type))

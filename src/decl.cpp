@@ -499,10 +499,23 @@ void Semantic::ProcessImports()
                 ReportSemError(SemanticError::STATIC_IMPORT_UNSUPPORTED,
                                import_declaration -> static_token_opt);
             }
+            else
+            {
+                // Java 5: Process static imports
+                if (import_declaration -> star_token_opt)
+                    ProcessStaticImportOnDemandDeclaration(import_declaration);
+                else
+                    ProcessSingleStaticImportDeclaration(import_declaration);
+            }
         }
-        if (import_declaration -> star_token_opt)
-            ProcessTypeImportOnDemandDeclaration(import_declaration);
-        else ProcessSingleTypeImportDeclaration(import_declaration);
+        else
+        {
+            // Regular type imports
+            if (import_declaration -> star_token_opt)
+                ProcessTypeImportOnDemandDeclaration(import_declaration);
+            else
+                ProcessSingleTypeImportDeclaration(import_declaration);
+        }
     }
 }
 
@@ -2473,6 +2486,123 @@ void Semantic::ProcessSingleTypeImportDeclaration(AstImportDeclaration* import_d
 }
 
 
+//
+// Java 5: Process a single static import declaration
+// Example: import static java.lang.Math.PI;
+//
+void Semantic::ProcessSingleStaticImportDeclaration(AstImportDeclaration* import_declaration)
+{
+    AstName* name = import_declaration -> name;
+
+    // For "import static pkg.Type.member", we need to:
+    // 1. Resolve pkg.Type (everything except the last identifier)
+    // 2. Find the static member in that type
+
+    // The name should be qualified (e.g., java.lang.Math.PI)
+    if (!name -> base_opt)
+    {
+        ReportSemError(SemanticError::INVALID_STATIC_IMPORT,
+                       name -> identifier_token,
+                       lex_stream -> NameString(name -> identifier_token));
+        return;
+    }
+
+    // Resolve the type part (everything except the last component)
+    ProcessImportQualifiedName(name -> base_opt);
+    TypeSymbol* type = name -> base_opt -> Type();
+
+    if (!type)
+    {
+        // Error already reported by ProcessImportQualifiedName
+        return;
+    }
+
+    // Ensure at least headers are processed
+    if (type -> SourcePending())
+        control.ProcessHeaders(type -> file_symbol);
+
+    // Get the member name (last component)
+    NameSymbol* member_name = lex_stream -> NameSymbol(name -> identifier_token);
+
+    // Search for static fields with this name
+    VariableSymbol* field = NULL;
+    for (unsigned i = 0; i < type -> NumVariableSymbols(); i++)
+    {
+        VariableSymbol* var = type -> VariableSym(i);
+        if (var -> Identity() == member_name && var -> ACC_STATIC())
+        {
+            field = var;
+            break;
+        }
+    }
+
+    // Search for static methods with this name
+    MethodSymbol* method = NULL;
+    for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* meth = type -> MethodSym(i);
+        if (meth -> Identity() == member_name && meth -> ACC_STATIC())
+        {
+            method = meth;
+            break;
+        }
+    }
+
+    if (!field && !method)
+    {
+        ReportSemError(SemanticError::STATIC_MEMBER_NOT_FOUND,
+                       name -> identifier_token,
+                       lex_stream -> NameString(name -> identifier_token),
+                       type -> ContainingPackageName(),
+                       type -> ExternalName());
+        return;
+    }
+
+    // Add the static member to our imports
+    // We prefer fields over methods if both exist with the same name
+    Symbol* member = field ? (Symbol*)field : (Symbol*)method;
+
+    // Check for duplicates
+    for (unsigned i = 0; i < single_static_imports.Length(); i++)
+    {
+        if (single_static_imports[i] == member)
+            return; // Duplicate, ignore
+    }
+
+    single_static_imports.Next() = member;
+}
+
+
+//
+// Java 5: Process a static import-on-demand declaration
+// Example: import static java.lang.Math.*;
+//
+void Semantic::ProcessStaticImportOnDemandDeclaration(AstImportDeclaration* import_declaration)
+{
+    ProcessImportQualifiedName(import_declaration -> name);
+    TypeSymbol* type = import_declaration -> name -> Type();
+
+    if (!type)
+    {
+        // Error already reported
+        return;
+    }
+
+    // Ensure at least headers are processed
+    if (type -> SourcePending())
+        control.ProcessHeaders(type -> file_symbol);
+
+    // Check for duplicates
+    for (unsigned i = 0; i < static_on_demand_imports.Length(); i++)
+    {
+        if (static_on_demand_imports[i] == type)
+            return;
+    }
+
+    static_on_demand_imports.Next() = type;
+}
+
+
 void Semantic::ProcessFieldDeclaration(AstFieldDeclaration* field_declaration)
 {
     TypeSymbol* this_type = ThisType();
@@ -4253,6 +4383,13 @@ MethodSymbol* Semantic::GetBoxingMethod(TypeSymbol* primitive_type)
     for (unsigned i = 0; i < wrapper_type -> NumMethodSymbols(); i++)
     {
         MethodSymbol* method = wrapper_type -> MethodSym(i);
+        if (!method -> IsTyped())
+        {
+            // Process the method signature if not already done
+            method -> ProcessMethodSignature((Semantic*)this, 0);
+        }
+        if (!method -> IsTyped())
+            continue;  // Still not typed, skip it
         if (method -> Identity() == valueOf_name &&
             method -> ACC_STATIC() &&
             method -> NumFormalParameters() == 1 &&
@@ -4302,6 +4439,13 @@ MethodSymbol* Semantic::GetUnboxingMethod(TypeSymbol* wrapper_type)
     for (unsigned i = 0; i < wrapper_type -> NumMethodSymbols(); i++)
     {
         MethodSymbol* method = wrapper_type -> MethodSym(i);
+        if (!method -> IsTyped())
+        {
+            // Process the method signature if not already done
+            method -> ProcessMethodSignature((Semantic*)this, 0);
+        }
+        if (!method -> IsTyped())
+            continue;  // Still not typed, skip it
         if (method -> Identity() == unbox_name &&
             !method -> ACC_STATIC() &&
             method -> NumFormalParameters() == 0 &&

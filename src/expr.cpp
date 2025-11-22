@@ -2516,6 +2516,83 @@ void Semantic::ProcessAmbiguousName(AstName* name)
             }
         }
         //
+        // Java 5: Check for static imports before type lookup
+        //
+        else if (control.option.source >= JikesOption::SDK1_5)
+        {
+            NameSymbol* name_symbol = lex_stream -> NameSymbol(name -> identifier_token);
+            Symbol* static_member = NULL;
+
+            // First check single static imports
+            for (unsigned i = 0; i < single_static_imports.Length(); i++)
+            {
+                Symbol* member = single_static_imports[i];
+                if (member -> Identity() == name_symbol)
+                {
+                    static_member = member;
+                    break;
+                }
+            }
+
+            // If not found in single imports, check static-on-demand imports
+            if (!static_member)
+            {
+                for (unsigned i = 0; i < static_on_demand_imports.Length(); i++)
+                {
+                    TypeSymbol* import_type = static_on_demand_imports[i];
+
+                    // Check for static fields
+                    for (unsigned j = 0; j < import_type -> NumVariableSymbols(); j++)
+                    {
+                        VariableSymbol* var = import_type -> VariableSym(j);
+                        if (var -> Identity() == name_symbol && var -> ACC_STATIC())
+                        {
+                            if (static_member)
+                            {
+                                // Ambiguous static import
+                                ReportSemError(SemanticError::AMBIGUOUS_FIELD,
+                                             name -> identifier_token,
+                                             name_symbol -> Name());
+                                name -> symbol = control.no_type;
+                                return;
+                            }
+                            static_member = var;
+                        }
+                    }
+
+                    // Check for static methods
+                    for (unsigned j = 0; j < import_type -> NumMethodSymbols(); j++)
+                    {
+                        MethodSymbol* meth = import_type -> MethodSym(j);
+                        if (meth -> Identity() == name_symbol && meth -> ACC_STATIC())
+                        {
+                            if (static_member && static_member -> VariableCast())
+                            {
+                                // Field takes precedence over methods, so don't mark as ambiguous
+                                break;
+                            }
+                            static_member = meth;
+                            break; // Methods can be overloaded, so we just note existence
+                        }
+                    }
+                }
+            }
+
+            if (static_member)
+            {
+                name -> symbol = static_member;
+                // For variables, check if we need to compute final value
+                VariableSymbol* var = static_member -> VariableCast();
+                if (var)
+                {
+                    if (var -> ACC_FINAL() && ! var -> IsInitialized())
+                        ComputeFinalValue(var);
+                    name -> value = var -> initial_value;
+                }
+                // Fall through to continue processing
+            }
+        }
+        //
         // ...Otherwise, if a type of that name is declared in the compilation
         // unit (7.3) containing the Identifier, either by a
         // single-type-import declaration (7.5.1) or by a class or interface
@@ -2536,26 +2613,28 @@ void Semantic::ProcessAmbiguousName(AstName* name)
         // type-import-on-demand declaration of the compilation unit
         // containing the Identifier, then a compile-time error results.
         //
-        else if ((type = FindType(name -> identifier_token)))
+        if (! name -> symbol)
         {
-            name -> symbol = type;
-            if (control.option.deprecation && type -> IsDeprecated() &&
-                ! InDeprecatedContext())
+            if ((type = FindType(name -> identifier_token)))
             {
-                ReportSemError(SemanticError::DEPRECATED_TYPE,
-                               name -> identifier_token,
-                               type -> ContainingPackageName(),
-                               type -> ExternalName());
+                name -> symbol = type;
+                if (control.option.deprecation && type -> IsDeprecated() &&
+                    ! InDeprecatedContext())
+                {
+                    ReportSemError(SemanticError::DEPRECATED_TYPE,
+                                   name -> identifier_token,
+                                   type -> ContainingPackageName(),
+                                   type -> ExternalName());
+                }
             }
-        }
-        //
-        // ...Otherwise, the Ambiguous name is reclassified as a PackageName.
-        // While the JLS claims a later step determines whether or not
-        // a package of that name actually exists, it is pointless to defer
-        // the error that long, as a package cannot qualify a method or field
-        // access, and a subpackage requires the base package to exist.
-        //
-        else
+            //
+            // ...Otherwise, the Ambiguous name is reclassified as a PackageName.
+            // While the JLS claims a later step determines whether or not
+            // a package of that name actually exists, it is pointless to defer
+            // the error that long, as a package cannot qualify a method or field
+            // access, and a subpackage requires the base package to exist.
+            //
+            else
         {
             NameSymbol* name_symbol =
                 lex_stream -> NameSymbol(name -> identifier_token);
@@ -2577,6 +2656,7 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                 ReportVariableNotFound(name, this_type);
                 name -> symbol = control.no_type;
             }
+        }
         }
     }
     //

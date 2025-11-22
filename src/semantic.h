@@ -808,6 +808,14 @@ public:
     bool IsConstantTrue(AstExpression* expr);
     bool IsConstantFalse(AstExpression* expr);
 
+    // Java 5: Boxing/Unboxing utilities - implemented in decl.cpp
+    TypeSymbol* GetWrapperType(TypeSymbol*);
+    TypeSymbol* GetPrimitiveType(TypeSymbol*);
+    bool IsBoxingConversion(TypeSymbol*, TypeSymbol*);
+    bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
+    MethodSymbol* GetBoxingMethod(TypeSymbol*);
+    MethodSymbol* GetUnboxingMethod(TypeSymbol*);
+
 private:
     enum
     {
@@ -850,6 +858,10 @@ private:
     // Used in the handling of imports - see decl.cpp
     Tuple<Symbol*> import_on_demand_packages;
     Tuple<TypeSymbol*> single_type_imports;
+
+    // Java 5: Static imports
+    Tuple<Symbol*> single_static_imports;  // MethodSymbol or VariableSymbol
+    Tuple<TypeSymbol*> static_on_demand_imports;  // Types for wildcard static imports
 
     //
     // Where am I?
@@ -973,6 +985,10 @@ private:
     TypeSymbol* FindSimpleNameType(PackageSymbol*, TokenIndex);
     void ProcessSingleTypeImportDeclaration(AstImportDeclaration*);
 
+    // Java 5: Static import processing
+    void ProcessSingleStaticImportDeclaration(AstImportDeclaration*);
+    void ProcessStaticImportOnDemandDeclaration(AstImportDeclaration*);
+
     // Implemented in modifier.cpp - process declaration modifiers
     AccessFlags ProcessModifiers(AstModifiers*, const wchar_t*, u2, u2 = 0);
     AccessFlags ProcessPackageModifiers(AstPackageDeclaration*);
@@ -1005,14 +1021,6 @@ private:
     TypeSymbol* FindInaccessibleType(AstName*);
     TypeSymbol* MustFindType(AstName*);
     void ProcessType(AstType*);
-
-    // Boxing/Unboxing utilities for Java 5 autoboxing
-    TypeSymbol* GetWrapperType(TypeSymbol*);
-    TypeSymbol* GetPrimitiveType(TypeSymbol*);
-    bool IsBoxingConversion(TypeSymbol*, TypeSymbol*);
-    bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
-    MethodSymbol* GetBoxingMethod(TypeSymbol*);
-    MethodSymbol* GetUnboxingMethod(TypeSymbol*);
 
     // Implemented in decl.cpp - process initializers
     void InitializeVariable(AstFieldDeclaration*, MethodSymbol*);

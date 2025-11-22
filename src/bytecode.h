@@ -893,6 +893,10 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
     void GenerateAssertVariableInitializer(TypeSymbol*, VariableSymbol*);
     void EmitCheckForNull(AstExpression* expr, bool = true);
 
+    // Java 5 Autoboxing/Unboxing support
+    void EmitBoxingConversion(TypeSymbol*, TypeSymbol*);
+    void EmitUnboxingConversion(TypeSymbol*, TypeSymbol*);
+
     //
     // Methods to process statements
     //

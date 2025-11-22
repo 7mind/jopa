@@ -1777,8 +1777,12 @@ void SemanticError::InitializeMessages()
         "for `-source 1.5' or greater."
         "(not yet implemented)";
     messages[STATIC_IMPORT_UNSUPPORTED] =
-        "Static imports are only supported for `-source 1.5' or greater."
-        "(not yet implemented)";
+        "Static imports are only supported for `-source 1.5' or greater.";
+    messages[INVALID_STATIC_IMPORT] =
+        "Static import \"%1\" is invalid. Static imports must be qualified "
+        "(e.g., \"import static pkg.Type.member;\").";
+    messages[STATIC_MEMBER_NOT_FOUND] =
+        "Static member \"%1\" not found in type \"%2.%3\".";
     messages[ANNOTATION_MODIFIER_UNSUPPORTED] =
         "Annotation modifiers are only supported for `-source 1.5' or "
         "greater."

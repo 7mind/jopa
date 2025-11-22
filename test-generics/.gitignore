@@ -1,0 +1,65 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.out
+.deps/
+.libs/
+*.lo
+*.la
+
+# Jikes compiler output
+src/jikes
+src/jikes.exe
+
+# Compiled Java class files
+*.class
+
+# Test outputs
+test-generics/*.class
+test-generics/*.log
+test-generics/.test-results
+
+# Autotools/build system
+Makefile
+Makefile.in
+aclocal.m4
+autom4te.cache/
+config.cache
+config.log
+config.status
+configure
+config.h
+config.h.in
+stamp-h1
+.dirstamp
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Nix
+result
+result-*
+.direnv/
+.envrc.cache
+
+# Temporary files
+/tmp/
+*.tmp
+/tmp/jikes_*
+
+# Documentation build
+docs/*.html
+docs/*.pdf
+
+# Package files
+*.tar.gz
+*.tar.bz2
+*.zip

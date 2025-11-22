@@ -1,0 +1,107 @@
+name: Jikes Java 5 CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    name: Build and Test Jikes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Check flake
+        run: nix flake check --show-trace
+
+      - name: Build Jikes
+        run: |
+          nix develop --command bash -c "
+            ./configure
+            make -j$(nproc)
+          "
+
+      - name: Run unit tests
+        run: |
+          nix develop --command bash -c "
+            make check || true
+          "
+
+      - name: Run Java 5 feature tests
+        run: |
+          nix develop --command bash -c "
+            cd test-generics
+            bash ./run-tests.sh
+          "
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f test-generics/.test-results ]; then
+            cat test-generics/.test-results >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            test-generics/*.class
+            test-generics/*.log
+          retention-days: 7
+
+  check-java5-features:
+    name: Java 5 Feature Matrix
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        feature:
+          - name: "Generics"
+            test: "test-generics/GenericTest.java"
+          - name: "Enums"
+            test: "test-generics/ColorTest.java"
+          - name: "Varargs"
+            test: "test-generics/VarargsTest.java"
+          - name: "Enhanced For"
+            test: "test-generics/ForEachTest.java"
+      fail-fast: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build Jikes
+        run: |
+          nix develop --command bash -c "
+            ./configure
+            make -j$(nproc)
+          "
+
+      - name: Test ${{ matrix.feature.name }}
+        run: |
+          nix develop --command bash -c "
+            ./src/jikes -source 1.5 -sourcepath test-generics/runtime -d test-generics ${{ matrix.feature.test }}
+            java -cp test-generics $(basename ${{ matrix.feature.test }} .java)
+          "
