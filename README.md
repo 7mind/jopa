@@ -15,8 +15,6 @@ This fork adds comprehensive Java 5 (J2SE 5.0) language features:
 - ✅ **Autoboxing/Unboxing** - Automatic conversions between primitives and wrappers (assignments, method args, return values, arithmetic)
 - ✅ **Static Imports** - Import static members (single field, single method, wildcard)
 
-**Test Coverage:** 36 tests (22 compile + 14 runtime) - all passing
-
 ## Building
 
 - Requirements:
