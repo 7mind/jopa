@@ -13,13 +13,13 @@ class Box<T> {
 
 public class TypeSubstitutionTest {
     public static void main(String[] args) {
-        Box<String> stringBox = new Box<String>();
+        Box<TestString> stringBox = new Box<TestString>();
 
         // Method call - this should work
-        String s = stringBox.get();
+        TestString s = stringBox.get();
 
         // Field access - this should ALSO work if type substitution is implemented
-        String s2 = stringBox.value;
+        TestString s2 = stringBox.value;
 
         stringBox.set("hello");
 
@@ -27,6 +27,6 @@ public class TypeSubstitutionTest {
     }
 }
 
-class String {
+class TestString {
     // Stub for compilation
 }

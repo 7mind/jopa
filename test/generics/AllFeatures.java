@@ -95,12 +95,12 @@ class GenericBase<T> {
 }
 
 // Covariant override - triggers bridge method generation
-class StringChild extends GenericBase<String> {
-    public String get() {  // Overrides GenericBase<String>.get() : Object
+class StringChild extends GenericBase<TestString> {
+    public TestString get() {  // Overrides GenericBase<TestString>.get() : Object
         return "test";
     }
 
-    public void set(String value) {  // Overrides GenericBase<String>.set(Object)
+    public void set(String value) {  // Overrides GenericBase<TestString>.set(Object)
     }
 }
 
@@ -122,8 +122,8 @@ class WildcardExamples {
 
 // ===== FEATURE 9: Nested Generics =====
 class NestedGenerics {
-    Box<Box<String>> boxOfBoxes;
-    Pair<Box<TestInteger>, Box<String>> pairOfBoxes;
+    Box<Box<TestString>> boxOfBoxes;
+    Pair<Box<TestInteger>, Box<TestString>> pairOfBoxes;
     Box<Pair<String, TestInteger>> boxOfPair;
 }
 
@@ -163,8 +163,8 @@ class TestDouble extends TestNumber {
     }
 }
 
-class String {
-    public String() {}
+class TestString {
+    public TestString() {}
 }
 
 // ===== FEATURE 11: Type Parameter Scope =====
@@ -201,18 +201,18 @@ class GenericImpl<T> implements GenericInterface<T> {
 class TestClient {
     public void testAllFeatures() {
         // Test parameterized types
-        Box<String> stringBox = new Box<String>("hello");
+        Box<TestString> stringBox = new Box<TestString>("hello");
         Box<TestInteger> intBox = new Box<TestInteger>(new TestInteger(42));
 
         // Test generic methods
-        String s = Utils.identity("test");
+        TestString s = Utils.identity("test");
         TestInteger i = Utils.max(new TestInteger(1), new TestInteger(2));
 
         // Test wildcards
         Box<? extends TestNumber> numBox = intBox;
 
         // Test nested generics
-        Box<Box<String>> nested = new Box<Box<String>>(stringBox);
+        Box<Box<TestString>> nested = new Box<Box<TestString>>(stringBox);
 
         // Test pairs
         Pair<String, TestInteger> pair = new Pair<String, TestInteger>("age", new TestInteger(25));

@@ -3,11 +3,11 @@ class Box<T> {
     T value;
 }
 
-class StringBox extends Box<String> {
+class StringBox extends Box<TestString> {
     // Now use type argument
 }
 
-class String {
+class TestString {
     // Stub
 }
 

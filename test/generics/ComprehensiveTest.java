@@ -52,8 +52,8 @@ class Utils {
 }
 
 // Test 5: Inheritance with covariant override (bridge method needed)
-class StringBox extends Box<String> {
-    String get() {  // Overrides Box.get() : Object with String return type
+class StringBox extends Box<TestString> {
+    TestString get() {  // Overrides Box.get() : Object with TestString return type
         return "test";
     }
 }
@@ -81,6 +81,6 @@ class TestInteger extends TestNumber {
     }
 }
 
-class String {
-    String() {}
+class TestString {
+    TestString() {}
 }

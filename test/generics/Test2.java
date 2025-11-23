@@ -4,8 +4,8 @@ class Gen<T> {
 }
 
 class Test {
-    Gen<String> field;
+    Gen<TestString> field;
 }
 
-class String {
+class TestString {
 }

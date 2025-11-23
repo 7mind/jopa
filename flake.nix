@@ -47,7 +47,6 @@
             echo "Available commands:"
             echo "  - Build with CMake: cmake -S . -B build && cmake --build build"
             echo "  - Run tests: cd build && ctest"
-            echo "  - Legacy build: ./configure && make"
             echo ""
           '';
         };

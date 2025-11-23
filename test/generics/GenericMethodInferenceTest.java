@@ -12,20 +12,20 @@ class Utils {
 
 public class GenericMethodInferenceTest {
     public static void main(String[] args) {
-        // Should infer <String>
-        String s = Utils.identity("hello");
+        // Should infer <TestString>
+        TestString s = Utils.identity("hello");
 
         // Should infer <TestInteger>
         TestInteger i = Utils.identity(42);
 
-        // Should infer <String>
-        String s2 = Utils.first("hello", "world");
+        // Should infer <TestString>
+        TestString s2 = Utils.first("hello", "world");
 
         System.out.println("Generic method inference works!");
     }
 }
 
-class String {
+class TestString {
     // Stub for compilation
 }
 
