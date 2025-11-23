@@ -1,9 +1,7 @@
 #ifndef HEADERS
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Parser::InitRuleAction()
 {
     rule_action[0] = &Parser::BadAction;
@@ -2493,8 +2491,7 @@ void Parser::InitRuleAction()
     return;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // ! HEADERS

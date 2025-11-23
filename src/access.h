@@ -4,11 +4,8 @@
 
 #include "platform.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 class AccessFlags
 {
 public:
@@ -214,9 +211,8 @@ public:
 #endif // JIKES_DEBUG
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // access_INCLUDED
 

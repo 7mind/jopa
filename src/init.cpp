@@ -3,10 +3,8 @@
 #include "control.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Semantic::ProcessVariableInitializer(AstVariableDeclarator* variable_declarator)
 {
     VariableSymbol* symbol = variable_declarator -> symbol;
@@ -219,7 +217,6 @@ void Semantic::ComputeFinalValue(VariableSymbol* variable)
     }
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

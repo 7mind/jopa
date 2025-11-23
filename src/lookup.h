@@ -6,10 +6,8 @@
 #include "long.h"
 #include "double.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Control;
 class Symbol;
 class PackageSymbol;
@@ -865,8 +863,7 @@ inline unsigned Symbol::HashCode() const
     return (unsigned) Identity() -> index;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // lookup_INCLUDED

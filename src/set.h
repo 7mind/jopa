@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "lookup.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class ShadowSymbol
 {
 public:
@@ -1082,9 +1080,8 @@ void Map<Key, Value>::Resize()
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // set_INCLUDED
 

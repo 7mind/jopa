@@ -4,10 +4,8 @@
 #include "option.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Semantic::ProcessBlockStatements(AstBlock* block_body)
 {
     //
@@ -2659,7 +2657,6 @@ void Semantic::ProcessExecutableBodies(AstClassBody* class_body)
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

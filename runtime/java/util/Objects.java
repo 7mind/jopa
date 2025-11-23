@@ -10,7 +10,7 @@ package java.util;
  */
 public final class Objects {
     private Objects() {
-        throw new AssertionError("No java.util.Objects instances for you!");
+        throw new Error("No java.util.Objects instances for you!");
     }
 
     /**
@@ -93,19 +93,6 @@ public final class Objects {
      */
     public static String toString(Object o, String nullDefault) {
         return (o != null) ? o.toString() : nullDefault;
-    }
-
-    /**
-     * Returns 0 if the arguments are identical and c.compare(a, b) otherwise.
-     *
-     * @param <T> the type of the objects being compared
-     * @param a an object
-     * @param b an object to be compared with a
-     * @param c the Comparator to compare the first two arguments
-     * @return 0 if the arguments are identical and c.compare(a, b) otherwise
-     */
-    public static <T> int compare(T a, T b, Comparable<? super T> c) {
-        return (a == b) ? 0 : ((Comparable<T>)c).compareTo(b);
     }
 
     /**

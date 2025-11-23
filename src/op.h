@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "tuple.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class ConstantPool;
 
 // code dealing with describing and listing byte code
@@ -283,8 +281,7 @@ private:
 #endif // JIKES_DEBUG
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // op_INCLUDED

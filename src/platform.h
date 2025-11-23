@@ -231,10 +231,8 @@ enum { false = 0, true = 1 };
 # include <typeinfo>
 #endif
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 template <typename TO, typename FROM>
 inline TO DYNAMIC_CAST(FROM f)
 {
@@ -997,9 +995,8 @@ extern Ostream Coutput;
 #define cout Please_Do_Not_Use_cout_Directly_But_use_an_instance_of_Ostream_with_cout_as_argument
 #define cerr Please_Do_Not_Use_cerr_Directly_But_use_an_instance_of_Ostream_with_cerr_as_argument
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // platform_INCLUDED
 

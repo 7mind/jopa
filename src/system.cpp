@@ -5,10 +5,8 @@
 #include "option.h"
 #include "case.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // Convert the null terminated Unicode string source into its Utf8
 // representation pointed to by target. The char string target is presumed
@@ -1722,7 +1720,6 @@ FileSymbol* Control::GetFileFirst(Control& control, PackageSymbol* package,
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

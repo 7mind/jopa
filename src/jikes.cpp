@@ -11,7 +11,7 @@
 #include "jikesapi.h"
 #include "error.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 using namespace Jikes;
 #endif
 

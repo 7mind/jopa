@@ -6,10 +6,8 @@
 #include "option.h"
 #include "code.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 int (*Scanner::scan_keyword[13]) (const wchar_t* p1) =
 {
     ScanKeyword0,
@@ -1664,6 +1662,6 @@ void Scanner::ClassifyBadToken()
                          cursor - lex -> InputBuffer() - 1);
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

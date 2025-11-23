@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "symbol.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class VariableShadowSymbol
 {
 public:
@@ -467,9 +465,8 @@ private:
     unsigned hash_size;
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // table_INCLUDED
 

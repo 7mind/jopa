@@ -5,10 +5,8 @@
 
 #ifdef JIKES_DEBUG
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 static const char* token_type(unsigned char kind)
 {
     switch (kind)
@@ -253,9 +251,8 @@ const char* Dump(const wchar_t* wstr)
     return saved_data;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // JIKES_DEBUG
 

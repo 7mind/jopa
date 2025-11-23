@@ -4,10 +4,8 @@
 # include "stream.h"
 #endif // JIKES_DEBUG
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 #ifdef JIKES_DEBUG
 unsigned Ast::count = 0;
 #endif
@@ -2275,6 +2273,6 @@ void AstAssignmentExpression::Print(LexStream& lex_stream)
 #endif // JIKES_DEBUG
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

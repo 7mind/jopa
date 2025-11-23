@@ -5,10 +5,8 @@
 #include "tuple.h"
 #include <zip.h>
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Control;
 class Zip;
 class DirectorySymbol;
@@ -55,8 +53,7 @@ private:
     void ProcessDirectoryEntry(zip_int64_t index);
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // zipfile_INCLUDED

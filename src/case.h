@@ -3,10 +3,8 @@
 
 #include "platform.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // NOTE that this class is hard-wired to work on an ASCII machine.
 // To make it universal, one should uncomment the constructor and
@@ -192,9 +190,8 @@ public:
 //  }
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // case_INCLUDED
 

@@ -2,10 +2,8 @@
 
 #include "code.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 char Code::codes[13558] =
 {
     ID_PART_CODE, ID_PART_CODE, ID_PART_CODE, ID_PART_CODE, ID_PART_CODE,
@@ -2972,7 +2970,6 @@ u2 Code::blocks[2176] =
     0x308b, 0x2e8b, 0x2c8b, 0x2a8b, 0x288b, 0x268b, 0x248b,
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

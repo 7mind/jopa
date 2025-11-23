@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Control;
 class FileSymbol;
 
@@ -113,9 +111,8 @@ private:
     void ClassifyNonAsciiUnicode();
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // scanner_INCLUDED
 

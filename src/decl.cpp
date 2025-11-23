@@ -10,10 +10,8 @@
 #include "typeparam.h"
 #include "paramtype.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // If this compilation unit contains a package declaration, make sure
 // the package is not also associated with a type. We used to also
@@ -5541,7 +5539,6 @@ void Semantic::ProcessInstanceInitializers(AstClassBody* class_body)
     init_method -> block_symbol -> CompressSpace(); // space optimization
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

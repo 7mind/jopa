@@ -7,9 +7,9 @@
 #include "zipfile.h"
 #include "typeparam.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif // HAVE_JIKES_NAMESPACE
+
 
 
 void ConstantPool::SetNext(CPInfo* constant)
@@ -2089,6 +2089,6 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

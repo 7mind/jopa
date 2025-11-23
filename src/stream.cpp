@@ -8,10 +8,8 @@
 #include "option.h"
 #include "tab.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 // Class StreamError
 
 JikesError::JikesErrorSeverity StreamError::getSeverity()
@@ -1364,7 +1362,6 @@ void LexStream::PrintMessages()
     }
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

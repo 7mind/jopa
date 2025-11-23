@@ -8,11 +8,8 @@
 #include "tuple.h"
 #include "set.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 class Control;
 class TypeShadowSymbol;
 class MethodShadowSymbol;
@@ -1362,9 +1359,8 @@ private:
 };
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // semantic_INCLUDED
 

@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "tuple.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Semantic;
 class TypeSymbol;
 class FileSymbol;
@@ -116,9 +114,8 @@ private:
     Tuple<TypeSymbol *> &type_list;
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // depend_INCLUDED
 

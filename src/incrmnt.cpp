@@ -6,10 +6,8 @@
 #include "case.h"
 #include "set.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Control::RemoveTrashedTypes(SymbolSet& type_trash_set)
 {
     TypeSymbol* type;
@@ -433,7 +431,6 @@ bool Control::IncrementalRecompilation()
     return true;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

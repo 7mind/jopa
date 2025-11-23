@@ -1,9 +1,7 @@
 #include "set.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 unsigned SymbolSet::primes[] = {DEFAULT_HASH_SIZE, 101, 401, MAX_HASH_SIZE};
 
 void SymbolSet::Rehash()
@@ -267,7 +265,6 @@ SymbolMap::~SymbolMap()
     delete [] base;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

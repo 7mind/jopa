@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "tuple.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class TypeSymbol;
 class TypeParameterSymbol;
 class Control;
@@ -437,8 +435,7 @@ public:
     Type* Clone();
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // paramtype_INCLUDED

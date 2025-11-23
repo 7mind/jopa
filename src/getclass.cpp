@@ -7,10 +7,8 @@
 #include "option.h"
 #include "code.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 inline u1 Semantic::GetU1(const char *buffer)
 {
     return *buffer;
@@ -1222,7 +1220,6 @@ bool Semantic::ProcessClassFile(TypeSymbol *type, const char *buffer,
     return true;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -3,10 +3,8 @@
 #ifndef javaprs_INCLUDED
 #define javaprs_INCLUDED
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 #define SCOPE_REPAIR
 #define DEFERRED_RECOVERY
 #define FULL_DIAGNOSIS
@@ -62,8 +60,7 @@ public:
     }
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif /* javaprs_INCLUDED */

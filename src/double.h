@@ -50,10 +50,8 @@
 #include "platform.h"
 #include "long.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class LongInt;
 class IEEEdouble;
 class BigInt;
@@ -707,9 +705,8 @@ inline void BigInt::resize(int k)
     neg = false;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // double_INCLUDED
 

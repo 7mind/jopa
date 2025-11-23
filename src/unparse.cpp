@@ -3,11 +3,8 @@
 
 #ifdef JIKES_DEBUG
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 bool Ast::debug_unparse = false;
 
 // Special top-level form
@@ -1261,8 +1258,7 @@ void AstAssignmentExpression::Unparse(Ostream& os, LexStream* lex_stream)
         os << "/*:AstAssignmentExpression#" << id << "*/";
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // JIKES_DEBUG

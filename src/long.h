@@ -3,10 +3,8 @@
 
 #include "platform.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class IEEEdouble;
 class IEEEfloat;
 
@@ -295,8 +293,7 @@ public:
     bool operator>=(const ULongInt) const; // greater-than or equal
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // long_INCLUDED

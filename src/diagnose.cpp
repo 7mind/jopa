@@ -6,10 +6,8 @@
 #include "option.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void DiagnoseParser::ReallocateStacks()
 {
     int old_stack_length = stack_length;
@@ -2307,7 +2305,6 @@ void ParseError::PrintMessage(int k)
     JikesAPI::getInstance() -> reportError(&errors[k]);
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -1,9 +1,7 @@
 #include "segment.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 u2& PairSegment::Image(int target)
 {
     if (array == NULL)
@@ -139,7 +137,6 @@ SegmentPool::~SegmentPool()
         delete pair_pool[i];
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

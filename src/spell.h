@@ -4,10 +4,8 @@
 #include "platform.h"
 #include "case.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // This is a helper class which hueristically determines the probability
 // that one string is a match for another.  The static function Index
@@ -127,9 +125,8 @@ public:
     }
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // spell_INCLUDED
 

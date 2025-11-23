@@ -3,10 +3,8 @@
 #include "lookup.h"
 #include "control.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // Get the erased type for this type parameter
 //
@@ -182,6 +180,6 @@ void TypeParameterSymbol::GenerateSignature(Control& control)
     signature_length = length;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

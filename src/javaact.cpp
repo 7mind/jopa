@@ -6,10 +6,8 @@
 #undef HEADERS
 #include "javaact.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //**************************************************************************//
 //**************************************************************************//
 //*                                                                        *//
@@ -4989,6 +4987,6 @@ void Parser::MakeTypeBound()
 //
 // void MakeTypeArguments();
 //
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

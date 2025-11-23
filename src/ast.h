@@ -4,11 +4,8 @@
 #include "platform.h"
 #include "depend.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 class Parser;
 class SemanticEnvironment;
 class LexStream;
@@ -6648,8 +6645,7 @@ AstArray<T>::AstArray(StoragePool* pool, unsigned estimate)
         array = new (pool -> Alloc(size * sizeof(T))) T[size];
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // ast_INCLUDED

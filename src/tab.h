@@ -3,10 +3,8 @@
 
 #include "platform.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Tab
 {
 public:
@@ -21,9 +19,8 @@ private:
     static int tab_size;
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // tab_INCLUDED
 

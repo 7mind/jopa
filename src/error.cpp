@@ -7,10 +7,8 @@
 #include "jikesapi.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Semantic::PrintMessages()
 {
     if (this != control.system_semantic)
@@ -2108,7 +2106,6 @@ void SemanticError::InitializeMessages()
         assert(messages[j]);
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

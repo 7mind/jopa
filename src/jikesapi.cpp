@@ -3,7 +3,7 @@
 #include "jikesapi.h"
 #include "option.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 using namespace Jikes;
 #endif
 
@@ -13,11 +13,8 @@ using namespace Jikes;
 // include build files like platform.h or config.h. Only
 // the Default* classes in this file can live in the Jikes namespace.
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes {
-#endif
-
-
 //
 // A default implementation of ReadObject that read from the file sysytem.
 //
@@ -75,9 +72,8 @@ private:
 #endif
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 JikesOption::~JikesOption()
 {
@@ -291,11 +287,8 @@ size_t JikesAPI::FileWriter::write(const unsigned char *data, size_t size)
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes {
-#endif
-
-
 #ifdef UNIX_FILE_SYSTEM
 // The following methods define UNIX specific methods for
 // reading files from the file system. WINDOWS method follow in
@@ -467,7 +460,6 @@ size_t DefaultFileWriter::doWrite(const unsigned char* data, size_t size)
 #endif // WIN32_FILE_SYSTEM
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

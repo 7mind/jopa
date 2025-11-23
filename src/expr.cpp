@@ -11,10 +11,8 @@
 #include "typeparam.h"
 #include "paramtype.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 template <typename T> inline void ExtremaForType(T& min, T& max);
 
 template <> inline void ExtremaForType(i4& min, i4& max)
@@ -7846,7 +7844,6 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
     }
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

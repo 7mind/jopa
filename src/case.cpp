@@ -1,9 +1,7 @@
 #include "case.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 char Case::lower[128] =
 {
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
@@ -38,7 +36,6 @@ char Case::upper[128] =
     U_X, U_Y, U_Z, 123, 124, 125, 126, 127
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -9,10 +9,8 @@
 #include "segment.h"
 #include "control.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class TypeSymbol;
 class Control;
 class Semantic;
@@ -1031,9 +1029,8 @@ public:
     void GenerateCode();
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // bytecode_INCLUDED
 

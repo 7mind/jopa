@@ -1,10 +1,8 @@
 #include "long.h"
 #include "double.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 BaseLong::operator LongInt() const
 {
     return LongInt(HighWord(), LowWord());
@@ -569,7 +567,6 @@ bool LongInt::operator>= (const LongInt op) const
 #endif // HAVE_64BIT_TYPES
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

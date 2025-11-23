@@ -7,10 +7,8 @@
 #include "long.h"
 #include "double.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // This header defines the .class file format, for both reading in and writing
 // out valid classfiles.
@@ -3203,9 +3201,8 @@ public:
 #endif // JIKES_DEBUG
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // class_INCLUDED
 

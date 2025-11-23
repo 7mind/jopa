@@ -1,11 +1,8 @@
 #include "op.h"
 #include "class.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 #ifdef JIKES_DEBUG
 int Operators::OpDesc(Opcode opc, const char** name, const char** desc)
 {
@@ -822,7 +819,6 @@ int Operators::stack_effect[] =
     // no need to list SOFTWARE and HARDWARE here
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

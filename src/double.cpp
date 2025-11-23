@@ -53,10 +53,8 @@
 #include "long.h"
 #include "code.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 #ifndef HAVE_MEMBER_CONSTANTS
 // VC++ can't cope with constant class members
 IEEEfloat IEEEfloat::tens[] = {
@@ -3201,7 +3199,6 @@ IEEEdouble BigInt::DoubleValue() const
 
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -3,10 +3,8 @@
 #include "control.h"
 #include "option.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // NOTE: This file is used to determine definite assignment and definite
 // unassignment rules, per JLS chapter 16.  Often, these are abbreviated
@@ -1760,6 +1758,5 @@ void Semantic::DefiniteCleanUp()
     delete ReachableAssignments();
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif

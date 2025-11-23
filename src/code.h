@@ -1,9 +1,7 @@
 #include "platform.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 #ifndef code_INCLUDED
 #define code_INCLUDED
 
@@ -167,7 +165,6 @@ public:
 
 #endif // code_INCLUDED
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

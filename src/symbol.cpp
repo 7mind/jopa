@@ -11,10 +11,8 @@
 #include "paramtype.h"
 #include "typeparam.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 const char* FileSymbol::java_suffix = StringConstant::U8S_DO_java;
 unsigned FileSymbol::java_suffix_length = strlen(java_suffix);
 const char* FileSymbol::class_suffix = StringConstant::U8S_DO_class;
@@ -2932,7 +2930,6 @@ TypeSymbol* TypeSymbol::GetPlaceholderType()
     return placeholder_type;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

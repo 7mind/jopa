@@ -2,10 +2,8 @@
 #include "ast.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void Parser::ReallocateStacks()
 {
     int old_stack_length = stack_length;
@@ -656,7 +654,6 @@ int Parser::ParseCheck(int stck[], int stack_top, int first_token,
     return 0;
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

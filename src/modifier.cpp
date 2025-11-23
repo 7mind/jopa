@@ -4,11 +4,8 @@
 #include "javasym.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 //
 // Process modifiers, returning the AccessFlags they represent.
 //
@@ -448,6 +445,6 @@ AccessFlags Semantic::ProcessEnumConstantModifiers(AstEnumConstant* decl)
                              AccessFlags::ACCESS_ENUM));
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

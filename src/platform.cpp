@@ -29,10 +29,8 @@
 #include "long.h"
 #include "double.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 // Define the PathSeparator() function with the proper
 // impl for each platform.
 
@@ -1470,6 +1468,6 @@ const char StringConstant::U8S_neg_Zero[] = {
 
 Ostream Coutput;
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

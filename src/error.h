@@ -5,10 +5,8 @@
 #include "tuple.h"
 #include "jikesapi.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Control;
 class LexStream;
 class FileSymbol;
@@ -512,9 +510,8 @@ private:
     void SortMessages();
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // error_INCLUDED
 

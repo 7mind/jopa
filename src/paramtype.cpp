@@ -4,10 +4,8 @@
 #include "control.h"
 #include <cstring>
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 //
 // ParameterizedType implementation
 //
@@ -337,6 +335,6 @@ Type* Type::Clone()
     }
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
 #endif

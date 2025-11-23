@@ -3,10 +3,8 @@
 #ifndef javasym_INCLUDED
 #define javasym_INCLUDED
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 enum {
       TK_abstract = 22,
       TK_assert = 74,
@@ -121,8 +119,7 @@ enum {
       TK_EOF = 96
      };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif /* javasym_INCLUDED */

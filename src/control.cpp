@@ -7,10 +7,8 @@
 #include "case.h"
 #include "option.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 Control::Control(char** arguments, Option& option_)
     : return_code(0)
     , option(option_)
@@ -1568,7 +1566,6 @@ void Control::CleanUp(FileSymbol* file_symbol)
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -6,10 +6,8 @@
 #include "access.h"
 #include "tuple.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class Semantic;
 class SemanticEnvironment;
 class Ast;
@@ -2475,9 +2473,8 @@ inline SymbolTable* BlockSymbol::Table()
     return table ? table : table = new SymbolTable();
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // symbol_INCLUDED
 

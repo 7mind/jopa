@@ -5,10 +5,8 @@
 #include "tuple.h"
 #include "jikesapi.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 class OptionError;
 class Ostream;
 
@@ -148,9 +146,8 @@ public:
     ~Option();
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // option_INCLUDED
 

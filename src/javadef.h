@@ -3,10 +3,8 @@
 #ifndef javadef_INCLUDED
 #define javadef_INCLUDED
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 enum {
       ERROR_SYMBOL      = 111,
       MAX_DISTANCE      = 30,
@@ -36,8 +34,7 @@ enum {
      };
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif /* javadef_INCLUDED */

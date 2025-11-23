@@ -4,11 +4,8 @@
 #include "platform.h"
 #include "lpginput.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 namespace Jikes { // Open namespace Jikes block
-#endif
-
-
 class StoragePool;
 class Ast;
 class AstListNode;
@@ -189,9 +186,8 @@ protected:
                    int buffer_position);
 };
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 
 #endif // parser_INCLUDED
 

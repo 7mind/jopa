@@ -8,10 +8,8 @@
 #include "table.h"
 #include "option.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 void ByteCode::GenerateCode()
 {
     AstClassBody* class_body = unit_type -> declaration;
@@ -7385,7 +7383,6 @@ void ByteCode::ChangeStack(int i)
 }
 
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

@@ -1,9 +1,7 @@
 #include "tab.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 int Tab::tab_size = Tab::DEFAULT_TAB_SIZE;
 
 //
@@ -30,7 +28,6 @@ int Tab::Wcslen(wchar_t *line, int start, int end)
     return (end - start);
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

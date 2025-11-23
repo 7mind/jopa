@@ -5,10 +5,8 @@
 #include "case.h"
 #include <cwchar>
 
-#ifdef HAVE_JIKES_NAMESPACE
-namespace Jikes { // Open namespace Jikes block
-#endif
 
+namespace Jikes { // Open namespace Jikes block
 PackageSymbol* Symbol::PackageCast()
 {
     return DYNAMIC_CAST<PackageSymbol*> (_kind == PACKAGE ? this : NULL);
@@ -1787,7 +1785,6 @@ bool NameSymbol::IsBadStyleForVariable() const
     return Code::IsAsciiUpper(*name_) || Contains(U_UNDERSCORE);
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
+
 } // Close namespace Jikes block
-#endif
 

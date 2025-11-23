@@ -5,9 +5,7 @@
 #include "tab.h"
 #include "stream.h"
 
-#ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
-#endif
 
 //
 // Look for file names in an @file and add them to the passed
@@ -164,15 +162,9 @@ const wchar_t* OptionError::GetErrorMessage()
         s << '\"' << name << "\" requires an argument.";
         break;
     case INVALID_SOURCE_ARGUMENT:
-        if (ENABLE_SOURCE_15)
-        {
-            s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 "
-              << "features), 1.4 (assert statement), 1.5 (partial "
-              << "support beta, see NEWS for supported features), 1.6, and 1.7.";
-            break;
-        }
-        s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 features) "
-          << "and 1.4 (assert statement).";
+        s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 "
+          << "features), 1.4 (assert statement), 1.5 (partial "
+          << "support beta, see NEWS for supported features), 1.6, and 1.7.";
         break;
     case INVALID_TARGET_ARGUMENT:
         s << "\"-target\" only recognizes Java releases 1.1, 1.2, 1.3, 1.4, "
@@ -599,21 +591,12 @@ Option::Option(ArgumentExpander& arguments,
                     source = SDK1_3;
                 else if (! strcmp(arguments.argv[i], "1.4"))
                     source = SDK1_4;
-                else if (ENABLE_SOURCE_15 &&
-                         ! strcmp(arguments.argv[i], "1.5"))
-                {
+                else if (! strcmp(arguments.argv[i], "1.5"))
                     source = SDK1_5;
-                }
-                else if (ENABLE_SOURCE_15 &&
-                         ! strcmp(arguments.argv[i], "1.6"))
-                {
+                else if (! strcmp(arguments.argv[i], "1.6"))
                     source = SDK1_6;
-                }
-                else if (ENABLE_SOURCE_15 &&
-                         ! strcmp(arguments.argv[i], "1.7"))
-                {
+                else if (! strcmp(arguments.argv[i], "1.7"))
                     source = SDK1_7;
-                }
                 else
                 {
                     bad_options.Next() =
@@ -973,13 +956,13 @@ Option::Option(ArgumentExpander& arguments,
             source = SDK1_4;
             break;
         case SDK1_5:
-            source = ENABLE_SOURCE_15 ? SDK1_5 : SDK1_4;
+            source = SDK1_5;
             break;
         case SDK1_6:
-            source = ENABLE_SOURCE_15 ? SDK1_6 : SDK1_4;
+            source = SDK1_6;
             break;
         case SDK1_7:
-            source = ENABLE_SOURCE_15 ? SDK1_7 : SDK1_4;
+            source = SDK1_7;
             break;
         default:
             assert(false && "Unexpected target level");
@@ -1055,7 +1038,5 @@ Option::~Option()
 #endif // WIN32_FILE_SYSTEM
 }
 
-#ifdef HAVE_JIKES_NAMESPACE
-} // Close namespace Jikes block
-#endif
 
+} // Close namespace Jikes block
