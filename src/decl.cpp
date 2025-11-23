@@ -8,6 +8,7 @@
 #include "option.h"
 #include "stream.h"
 #include "typeparam.h"
+#include "paramtype.h"
 
 #ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
@@ -1028,11 +1029,22 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
 //
 // Process type arguments for a parameterized type (e.g., List<String>)
 //
-void Semantic::ProcessTypeArguments(TypeSymbol* base_type,
-                                    AstTypeArguments* type_arguments)
+// Process type arguments and optionally create a ParameterizedType
+// Returns the ParameterizedType if one was created, NULL otherwise
+//
+ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
+                                                   AstTypeArguments* type_arguments)
 {
     if (! type_arguments)
-        return;
+        return NULL;
+
+    // Ensure the type header is processed before checking if it's generic
+    // This is necessary when the base type is defined in the same compilation unit
+    // but hasn't been processed yet
+    if (! base_type -> HeaderProcessed() && base_type -> declaration)
+    {
+        base_type -> ProcessTypeHeaders();
+    }
 
     // Check if the base type is actually a generic type
     if (! base_type -> IsGeneric())
@@ -1041,7 +1053,7 @@ void Semantic::ProcessTypeArguments(TypeSymbol* base_type,
                       type_arguments,
                       base_type -> ContainingPackageName(),
                       base_type -> ExternalName());
-        return;
+        return NULL;
     }
 
     // Validate arity (number of type arguments matches number of type parameters)
@@ -1054,7 +1066,7 @@ void Semantic::ProcessTypeArguments(TypeSymbol* base_type,
                       type_arguments,
                       base_type -> ContainingPackageName(),
                       base_type -> ExternalName());
-        return;
+        return NULL;
     }
 
     // Process each type argument
@@ -1107,9 +1119,21 @@ void Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     }
 
     // At this point, all type arguments are valid
-    // For type erasure, we continue to use base_type
-    // TODO: In later phase, create and store ParameterizedType instance
-    // ParameterizedType* param_type = new ParameterizedType(base_type, processed_args);
+    // Create a ParameterizedType to track the type arguments
+    Tuple<Type*>* type_arg_tuple = new Tuple<Type*>(num_args);
+    for (unsigned i = 0; i < num_args; i++)
+    {
+        AstType* type_arg_ast = type_arguments -> TypeArgument(i);
+        // For now, we just store the TypeSymbol as a Type*
+        // In full implementation, we'd convert wildcards, nested parameterized types, etc.
+        TypeSymbol* arg_sym = type_arg_ast -> symbol;
+        if (! arg_sym || arg_sym -> Bad())
+            arg_sym = control.no_type; // Use placeholder for bad types
+        type_arg_tuple -> Next() = new Type(arg_sym);
+    }
+
+    ParameterizedType* param_type = new ParameterizedType(base_type, type_arg_tuple);
+    return param_type;
 }
 
 
@@ -2691,6 +2715,13 @@ void Semantic::ProcessFieldDeclaration(AstFieldDeclaration* field_declaration)
             variable -> SetFlags(access_flags);
             variable -> SetOwner(this_type);
             variable -> declarator = variable_declarator;
+
+            // Copy parameterized type information if present
+            AstTypeName* type_name = field_declaration -> type -> TypeNameCast();
+            if (type_name && type_name -> parameterized_type)
+            {
+                variable -> parameterized_type = type_name -> parameterized_type;
+            }
             if (must_be_constant &&
                 (dims || ! variable_declarator -> variable_initializer_opt ||
                  (! field_type -> Primitive() &&
@@ -4963,7 +4994,7 @@ void Semantic::ProcessType(AstType* type_expr)
         else type = MustFindType(name -> name);
         if (name -> type_arguments_opt)
         {
-            ProcessTypeArguments(type, name -> type_arguments_opt);
+            name -> parameterized_type = ProcessTypeArguments(type, name -> type_arguments_opt);
         }
         else if (type -> IsGeneric() && control.option.source >= JikesOption::SDK1_5)
         {

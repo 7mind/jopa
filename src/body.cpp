@@ -262,6 +262,14 @@ void Semantic::ProcessLocalVariableStatement(Ast* stmt)
             symbol -> SetFlags(access_flags);
             symbol -> SetOwner(ThisMethod());
             symbol -> declarator = variable_declarator;
+
+            // Copy parameterized type information if present
+            AstTypeName* type_name = local_decl -> type -> TypeNameCast();
+            if (type_name && type_name -> parameterized_type)
+            {
+                symbol -> parameterized_type = type_name -> parameterized_type;
+            }
+
             symbol -> SetLocation();
             symbol -> SetLocalVariableIndex(block -> block_symbol ->
                                             max_variable_index++);

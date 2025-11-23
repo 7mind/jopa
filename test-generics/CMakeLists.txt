@@ -117,6 +117,11 @@ add_jikes_run_test(GenericTest "GenericTest.java" "GenericTest")
 add_jikes_compile_test(SimpleGeneric "SimpleGeneric.java")
 add_jikes_compile_test(TwoTypeParams "TwoTypeParams.java")
 add_jikes_compile_test(BoundedGeneric "BoundedGeneric.java")
+add_jikes_compile_test(Wildcards "Wildcards.java")
+add_jikes_compile_test(GenericMethods "GenericMethods.java")
+add_jikes_compile_test(CovariantReturnTest "CovariantReturnTest.java")
+add_jikes_compile_test(BridgeTest "BridgeTest.java")
+add_jikes_compile_test(SimpleSameFileTest "SimpleSameFileTest.java")
 
 # Autoboxing/Unboxing Tests
 add_jikes_run_test(BasicBoxingTest "BasicBoxingTest.java" "BasicBoxingTest")

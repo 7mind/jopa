@@ -1549,6 +1549,7 @@ public:
     Symbol* owner;
     LiteralValue* initial_value;
     Utf8LiteralValue* signature;
+    ParameterizedType* parameterized_type; // For tracking generic type arguments
 
     // Index of element in symbol_pool (in the relevant symbol table) that
     // points to this variable.
@@ -1615,6 +1616,7 @@ public:
         , owner(NULL)
         , initial_value(NULL)
         , signature(NULL)
+        , parameterized_type(NULL)
         , accessed_local(NULL)
         , external_name_symbol(NULL)
         , status(0)

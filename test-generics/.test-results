@@ -1,9 +1,9 @@
 ### Java 5 Feature Test Results
 
 **Total Tests**: 22
-**Passed**: ✅ 22
-**Failed**: ❌ 0
-**Success Rate**: 100%
+**Passed**: ✅ 8
+**Failed**: ❌ 14
+**Success Rate**: 36%
 
 #### Feature Coverage
 - ✅ Generics (Type Erasure, basic support)

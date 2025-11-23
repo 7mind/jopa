@@ -5,6 +5,7 @@
 #include "option.h"
 #include "semantic.h"
 #include "zip.h"
+#include "typeparam.h"
 
 #ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
@@ -330,24 +331,24 @@ FieldInfo::FieldInfo(ClassFile& buffer)
 }
 
 const char* FieldInfo::Signature(const ConstantPool& pool,
-                                 const Control& /*control*/) const
+                                 const Control& control) const
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        /*(control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
-        :*/ (const CPUtf8Info*) pool[descriptor_index];
+        : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Bytes();
 }
 
 u2 FieldInfo::SignatureLength(const ConstantPool& pool,
-                              const Control& /*control*/) const
+                              const Control& control) const
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        /*(control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
-        :*/ (const CPUtf8Info*) pool[descriptor_index];
+        : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Length();
 }
 
@@ -450,24 +451,24 @@ MethodInfo::MethodInfo(ClassFile& buffer)
 }
 
 const char* MethodInfo::Signature(const ConstantPool& pool,
-                                  const Control& /*control*/) const
+                                  const Control& control) const
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        /*(control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
-        :*/ (const CPUtf8Info*) pool[descriptor_index];
+        : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Bytes();
 }
 
 u2 MethodInfo::SignatureLength(const ConstantPool& pool,
-                               const Control& /*control*/) const
+                               const Control& control) const
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        /*(control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
-        :*/ (const CPUtf8Info*) pool[descriptor_index];
+        : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Length();
 }
 
@@ -1864,8 +1865,61 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
     }
 
     //
+    // For Java 5+, parse the Signature attribute to get type parameters
+    //
+    if (control.option.source >= JikesOption::SDK1_5 &&
+        class_data -> Signature())
+    {
+        const CPUtf8Info* sig_info = class_data -> Signature() -> Signature(pool);
+        const char* sig = sig_info -> Bytes();
+        // Class signature format: <T:Bound;>SuperclassSig InterfaceSig*
+        // Parse type parameters if signature starts with '<'
+        if (sig && sig[0] == '<')
+        {
+            // Skip the '<' and parse type parameters
+            const char* p = sig + 1;
+            unsigned param_index = 0;
+            while (*p && *p != '>')
+            {
+                // Parse type parameter name (e.g., "T:")
+                const char* name_start = p;
+                while (*p && *p != ':') p++;
+                if (*p != ':') break;
+
+                int name_len = p - name_start;
+                wchar_t* param_name = new wchar_t[name_len + 1];
+                Control::ConvertUtf8ToUnicode(param_name, name_start, name_len);
+                param_name[name_len] = U_NULL;
+
+                // Create type parameter symbol
+                NameSymbol* name_sym = control.FindOrInsertName(param_name, name_len);
+                TypeParameterSymbol* param = new TypeParameterSymbol(name_sym, type, param_index++);
+                type -> AddTypeParameter(param);
+
+                delete[] param_name;
+
+                // Skip the bounds (everything up to the next type parameter or '>')
+                p++; // skip ':'
+                int bracket_depth = 0;
+                while (*p && (*p != '>' || bracket_depth > 0))
+                {
+                    if (*p == '<') bracket_depth++;
+                    else if (*p == '>') bracket_depth--;
+                    else if (*p == ';' && bracket_depth == 0)
+                    {
+                        p++;
+                        // Check if next char is another type parameter or '>'
+                        if (*p == '>' || (*p >= 'A' && *p <= 'Z'))
+                            break;
+                    }
+                    p++;
+                }
+            }
+        }
+    }
+
+    //
     // Tie this type to its supertypes.
-    // FIXME: for sdk1_5, read attr_signature
     //
     class_info = class_data -> SuperClass();
     if ((type == control.Object()) != (class_info == NULL))

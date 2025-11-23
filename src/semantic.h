@@ -844,7 +844,7 @@ private:
     void ProcessSuperinterface(TypeSymbol*, AstTypeName*);
     void ProcessTypeParameters(TypeSymbol*, AstTypeParameters*);
     void ProcessMethodTypeParameters(MethodSymbol*, AstTypeParameters*);
-    void ProcessTypeArguments(TypeSymbol*, AstTypeArguments*);
+    ParameterizedType* ProcessTypeArguments(TypeSymbol*, AstTypeArguments*);
     void GenerateBridgeMethods(TypeSymbol*);
     void ProcessConstructorMembers(AstClassBody*);
     void ProcessMethodMembers(AstClassBody*);

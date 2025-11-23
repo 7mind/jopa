@@ -8,6 +8,8 @@
 #include "spell.h"
 #include "option.h"
 #include "stream.h"
+#include "typeparam.h"
+#include "paramtype.h"
 
 #ifdef HAVE_JIKES_NAMESPACE
 namespace Jikes { // Open namespace Jikes block
@@ -3526,6 +3528,45 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         SymbolSet* exception_set = TryExceptionTableStack().Top();
         if (exception_set)
             exception_set -> AddElement(control.no_type);
+    }
+
+    //
+    // Type substitution for generics: If the receiver has a parameterized type,
+    // and the method's return type is a type parameter, substitute it with the
+    // corresponding type argument.
+    //
+    MethodSymbol* method = method_call -> symbol -> MethodCast();
+    if (method && base)
+    {
+        // Get the receiver's parameterized type (if any)
+        ParameterizedType* receiver_param_type = NULL;
+        VariableSymbol* var = base -> symbol -> VariableCast();
+        if (var && var -> parameterized_type)
+        {
+            receiver_param_type = var -> parameterized_type;
+        }
+
+        if (receiver_param_type)
+        {
+            TypeSymbol* return_type = method -> Type();
+            TypeSymbol* declaring_class = method -> containing_type;
+
+            // Check if the return type is a type parameter of the declaring class
+            for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
+                if (return_type == (TypeSymbol*) type_param)
+                {
+                    // Substitute with the corresponding type argument
+                    if (i < receiver_param_type -> NumTypeArguments())
+                    {
+                        Type* type_arg = receiver_param_type -> TypeArgument(i);
+                        method_call -> resolved_type = type_arg -> Erasure();
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
 

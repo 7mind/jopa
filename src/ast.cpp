@@ -208,6 +208,11 @@ CaseElement* AstSwitchStatement::CaseForValue(i4 value)
 
 TypeSymbol* AstMemberValue::Type()
 {
+    // Check if this is an expression with a resolved type (for generics type substitution)
+    AstExpression* expr = ExpressionCast();
+    if (expr && expr -> resolved_type)
+        return expr -> resolved_type;
+
     return ! symbol ? (TypeSymbol*) NULL
         : symbol -> Kind() == Symbol::TYPE
         ? (TypeSymbol*) symbol

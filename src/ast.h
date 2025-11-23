@@ -19,6 +19,7 @@ class VariableSymbol;
 class MethodSymbol;
 class TypeSymbol;
 class TypeParameterSymbol;
+class ParameterizedType;
 class StoragePool;
 struct CaseElement;
 
@@ -802,9 +803,11 @@ class AstExpression : public AstMemberValue
 {
 public:
     LiteralValue* value; // The compile-time constant value of the expression.
+    TypeSymbol* resolved_type; // For type substitution in generics (overrides symbol's type)
 
     inline AstExpression(AstKind k)
         : AstMemberValue(k, EXPRESSION)
+        , resolved_type(NULL)
     {}
     ~AstExpression() {}
 
@@ -1147,10 +1150,12 @@ public:
     AstTypeName* base_opt;
     AstName* name;
     AstTypeArguments* type_arguments_opt;
+    ParameterizedType* parameterized_type; // For tracking type arguments
 
     inline AstTypeName(AstName* n)
         : AstType(TYPE)
         , name(n)
+        , parameterized_type(NULL)
     {}
     ~AstTypeName() {}
 
