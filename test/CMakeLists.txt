@@ -156,3 +156,24 @@ if(JIKES_ENABLE_JVM_TESTS)
         DEPENDS "compile_SimpleJava6Test"
     )
 endif()
+
+# Reflection Tests (compile with our runtime, run with system JVM for real reflection)
+add_test(
+    NAME "compile_ReflectionBasicTest"
+    COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_DIR}"
+            -d "${OUTPUT_DIR}"
+            "${TEST_DIR}/java6/ReflectionBasicTest.java"
+)
+set_tests_properties("compile_ReflectionBasicTest" PROPERTIES LABELS "compile")
+if(JIKES_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "run_ReflectionBasicTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}" "ReflectionBasicTest"
+    )
+    set_tests_properties("run_ReflectionBasicTest" PROPERTIES
+        LABELS "run"
+        DEPENDS "compile_ReflectionBasicTest"
+    )
+endif()

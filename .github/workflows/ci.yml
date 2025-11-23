@@ -74,7 +74,8 @@ jobs:
             echo '### Java 6 Support' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Bytecode version 50.0 (Java 6)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Parameter names in LocalVariableTable (reflection support)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Java 6 test (1 compile + 1 runtime test - all passing)' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Basic reflection (Class, Method, Field) verified with system JVM' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Java 6 tests (2 compile + 2 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
           "
 
       - name: Upload test artifacts
