@@ -4,6 +4,7 @@
 **Date:** 2025-01-23
 **Status:** Planning Phase
 **Target:** Complete Java 7 (JSR 336) Language and Bytecode Support
+**Strategic Goal:** Foundation for Java 8 (Lambdas and Method References)
 
 ---
 
@@ -16,9 +17,12 @@ This document provides a comprehensive roadmap for implementing Java 7 support i
 - ✅ Java 6 bytecode: Partial support (version 50.0, basic reflection)
 
 **Complexity Assessment:**
-- **High Complexity:** invokedynamic, Method Handles, StackMapTable generation
-- **Medium Complexity:** Try-with-resources, multi-catch, precise rethrow, strings in switch
-- **Low Complexity:** Binary literals, underscores in literals, diamond operator, SafeVarargs
+- **Very High Complexity:** invokedynamic infrastructure, Method Handles, StackMapTable generation
+- **High Complexity:** Try-with-resources, strings in switch
+- **Medium Complexity:** Multi-catch, precise rethrow, diamond operator
+- **Low Complexity:** Binary literals, underscores in literals, SafeVarargs
+
+**Strategic Note:** invokedynamic and Method Handles (JSR 292) are essential infrastructure for Java 8 lambda expressions and method references. While not directly used by Java 7 source code, implementing them now provides the foundation for Java 8 support and validates the complete Java 7 JVM specification.
 
 ---
 
@@ -105,7 +109,7 @@ This document provides a comprehensive roadmap for implementing Java 7 support i
 
 ### 1.2 Strings in Switch Statements
 
-**Complexity:** MEDIUM
+**Complexity:** MEDIUM-HIGH
 **Estimated Effort:** 5-7 days
 **Dependencies:** None
 
@@ -710,7 +714,7 @@ In Java 6 and earlier, the JVM performed verification by type inference (dataflo
 **Reference:** JVMS §4.7.4 (StackMapTable Attribute), JVMS §4.10.1 (Verification by Type Checking)
 
 **Notes:**
-- This is the most complex part of Java 7 implementation
+- This is one of the most complex parts of Java 7 implementation
 - Consider incremental approach: start with simple methods, add complexity
 - Extensive testing required with real JVM verification
 - May need debugging support: dump generated stack maps
@@ -719,115 +723,380 @@ In Java 6 and earlier, the JVM performed verification by type inference (dataflo
 
 ## Phase 3: invokedynamic and Method Handles (JSR 292)
 
-### 3.1 invokedynamic Bytecode Instruction
+### 3.1 New Constant Pool Entries
 
-**Complexity:** VERY HIGH
-**Estimated Effort:** 15-20 days
-**Dependencies:** Bytecode version 51.0, new constant pool entries
+**Complexity:** HIGH
+**Estimated Effort:** 7-10 days
+**Dependencies:** Bytecode version 51.0
 
 #### Description
-- New bytecode instruction: `invokedynamic` (opcode 186, 0xBA)
-- Supports dynamic method invocation for dynamic languages
-- For Java 7: NOT directly usable from Java source (only from bytecode)
-- Java 8 uses it for lambda expressions
+Java 7 introduces three new constant pool entry types to support dynamic method invocation:
+- `CONSTANT_MethodHandle` (tag 15)
+- `CONSTANT_MethodType` (tag 16)
+- `CONSTANT_InvokeDynamic` (tag 18)
 
-#### Java 7 Scope Decision
+These are essential infrastructure for invokedynamic and will be used extensively by Java 8 for lambda expressions.
 
-**RECOMMENDATION:** Defer invokedynamic implementation until after Java 7 core features are complete.
+#### Implementation Tasks
 
-**Rationale:**
-1. Java 7 source code does NOT generate invokedynamic instructions
-2. Only dynamic languages (JRuby, Groovy, Jython) use it directly
-3. Java uses it starting in Java 8 for lambdas
-4. Implementing invokedynamic requires:
-   - New constant pool entries
-   - BootstrapMethods attribute
-   - Complex runtime linkage semantics
-5. JOPA compiler's primary goal: compile Java source, not support dynamic languages
+1. **Constant Pool Tag Constants** (`src/class.h`)
+   ```cpp
+   enum {
+       CONSTANT_Utf8 = 1,
+       // ... existing tags ...
+       CONSTANT_MethodHandle = 15,
+       CONSTANT_MethodType = 16,
+       CONSTANT_InvokeDynamic = 18
+   };
+   ```
 
-**If Implemented Later:**
+2. **CONSTANT_MethodHandle Structure**
+   ```
+   CONSTANT_MethodHandle_info {
+       u1 tag = 15;
+       u1 reference_kind;  // 1-9
+       u2 reference_index; // -> CONSTANT_Fieldref, Methodref, or InterfaceMethodref
+   }
+   ```
 
-1. **New Constant Pool Entries**
-   - `CONSTANT_MethodHandle` (tag 15)
-   - `CONSTANT_MethodType` (tag 16)
-   - `CONSTANT_InvokeDynamic` (tag 18)
+   Reference kinds:
+   - 1: REF_getField
+   - 2: REF_getStatic
+   - 3: REF_putField
+   - 4: REF_putStatic
+   - 5: REF_invokeVirtual
+   - 6: REF_invokeStatic
+   - 7: REF_invokeSpecial
+   - 8: REF_newInvokeSpecial
+   - 9: REF_invokeInterface
 
-2. **BootstrapMethods Attribute**
-   - Class-level attribute
-   - Lists bootstrap methods for invokedynamic sites
-   - Structure:
-     ```
-     BootstrapMethods_attribute {
-         u2 attribute_name_index;
-         u4 attribute_length;
-         u2 num_bootstrap_methods;
-         bootstrap_method bootstrap_methods[num_bootstrap_methods];
-     }
-     ```
+3. **CONSTANT_MethodType Structure**
+   ```
+   CONSTANT_MethodType_info {
+       u1 tag = 16;
+       u2 descriptor_index; // -> CONSTANT_Utf8 (method descriptor)
+   }
+   ```
 
-3. **Bytecode Emission**
-   - `invokedynamic` instruction (0xBA)
-   - 2-byte constant pool index (CONSTANT_InvokeDynamic)
-   - 2 bytes of zero padding (reserved)
+4. **CONSTANT_InvokeDynamic Structure**
+   ```
+   CONSTANT_InvokeDynamic_info {
+       u1 tag = 18;
+       u2 bootstrap_method_attr_index; // index into BootstrapMethods array
+       u2 name_and_type_index;         // -> CONSTANT_NameAndType
+   }
+   ```
 
-**Alternative: Minimal Implementation**
-- Add constant pool entry types (for class file reading compatibility)
-- Add BootstrapMethods attribute parsing
-- Do NOT generate invokedynamic from source (not needed for Java 7 source)
-- Enables reading Java 8+ class files without crashing
+5. **Constant Pool Reading** (`src/class.cpp` or `src/bytecode.cpp`)
+   - Extend constant pool parsing to handle new entry types
+   - Read and validate structure of each new entry type
+   - Maintain references between entries
 
-**Files to Modify (if implemented):**
-- `src/class.h` - Constant pool tag constants
-- `src/bytecode.cpp` - Constant pool entry reading/writing
-- `src/code.cpp` - invokedynamic instruction emission
+6. **Constant Pool Writing** (`src/bytecode.cpp`)
+   - Implement serialization for new entry types
+   - Track indices when building constant pool
+   - Ensure proper ordering and references
+
+7. **Constant Pool API**
+   - Add methods to create MethodHandle entries
+   - Add methods to create MethodType entries
+   - Add methods to create InvokeDynamic entries
+   - Deduplicate entries (same value = same index)
+
+8. **Validation**
+   - Validate reference_kind in MethodHandle (must be 1-9)
+   - Validate reference_index points to correct constant type
+   - Validate descriptor_index in MethodType points to Utf8
+   - Validate bootstrap_method_attr_index within bounds
+
+**Files to Modify:**
+- `src/class.h` - Tag constants, data structures
+- `src/bytecode.cpp` - Reading/writing logic
+- `src/symbol.h` - Possibly extend for symbolic references
 
 **Testing:**
-- Read Java 8 class file with invokedynamic (compatibility test)
-- Do NOT test source generation (not applicable)
+- Read Java 8 class file with these entries (compatibility)
+- Create test bytecode with new constant pool entries
+- Verify with `javap -v`
 
-**Reference:** JVMS §4.4.10 (CONSTANT_InvokeDynamic), JVMS §4.7.23 (BootstrapMethods), JVMS §6.5.invokedynamic
+**Reference:** JVMS §4.4.8 (MethodHandle), §4.4.9 (MethodType), §4.4.10 (InvokeDynamic)
 
 ---
 
-### 3.2 Method Handles (java.lang.invoke)
+### 3.2 BootstrapMethods Attribute
+
+**Complexity:** MEDIUM-HIGH
+**Estimated Effort:** 5-7 days
+**Dependencies:** New constant pool entries (Phase 3.1)
+
+#### Description
+The BootstrapMethods attribute is a variable-length class-level attribute that records bootstrap method specifiers referenced by invokedynamic instructions.
+
+#### Implementation Tasks
+
+1. **Attribute Structure**
+   ```
+   BootstrapMethods_attribute {
+       u2 attribute_name_index;           // -> "BootstrapMethods"
+       u4 attribute_length;
+       u2 num_bootstrap_methods;
+       bootstrap_method bootstrap_methods[num_bootstrap_methods];
+   }
+
+   bootstrap_method {
+       u2 bootstrap_method_ref;           // -> CONSTANT_MethodHandle
+       u2 num_bootstrap_arguments;
+       u2 bootstrap_arguments[num_bootstrap_arguments]; // -> loadable constants
+   }
+   ```
+
+2. **Data Structures** (`src/class.h`)
+   - Define `BootstrapMethod` structure
+   - Define `BootstrapMethodsAttribute` structure
+   - Add to class file attributes
+
+3. **Attribute Reading** (`src/class.cpp` or `src/bytecode.cpp`)
+   - Parse BootstrapMethods attribute from class file
+   - Validate bootstrap_method_ref points to MethodHandle
+   - Validate bootstrap_arguments are loadable constants
+
+4. **Attribute Writing** (`src/bytecode.cpp`)
+   - Track bootstrap methods during compilation
+   - Emit BootstrapMethods attribute at class level
+   - Assign indices to bootstrap method entries
+
+5. **Bootstrap Method Registry**
+   - Maintain list of bootstrap methods per class
+   - Deduplicate identical bootstrap method specifiers
+   - Return index for use in CONSTANT_InvokeDynamic
+
+6. **API for Creating Bootstrap Methods**
+   ```cpp
+   int AddBootstrapMethod(
+       int method_handle_index,
+       std::vector<int> argument_indices
+   );
+   ```
+
+**Files to Modify:**
+- `src/class.h` - Data structures
+- `src/bytecode.cpp` - Reading/writing logic
+- `src/code.h` - Bootstrap method tracking
+
+**Testing:**
+- Read Java 8 class file with BootstrapMethods
+- Generate class with BootstrapMethods attribute
+- Verify structure with `javap -v`
+
+**Reference:** JVMS §4.7.23 (BootstrapMethods Attribute)
+
+---
+
+### 3.3 invokedynamic Bytecode Instruction
 
 **Complexity:** HIGH
-**Estimated Effort:** 10-15 days (if implemented)
+**Estimated Effort:** 10-14 days
+**Dependencies:** Phase 3.1 (constant pool), Phase 3.2 (BootstrapMethods)
+
+#### Description
+The `invokedynamic` instruction (opcode 186, 0xBA) enables dynamic method invocation. While not directly generated from Java 7 source, it's essential infrastructure for Java 8 lambdas and provides validation of the complete JSR 292 implementation.
+
+#### Implementation Tasks
+
+1. **Instruction Format**
+   ```
+   invokedynamic
+   indexbyte1
+   indexbyte2
+   0
+   0
+   ```
+   - Opcode: 186 (0xBA)
+   - 2 bytes: index into constant pool (CONSTANT_InvokeDynamic)
+   - 2 bytes: must be zero (reserved)
+
+2. **Bytecode Emission** (`src/code.cpp`)
+   - Add `EmitInvokeDynamic(int cp_index)` method
+   - Write opcode 0xBA
+   - Write 2-byte constant pool index
+   - Write 2 zero bytes
+   - Update stack depth tracking
+
+3. **Stack Effect**
+   - Pop: arguments according to method descriptor
+   - Push: return value according to method descriptor
+   - Parse MethodType descriptor to determine stack effect
+
+4. **Control Flow**
+   - invokedynamic is not a branch instruction
+   - May throw exceptions (LinkageError, BootstrapMethodError)
+   - Normal flow continues to next instruction
+
+5. **Constant Pool Integration**
+   - Create CONSTANT_InvokeDynamic entry
+   - Reference bootstrap method index
+   - Reference name and type
+
+6. **Verification Support**
+   - StackMapTable must account for invokedynamic
+   - Treat like other invoke instructions for verification
+
+7. **Testing Strategy**
+   - **Compatibility Testing:** Read Java 8 class files with invokedynamic
+   - **Bytecode Generation Testing:** Manually emit invokedynamic in test (no source syntax yet)
+   - **Verification Testing:** Ensure StackMapTable handles invokedynamic correctly
+   - **JVM Execution:** Test with simple bootstrap method
+
+8. **Test Bootstrap Method**
+   Create minimal runtime support for testing:
+   ```java
+   public class TestBootstrap {
+       public static CallSite bootstrap(
+           MethodHandles.Lookup lookup,
+           String name,
+           MethodType type
+       ) {
+           // Minimal implementation for testing
+       }
+   }
+   ```
+
+**Files to Modify:**
+- `src/code.cpp/h` - Instruction emission
+- `src/bytecode.cpp` - Integration
+- `src/stackmap.cpp` - Verification support
+
+**Testing:**
+- `test/java7/invokedynamic_compat.java` - Read Java 8 class file
+- `test/java7/invokedynamic_manual.java` - Manually constructed test (bytecode engineering)
+
+**Reference:** JVMS §6.5.invokedynamic, JVMS §4.10.1.9.5 (Type Checking invokedynamic)
+
+**Note:** Java 7 source code does NOT generate invokedynamic. Testing will use:
+1. Reading existing Java 8 class files
+2. Manually constructed test cases
+3. Validation that infrastructure works for future Java 8 lambda implementation
+
+---
+
+### 3.4 Method Handles Runtime Support (Minimal)
+
+**Complexity:** MEDIUM
+**Estimated Effort:** 5-7 days
 **Dependencies:** invokedynamic infrastructure
 
 #### Description
-- `java.lang.invoke` package (MethodHandle, MethodType, CallSite, etc.)
-- Low-level mechanism for method invocation
-- Used by dynamic languages and lambda implementation
-- For compiler: primarily library work, minimal compiler changes
+Provide minimal `java.lang.invoke` package support to enable invokedynamic testing and validate the infrastructure for future Java 8 implementation.
 
-#### Java 7 Scope Decision
+#### Implementation Strategy
 
-**RECOMMENDATION:** Do NOT implement java.lang.invoke in JOPA runtime.
+**Approach:** Minimal stub implementation sufficient for:
+1. Compilation of code that imports `java.lang.invoke`
+2. Basic invokedynamic testing
+3. Foundation for Java 8 lambda implementation
 
-**Rationale:**
-1. Method handles are primarily used by dynamic language implementers
-2. Java source code in Java 7 does not directly use method handles
-3. Runtime library work, not compiler work
-4. JOPA runtime is minimal; full java.lang.invoke would require:
-   - MethodHandle class and subclasses
-   - MethodType class
-   - CallSite and subclasses
-   - MethodHandles lookup class
-   - Complex native implementation
+**NOT Implemented:** Full native method handle invocation (requires JVM internals)
 
-**If Implemented:**
-- Add minimal stubs to runtime library
-- Real implementation would require JVM support (native methods)
+#### Implementation Tasks
 
-**Files to Create (if implemented):**
+1. **MethodHandle Class** (`runtime/java/lang/invoke/MethodHandle.java`)
+   ```java
+   package java.lang.invoke;
+
+   public abstract class MethodHandle {
+       // Minimal stub - actual implementation requires native code
+       public Object invoke(Object... args) throws Throwable {
+           throw new UnsupportedOperationException("MethodHandle requires JVM support");
+       }
+
+       public Object invokeExact(Object... args) throws Throwable {
+           throw new UnsupportedOperationException("MethodHandle requires JVM support");
+       }
+   }
+   ```
+
+2. **MethodType Class** (`runtime/java/lang/invoke/MethodType.java`)
+   ```java
+   package java.lang.invoke;
+
+   public final class MethodType {
+       private final Class<?> returnType;
+       private final Class<?>[] parameterTypes;
+
+       public static MethodType methodType(Class<?> rtype, Class<?>... ptypes) {
+           return new MethodType(rtype, ptypes);
+       }
+
+       public Class<?> returnType() { return returnType; }
+       public Class<?>[] parameterArray() { return parameterTypes.clone(); }
+   }
+   ```
+
+3. **CallSite Class** (`runtime/java/lang/invoke/CallSite.java`)
+   ```java
+   package java.lang.invoke;
+
+   public abstract class CallSite {
+       protected MethodHandle target;
+
+       public abstract MethodHandle getTarget();
+       public abstract void setTarget(MethodHandle newTarget);
+   }
+
+   public class ConstantCallSite extends CallSite {
+       public ConstantCallSite(MethodHandle target) { this.target = target; }
+       public MethodHandle getTarget() { return target; }
+       public void setTarget(MethodHandle newTarget) {
+           throw new UnsupportedOperationException("immutable");
+       }
+   }
+
+   public class MutableCallSite extends CallSite {
+       public MutableCallSite(MethodHandle target) { this.target = target; }
+       public MethodHandle getTarget() { return target; }
+       public void setTarget(MethodHandle newTarget) { this.target = newTarget; }
+   }
+   ```
+
+4. **MethodHandles Lookup** (`runtime/java/lang/invoke/MethodHandles.java`)
+   ```java
+   package java.lang.invoke;
+
+   public class MethodHandles {
+       public static final class Lookup {
+           // Minimal stub
+       }
+
+       public static Lookup lookup() {
+           return new Lookup();
+       }
+   }
+   ```
+
+5. **Compilation Support**
+   - Ensure compiler can parse and compile imports of `java.lang.invoke`
+   - No special compiler support needed (just library classes)
+
+**Files to Create:**
 - `runtime/java/lang/invoke/MethodHandle.java`
 - `runtime/java/lang/invoke/MethodType.java`
 - `runtime/java/lang/invoke/CallSite.java`
+- `runtime/java/lang/invoke/ConstantCallSite.java`
+- `runtime/java/lang/invoke/MutableCallSite.java`
+- `runtime/java/lang/invoke/VolatileCallSite.java`
+- `runtime/java/lang/invoke/MethodHandles.java`
 
 **Testing:**
-- Compatibility: compile code that imports java.lang.invoke
-- Do NOT test actual method handle invocation (requires JVM support)
+- Compile code that imports java.lang.invoke classes
+- Verify class files reference java.lang.invoke types correctly
+- Basic invokedynamic test using stub bootstrap method
+
+**Note:** Full MethodHandle implementation requires JVM-level support (native code, JIT optimization). The stub implementation provides:
+- Type checking and compilation support
+- Foundation for Java 8 lambda desugaring
+- Validation of invokedynamic infrastructure
+
+**Reference:** JSR 292 specification, java.lang.invoke package documentation
 
 ---
 
@@ -996,6 +1265,8 @@ Create comprehensive tests for each Java 7 feature:
 4. **Integration Tests** - Combine multiple features
 
 **Test Files to Create:**
+
+**Phase 1 - Language Features:**
 - `test/java7/binary_literals.java` - Binary literal syntax
 - `test/java7/underscore_literals.java` - Underscore separators
 - `test/java7/switch_string_basic.java` - Basic string switch
@@ -1007,10 +1278,21 @@ Create comprehensive tests for each Java 7 feature:
 - `test/java7/try_with_resources_multiple.java` - Multiple resources
 - `test/java7/try_with_resources_exceptions.java` - Exception suppression
 - `test/java7/safevarargs.java` - SafeVarargs annotation
+
+**Phase 2 - Bytecode:**
 - `test/java7/stackmap_simple.java` - Simple stack map generation
 - `test/java7/stackmap_branches.java` - Branches and stack maps
 - `test/java7/stackmap_exceptions.java` - Exception handlers and stack maps
 - `test/java7/stackmap_loops.java` - Loops and stack maps
+- `test/java7/bytecode_version.java` - Verify version 51.0
+
+**Phase 3 - invokedynamic:**
+- `test/java7/invokedynamic_compat.java` - Read Java 8 class files
+- `test/java7/invokedynamic_constants.java` - New constant pool entries
+- `test/java7/bootstrap_methods.java` - BootstrapMethods attribute
+- `test/java7/method_handles_import.java` - Import java.lang.invoke
+
+**Integration:**
 - `test/java7/integration_all_features.java` - Combine all features
 
 ### 5.2 Bytecode Verification
@@ -1019,7 +1301,8 @@ For each test, verify bytecode with `javap -v`:
 - Check class file version: 51.0
 - Verify StackMapTable attributes present
 - Verify correct desugaring (string switch, try-with-resources)
-- Verify constant pool entries
+- Verify constant pool entries (especially invokedynamic constants)
+- Verify BootstrapMethods attribute when present
 
 ### 5.3 JVM Compatibility Testing
 
@@ -1034,6 +1317,14 @@ Ensure all existing Java 5 and Java 6 tests still pass:
 - Run full test suite after each feature implementation
 - Fix any regressions immediately
 
+### 5.5 invokedynamic Validation
+
+Special validation for JSR 292 implementation:
+1. **Read Java 8 class files:** Verify JOPA can read lambdas without crashing
+2. **Constant pool integrity:** Verify new constant types read/write correctly
+3. **BootstrapMethods:** Verify attribute structure matches specification
+4. **Future-ready:** Confirm infrastructure ready for Java 8 lambda generation
+
 ---
 
 ## Implementation Dependencies
@@ -1041,56 +1332,75 @@ Ensure all existing Java 5 and Java 6 tests still pass:
 ### Dependency Graph
 
 ```
-Phase 1: Language Features (Can be mostly parallel)
+Phase 1: Language Features (Mostly parallel, some dependencies)
 ├── 1.1 Binary Literals & Underscores (independent)
 ├── 1.2 Strings in Switch (independent)
 ├── 1.3 Diamond Operator (requires generics - already done)
 ├── 1.4 Multi-Catch (independent)
 ├── 1.5 Precise Rethrow (soft dependency on multi-catch)
-├── 1.6 Try-with-Resources (requires AutoCloseable runtime)
+├── 1.6 Try-with-Resources (requires AutoCloseable runtime - Phase 4.1, 4.2)
 └── 1.7 SafeVarargs (requires annotation support - already done)
 
 Phase 2: Bytecode Version 51
-├── 2.1 Version Update (independent, but should be first)
-└── 2.2 StackMapTable (requires all bytecode generation working)
+├── 2.1 Version Update (independent, should be first in Phase 2)
+└── 2.2 StackMapTable (requires all bytecode generation working, MUST support invokedynamic)
 
-Phase 3: invokedynamic (DEFERRED)
-├── 3.1 invokedynamic instruction (requires constant pool changes)
-└── 3.2 Method Handles (DEFERRED - library work)
+Phase 3: invokedynamic (Sequential dependencies)
+├── 3.1 New Constant Pool Entries (requires 2.1 version update)
+├── 3.2 BootstrapMethods Attribute (requires 3.1)
+├── 3.3 invokedynamic Instruction (requires 3.1, 3.2, and 2.2 StackMapTable)
+└── 3.4 Method Handles Runtime (requires 3.3 for testing)
 
 Phase 4: Runtime Library (Can be parallel)
-├── 4.1 AutoCloseable (required for try-with-resources)
-├── 4.2 Throwable.addSuppressed() (required for try-with-resources)
-├── 4.3 SafeVarargs (required for SafeVarargs annotation)
+├── 4.1 AutoCloseable (required for 1.6 try-with-resources)
+├── 4.2 Throwable.addSuppressed() (required for 1.6 try-with-resources)
+├── 4.3 SafeVarargs (required for 1.7 SafeVarargs annotation)
 └── 4.4 Objects utility class (independent)
 
-Phase 5: Testing (After each feature)
+Phase 5: Testing (After each feature, comprehensive at end)
 └── Continuous integration testing
 ```
 
 ### Critical Path
 
-1. **Phase 2.1:** Bytecode version 51.0 update (enables target 1.7)
+1. **Phase 2.1:** Bytecode version 51.0 update (enables `-target 1.7`)
 2. **Phase 4.1, 4.2:** AutoCloseable and Throwable updates (blocks try-with-resources)
-3. **Phase 1 Features:** Implement in priority order
-4. **Phase 2.2:** StackMapTable generation (required for Java 7 compliance)
-5. **Phase 5:** Comprehensive testing
+3. **Phase 1 Features:** Implement in priority order (except try-with-resources)
+4. **Phase 1.6:** Try-with-resources (after AutoCloseable ready)
+5. **Phase 3.1, 3.2:** Constant pool and BootstrapMethods (foundation for invokedynamic)
+6. **Phase 2.2:** StackMapTable generation (MUST handle invokedynamic)
+7. **Phase 3.3:** invokedynamic instruction (after StackMapTable ready)
+8. **Phase 3.4:** Method Handles runtime (validates invokedynamic)
+9. **Phase 5:** Comprehensive testing
+
+**Key Insight:** StackMapTable implementation must wait until invokedynamic infrastructure is in place, as it needs to support verification of invokedynamic instructions.
 
 ---
 
 ## Risk Assessment
 
-### High-Risk Components
+### Very High-Risk Components
 
 1. **StackMapTable Generation (Phase 2.2)**
-   - **Risk:** Most complex feature, potential for subtle bugs
+   - **Risk:** Most complex feature, must support all instructions including invokedynamic
    - **Mitigation:**
      - Implement incrementally (simple methods first)
+     - Add invokedynamic support explicitly
      - Extensive testing with `javap -v` verification
      - Test with multiple JVMs
      - Study reference implementations (OpenJDK, Eclipse JDT)
 
-2. **Try-with-Resources Desugaring (Phase 1.6)**
+2. **invokedynamic Infrastructure (Phase 3)**
+   - **Risk:** New bytecode paradigm, complex constant pool structure, critical for Java 8
+   - **Mitigation:**
+     - Implement in strict order: constants → BootstrapMethods → instruction
+     - Validate each step with Java 8 class file reading
+     - Test with javap and real JVM
+     - Reference JSR 292 specification closely
+
+### High-Risk Components
+
+1. **Try-with-Resources Desugaring (Phase 1.6)**
    - **Risk:** Complex control flow, multiple exception paths
    - **Mitigation:**
      - Follow JLS specification exactly
@@ -1098,7 +1408,7 @@ Phase 5: Testing (After each feature)
      - Verify suppressed exception handling
      - Compare bytecode with javac output
 
-3. **String Switch Desugaring (Phase 1.2)**
+2. **String Switch Desugaring (Phase 1.2)**
    - **Risk:** Hash collision handling, correct equals() behavior
    - **Mitigation:**
      - Test with strings that have hash collisions
@@ -1115,12 +1425,17 @@ Phase 5: Testing (After each feature)
    - **Risk:** Flow analysis complexity
    - **Mitigation:** Conservative analysis, fallback to declared types
 
+3. **Method Handles Runtime (Phase 3.4)**
+   - **Risk:** Limited without JVM native support
+   - **Mitigation:** Minimal stub implementation, document limitations
+
 ### Low-Risk Components
 
 1. Binary literals and underscores (Phase 1.1)
 2. Multi-catch (Phase 1.4)
 3. SafeVarargs (Phase 1.7)
 4. Runtime library updates (Phase 4)
+5. Bytecode version update (Phase 2.1)
 
 ---
 
@@ -1128,23 +1443,48 @@ Phase 5: Testing (After each feature)
 
 ### Optimistic Timeline (Focused Development)
 
-- **Phase 1.1:** 2-3 days (Binary literals, underscores)
-- **Phase 1.2:** 5-7 days (Strings in switch)
-- **Phase 1.3:** 7-10 days (Diamond operator)
-- **Phase 1.4:** 5-7 days (Multi-catch)
-- **Phase 1.5:** 4-5 days (Precise rethrow)
-- **Phase 1.6:** 10-14 days (Try-with-resources)
-- **Phase 1.7:** 2-3 days (SafeVarargs)
-- **Phase 2.1:** 1-2 days (Version update)
-- **Phase 2.2:** 20-30 days (StackMapTable)
-- **Phase 4:** 3-5 days (Runtime library)
-- **Phase 5:** 10-15 days (Testing, debugging, refinement)
+**Phase 1: Language Features**
+- 1.1 Binary literals & underscores: 2-3 days
+- 1.2 Strings in switch: 5-7 days
+- 1.3 Diamond operator: 7-10 days
+- 1.4 Multi-catch: 5-7 days
+- 1.5 Precise rethrow: 4-5 days
+- 1.6 Try-with-resources: 10-14 days
+- 1.7 SafeVarargs: 2-3 days
+- **Subtotal:** 35-49 days
 
-**Total: 69-101 days (approximately 3-5 months of focused work)**
+**Phase 2: Bytecode Version 51**
+- 2.1 Version update: 1-2 days
+- 2.2 StackMapTable: 20-30 days
+- **Subtotal:** 21-32 days
 
-### Realistic Timeline (With Debugging, Iteration)
+**Phase 3: invokedynamic and Method Handles**
+- 3.1 Constant pool entries: 7-10 days
+- 3.2 BootstrapMethods attribute: 5-7 days
+- 3.3 invokedynamic instruction: 10-14 days
+- 3.4 Method Handles runtime: 5-7 days
+- **Subtotal:** 27-38 days
 
-**Total: 4-6 months**
+**Phase 4: Runtime Library**
+- 4.1-4.4 All runtime updates: 3-5 days
+
+**Phase 5: Testing and Refinement**
+- Comprehensive testing: 10-15 days
+- Bug fixes and iteration: 5-10 days
+- **Subtotal:** 15-25 days
+
+**Total: 101-149 days (approximately 4-7 months of focused work)**
+
+### Realistic Timeline (With Debugging, Iteration, Learning)
+
+**Total: 5-8 months**
+
+Includes time for:
+- Learning JSR 292 specification in depth
+- Debugging complex StackMapTable issues
+- Iterating on invokedynamic implementation
+- Comprehensive cross-JVM testing
+- Documentation updates
 
 ---
 
@@ -1152,27 +1492,114 @@ Phase 5: Testing (After each feature)
 
 ### Stage 1: Foundation (Weeks 1-2)
 1. Bytecode version 51.0 update (Phase 2.1)
-2. Runtime library updates (Phase 4)
+2. Runtime library updates (Phase 4.1-4.4)
 3. Testing infrastructure setup
+
+**Deliverable:** Can compile with `-target 1.7`, runtime classes available
 
 ### Stage 2: Low-Hanging Fruit (Weeks 3-4)
 1. Binary literals and underscores (Phase 1.1)
 2. SafeVarargs annotation (Phase 1.7)
 3. Multi-catch (Phase 1.4)
 
-### Stage 3: Medium Complexity (Weeks 5-8)
+**Deliverable:** 3 Project Coin features working
+
+### Stage 3: Medium Complexity Language Features (Weeks 5-9)
 1. Strings in switch (Phase 1.2)
 2. Diamond operator (Phase 1.3)
 3. Precise rethrow (Phase 1.5)
+4. Try-with-resources (Phase 1.6)
 
-### Stage 4: High Complexity (Weeks 9-14)
-1. Try-with-resources (Phase 1.6)
-2. StackMapTable generation (Phase 2.2)
+**Deliverable:** All 7 Project Coin features complete
 
-### Stage 5: Testing and Refinement (Weeks 15-16)
-1. Comprehensive testing (Phase 5)
-2. Bug fixes and optimization
-3. Documentation updates
+### Stage 4: invokedynamic Foundation (Weeks 10-12)
+1. New constant pool entries (Phase 3.1)
+2. BootstrapMethods attribute (Phase 3.2)
+3. Constant pool testing with Java 8 class files
+
+**Deliverable:** Can read Java 8 class files without errors
+
+### Stage 5: StackMapTable (Weeks 13-17)
+1. Basic StackMapTable for simple methods (Phase 2.2)
+2. Add support for all control flow
+3. Add support for invokedynamic instruction
+4. Comprehensive testing
+
+**Deliverable:** All methods have valid StackMapTable, JVM verification passes
+
+### Stage 6: invokedynamic Completion (Weeks 18-20)
+1. invokedynamic instruction implementation (Phase 3.3)
+2. Method Handles runtime stubs (Phase 3.4)
+3. invokedynamic testing and validation
+
+**Deliverable:** invokedynamic infrastructure complete and tested
+
+### Stage 7: Comprehensive Testing (Weeks 21-24)
+1. Feature integration testing (Phase 5)
+2. Multi-JVM compatibility testing
+3. Regression testing (Java 5, 6, 7)
+4. Bug fixes and refinement
+5. Documentation updates
+
+**Deliverable:** Production-ready Java 7 compiler with invokedynamic support
+
+---
+
+## Success Criteria
+
+**Java 7 implementation is complete when:**
+
+1. ✅ All JSR 334 (Project Coin) features implemented and tested
+2. ✅ Bytecode version 51.0 generated correctly
+3. ✅ StackMapTable attributes generated for all methods (including those with invokedynamic)
+4. ✅ All three new constant pool entry types (MethodHandle, MethodType, InvokeDynamic) implemented
+5. ✅ BootstrapMethods attribute reading and writing works correctly
+6. ✅ invokedynamic instruction can be emitted and verified
+7. ✅ java.lang.invoke package classes available (minimal stubs)
+8. ✅ All generated class files load and execute on Java 7+ JVMs
+9. ✅ Can read Java 8 class files (lambdas) without errors
+10. ✅ Comprehensive test suite passes (60+ Java 7 tests)
+11. ✅ No regressions in Java 5/6 tests
+12. ✅ Documentation updated (README, implementation status)
+
+**Future-Ready for Java 8:**
+- ✅ invokedynamic infrastructure validated and tested
+- ✅ Ready to implement lambda desugaring using invokedynamic
+- ✅ Method reference implementation can build on MethodHandle infrastructure
+
+---
+
+## Strategic Value of Complete JSR 292 Implementation
+
+### Why Implement invokedynamic Now?
+
+1. **Java 8 Foundation**
+   - Lambda expressions desugar to invokedynamic
+   - Method references use invokedynamic
+   - Without JSR 292, Java 8 implementation would require massive refactoring
+
+2. **Specification Completeness**
+   - Java 7 spec includes JSR 292
+   - Full compliance validates JOPA as a complete Java 7 compiler
+   - Tests the most advanced JVM features
+
+3. **Technical Learning**
+   - Understanding invokedynamic deepens JVM knowledge
+   - Prepares for modern Java features (lambdas, streams, etc.)
+   - Validates ability to implement complex bytecode features
+
+4. **Future-Proofing**
+   - Java 9-21 increasingly rely on invokedynamic
+   - String concatenation, switch expressions, pattern matching use it
+   - Essential foundation for modern Java
+
+### Validation Strategy
+
+Test invokedynamic infrastructure by:
+1. Reading Java 8 lambda-based class files
+2. Manually constructing invokedynamic test cases
+3. Verifying constant pool structure matches javac output
+4. Confirming JVM accepts and executes generated bytecode
 
 ---
 
@@ -1188,53 +1615,41 @@ Phase 5: Testing (After each feature)
 - **JSR 336:** Java SE 7 Release Contents
 - **JSR 334:** Small Enhancements to the Java Programming Language (Project Coin)
 - **JSR 292:** Supporting Dynamically Typed Languages on the Java Platform
+  - https://jcp.org/en/jsr/detail?id=292
 - **JSR 203:** More New I/O APIs for the Java Platform (NIO.2)
 
 ### Implementation References
 - **OpenJDK 7 Source Code:** https://github.com/openjdk/jdk7u
 - **Eclipse JDT Compiler:** https://github.com/eclipse-jdt/eclipse.jdt.core
 - **Project Coin Documentation:** https://openjdk.org/projects/coin/
+- **JSR 292 Cookbook:** https://wiki.openjdk.org/display/HotSpot/Method+Handles
 
----
-
-## Success Criteria
-
-**Java 7 implementation is complete when:**
-
-1. ✅ All JSR 334 (Project Coin) features implemented and tested
-2. ✅ Bytecode version 51.0 generated correctly
-3. ✅ StackMapTable attributes generated for all methods
-4. ✅ All generated class files load and execute on Java 7+ JVMs
-5. ✅ Comprehensive test suite passes (50+ Java 7 tests)
-6. ✅ No regressions in Java 5/6 tests
-7. ✅ Documentation updated (README, implementation status)
-
-**Optional (Deferred to Java 8):**
-- invokedynamic instruction support
-- java.lang.invoke package
-- NIO.2 library additions
+### invokedynamic Resources
+- **Oracle invokedynamic Article:** https://www.oracle.com/technical-resources/articles/javase/dyntypelang.html
+- **JSR 292 Deep Dive:** John Rose's blog posts on invokedynamic
+- **InfoQ JSR 292 Article:** https://www.infoq.com/articles/invokedynamic/
 
 ---
 
 ## Conclusion
 
-Java 7 implementation is a substantial but achievable project. The roadmap prioritizes:
+Java 7 implementation is a substantial but achievable project that builds essential foundation for Java 8 and beyond. The roadmap prioritizes:
 
 1. **Foundation first:** Bytecode version, runtime library
 2. **Quick wins:** Simple features for early progress
 3. **Core features:** Project Coin language enhancements
-4. **Complex features last:** StackMapTable, try-with-resources
-5. **Continuous testing:** Validate with real JVM at each step
+4. **Essential infrastructure:** invokedynamic and Method Handles (for Java 8)
+5. **Complex features last:** StackMapTable with full invokedynamic support
+6. **Continuous testing:** Validate with real JVM at each step
 
-**Deferred to Later:**
-- invokedynamic and Method Handles (not used by Java 7 source)
-- NIO.2 library (runtime library, not compiler work)
+**Key Strategic Decision:** Implementing complete JSR 292 (invokedynamic) support now, despite not being directly used by Java 7 source code, provides essential foundation for Java 8 lambda expressions and method references. This approach ensures JOPA can continue evolving toward full modern Java support.
 
-With focused effort, JOPA can achieve comprehensive Java 7 support, continuing its mission as a modern, bootstrappable Java compiler.
+With focused effort and strategic implementation order, JOPA can achieve comprehensive Java 7 support including the revolutionary invokedynamic infrastructure, continuing its mission as a modern, bootstrappable Java compiler ready for Java 8 and beyond.
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Last Updated:** 2025-01-23
 **Author:** Claude (Anthropic)
 **Status:** Draft - Ready for Review
+**Revision:** Updated to include full invokedynamic/JSR 292 implementation as essential for Java 8 path
