@@ -96,6 +96,8 @@ add_jikes_compile_test(BridgeTest "${TEST_DIR}/generics/BridgeTest.java")
 add_jikes_compile_test(SimpleSameFileTest "${TEST_DIR}/generics/SimpleSameFileTest.java")
 add_jikes_compile_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTest.java")
 add_jikes_compile_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java")
+add_jikes_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
+add_jikes_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
 
 # Autoboxing/Unboxing Tests
 add_jikes_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
