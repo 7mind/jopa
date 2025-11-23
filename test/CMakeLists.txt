@@ -129,3 +129,9 @@ set_tests_properties("compile_MathUtils" PROPERTIES LABELS "compile")
 add_jikes_run_test(StaticFieldOnlyTest "${TEST_DIR}/static-imports/StaticFieldOnlyTest.java" "StaticFieldOnlyTest")
 add_jikes_run_test(StaticMethodImportTest "${TEST_DIR}/static-imports/StaticMethodImportTest.java" "StaticMethodImportTest")
 add_jikes_run_test(StaticWildcardImportTest "${TEST_DIR}/static-imports/StaticWildcardImportTest.java" "StaticWildcardImportTest")
+
+# Annotation Tests
+add_jikes_run_test(AnnotationTest "${TEST_DIR}/annotations/AnnotationTest.java" "AnnotationTest")
+add_jikes_run_test(MarkerAnnotationTest "${TEST_DIR}/annotations/MarkerAnnotationTest.java" "MarkerAnnotationTest")
+add_jikes_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotationTest.java" "CustomAnnotationTest")
+add_jikes_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")

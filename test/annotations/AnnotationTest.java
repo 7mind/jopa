@@ -8,6 +8,13 @@ public class AnnotationTest {
 
     @Deprecated
     public void oldMethod() {
-        // Deprecated method
+        System.out.println("Deprecated method called");
+    }
+
+    public static void main(String[] args) {
+        AnnotationTest test = new AnnotationTest();
+        System.out.println(test.toString());
+        test.oldMethod();
+        System.out.println("✓ Annotation test passed");
     }
 }

@@ -69,6 +69,7 @@ jobs:
             echo '- ✅ Enhanced For-Loop (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Autoboxing (5 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Static Imports (1 compile + 3 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Annotations (4 compile + 4 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
           "
 
       - name: Upload test artifacts

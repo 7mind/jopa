@@ -43,9 +43,9 @@ AccessFlags Semantic::ProcessModifiers(AstModifiers* modifiers,
                                lex_stream -> NameString(annotation -> name ->
                                                         identifier_token));
             }
-            // TODO: Add annotation support for 1.5.
-            ReportSemError(SemanticError::ANNOTATION_MODIFIER_UNSUPPORTED,
-                           mod);
+            // Annotations are allowed in Java 5+. They will be processed
+            // separately for semantic checking and bytecode generation.
+            // For now, we just allow them to be parsed without error.
             continue;
         }
         assert(keyword);
