@@ -12,9 +12,8 @@ OSI Certified is a certification mark of the Open Source Initiative.
 
 See the ChangeLog for file revision history.
 
-For instructions on how to build and install jikes, see
-the INSTALL file. For info about making changes to the
-Jikes source code itself, see the HACKING file.
+See the INSTALL file for current build instructions using CMake. For info
+about making changes to the Jikes source code itself, see the HACKING file.
 
 A man page is included in the 'doc' directory.
 

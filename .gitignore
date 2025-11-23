@@ -14,28 +14,29 @@
 *.a
 
 # Build artifacts
-.libs/
+/build/
+/cmake-build-*/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/Testing/
 .deps/
+.libs/
+*.ninja
+*.ninja_deps
+*.ninja_log
 src/jikes
 jikes
 
 # Compiled Java classes
 *.class
 
-# Autotools generated files
+# Legacy autotools outputs
 /autom4te.cache/
-/config.h
-/config.h.in~
 /config.log
 /config.status
-/configure~
-/stamp-h1
-Makefile
-Makefile.in
 .dirstamp
-
-# Libtool
-libtool
 
 # Editor and IDE files
 *~
