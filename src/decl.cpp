@@ -2509,67 +2509,75 @@ void Semantic::ProcessSingleStaticImportDeclaration(AstImportDeclaration* import
 
     // Resolve the type part (everything except the last component)
     ProcessImportQualifiedName(name -> base_opt);
-    TypeSymbol* type = name -> base_opt -> Type();
 
-    if (!type)
+    // Check if resolution succeeded
+    if (!name -> base_opt || !name -> base_opt -> symbol)
     {
-        // Error already reported by ProcessImportQualifiedName
+        // Resolution failed, error already reported
         return;
     }
 
-    // Ensure at least headers are processed
-    if (type -> SourcePending())
-        control.ProcessHeaders(type -> file_symbol);
+    Symbol* symbol = name -> base_opt -> symbol;
+
+    // The symbol must be a type, not a package
+    PackageSymbol* package = symbol -> PackageCast();
+    TypeSymbol* type = symbol -> TypeCast();
+
+    if (package || !type)
+    {
+        ReportSemError(SemanticError::INVALID_STATIC_IMPORT,
+                       name -> identifier_token,
+                       lex_stream -> NameString(name -> identifier_token));
+        return;
+    }
+
+    if (type -> Bad())
+    {
+        // Avoid cascading errors
+        return;
+    }
 
     // Get the member name (last component)
-    NameSymbol* member_name = lex_stream -> NameSymbol(name -> identifier_token);
-
-    // Search for static fields with this name
-    VariableSymbol* field = NULL;
-    for (unsigned i = 0; i < type -> NumVariableSymbols(); i++)
+    if (!name || name -> identifier_token == 0)
     {
-        VariableSymbol* var = type -> VariableSym(i);
-        if (var -> Identity() == member_name && var -> ACC_STATIC())
-        {
-            field = var;
-            break;
-        }
-    }
-
-    // Search for static methods with this name
-    MethodSymbol* method = NULL;
-    for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
-    {
-        MethodSymbol* meth = type -> MethodSym(i);
-        if (meth -> Identity() == member_name && meth -> ACC_STATIC())
-        {
-            method = meth;
-            break;
-        }
-    }
-
-    if (!field && !method)
-    {
-        ReportSemError(SemanticError::STATIC_MEMBER_NOT_FOUND,
-                       name -> identifier_token,
-                       lex_stream -> NameString(name -> identifier_token),
-                       type -> ContainingPackageName(),
-                       type -> ExternalName());
+        // Invalid token
         return;
     }
 
-    // Add the static member to our imports
-    // We prefer fields over methods if both exist with the same name
-    Symbol* member = field ? (Symbol*)field : (Symbol*)method;
+    NameSymbol* member_name = lex_stream -> NameSymbol(name -> identifier_token);
+    if (!member_name)
+    {
+        // Failed to get member name
+        return;
+    }
+
+    // Store the import information for lazy resolution during name lookup
+    // We don't validate that the member exists here because:
+    // 1. The type might not be fully processed yet (source files)
+    // 2. We want to defer resolution until the member is actually used
+    // 3. This avoids circular dependency issues during compilation
 
     // Check for duplicates
     for (unsigned i = 0; i < single_static_imports.Length(); i++)
     {
-        if (single_static_imports[i] == member)
+        StaticImportInfo* info = single_static_imports[i];
+        if (!info)
+            continue;
+        if (info -> type == type && info -> member_name == member_name)
             return; // Duplicate, ignore
     }
 
-    single_static_imports.Next() = member;
+    // Create and store the import info
+    StaticImportInfo* info = new StaticImportInfo();
+    if (!info)
+    {
+        // Out of memory?
+        return;
+    }
+
+    info -> type = type;
+    info -> member_name = member_name;
+    single_static_imports.Next() = info;
 }
 
 

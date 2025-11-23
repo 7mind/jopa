@@ -1446,7 +1446,17 @@ void Control::CheckForUnusedImports(Semantic* sem)
     {
         AstImportDeclaration* import_declaration =
             sem -> compilation_unit -> ImportDeclaration(i);
+
+        // Java 5: Skip static imports for now (not fully implemented yet)
+        if (import_declaration -> static_token_opt)
+            continue;
+
         Symbol* symbol = import_declaration -> name -> symbol;
+
+        // Safety check: symbol might be NULL if import processing failed
+        if (!symbol)
+            continue;
+
         if (import_declaration -> star_token_opt)
         {
             PackageSymbol* package = symbol -> PackageCast();

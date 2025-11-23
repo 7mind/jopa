@@ -738,9 +738,9 @@ public:
     ~Semantic()
     {
         delete error;
-        // Clean up static import method shadows
-        for (unsigned i = 0; i < static_import_method_shadows.Length(); i++)
-            delete static_import_method_shadows[i];
+        // Clean up static import info
+        for (unsigned i = 0; i < single_static_imports.Length(); i++)
+            delete single_static_imports[i];
     }
 
     // Report a multi-token semantic warning or error.
@@ -865,10 +865,13 @@ private:
     Tuple<Symbol*> import_on_demand_packages;
     Tuple<TypeSymbol*> single_type_imports;
 
-    // Java 5: Static imports
-    Tuple<Symbol*> single_static_imports;  // MethodSymbol or VariableSymbol
+    // Java 5: Static imports - store import info, resolve lazily during lookup
+    struct StaticImportInfo {
+        TypeSymbol* type;
+        NameSymbol* member_name;
+    };
+    Tuple<StaticImportInfo*> single_static_imports;
     Tuple<TypeSymbol*> static_on_demand_imports;  // Types for wildcard static imports
-    Tuple<MethodShadowSymbol*> static_import_method_shadows;  // Storage for method shadows
 
     //
     // Where am I?

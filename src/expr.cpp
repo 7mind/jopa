@@ -1196,61 +1196,56 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
     {
         for (unsigned i = 0; i < single_static_imports.Length(); i++)
         {
-            Symbol* imported_member = single_static_imports[i];
-            MethodSymbol* method = imported_member -> MethodCast();
-            if (method && method -> Identity() == name_symbol)
+            StaticImportInfo* info = single_static_imports[i];
+            if (!info || !info -> type || !info -> member_name)
+                continue;
+
+            if (info -> member_name != name_symbol)
+                continue;
+
+            // Lazy resolution: look up the method in the type now
+            TypeSymbol* import_type = info -> type;
+
+            // Skip if type is bad or not ready
+            if (import_type -> Bad() || import_type -> SourcePending())
+                continue;
+
+            // Make sure the type has been processed enough to have members
+            if (!import_type -> MethodMembersProcessed())
+                continue;
+
+            // Compute method closure if needed
+            if (!import_type -> expanded_method_table)
+                ComputeMethodsClosure(import_type, id_token);
+
+            // Double-check the table exists
+            if (!import_type -> expanded_method_table)
+                continue;
+
+            MethodShadowSymbol* method_shadow =
+                import_type -> expanded_method_table -> FindMethodShadowSymbol(name_symbol);
+            if (!method_shadow)
+                continue;
+
+            // Check each method in the shadow (handle overloading)
+            for (MethodShadowSymbol* shadow = method_shadow; shadow; shadow = shadow -> next_method)
             {
+                MethodSymbol* method = shadow -> method_symbol;
+                if (!method || !method -> ACC_STATIC())
+                    continue;
+
                 // Process method signature if needed
-                if (! method -> IsTyped())
+                if (!method -> IsTyped())
                     method -> ProcessMethodSignature(this, id_token);
 
-                // Check if method is applicable
+                // Check if method is applicable to the arguments
                 unsigned num_args = method_call -> arguments -> NumArguments();
-                if (MethodApplicableByArity(method, num_args))
-                {
-                    unsigned j;
-                    unsigned num_formals = method -> NumFormalParameters();
-                    bool is_varargs = method -> ACC_VARARGS();
+                if (!MethodApplicableByArity(method, num_args))
+                    continue;
 
-                    // Check fixed parameters
-                    unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
-                    for (j = 0; j < num_fixed && j < num_args; j++)
-                    {
-                        AstExpression* expr = method_call -> arguments -> Argument(j);
-                        if (! CanMethodInvocationConvert(method -> FormalParameter(j) -> Type(),
-                                                         expr -> Type()))
-                        {
-                            break;
-                        }
-                    }
-
-                    // Check varargs parameters
-                    if (j == num_fixed && is_varargs && num_formals > 0)
-                    {
-                        TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
-                        TypeSymbol* component_type = varargs_type -> IsArray() ?
-                            varargs_type -> ArraySubtype() : varargs_type;
-
-                        for ( ; j < num_args; j++)
-                        {
-                            AstExpression* expr = method_call -> arguments -> Argument(j);
-                            if (! CanMethodInvocationConvert(component_type, expr -> Type()))
-                            {
-                                break;
-                            }
-                        }
-                    }
-
-                    if (j == num_args)
-                    {
-                        // Create a method shadow for this static import
-                        MethodShadowSymbol* shadow = new MethodShadowSymbol(method);
-                        shadow -> next_method = NULL;
-                        static_import_method_shadows.Next() = shadow;  // Store for lifetime management
-                        methods_found.Next() = shadow;
-                        // where_found remains NULL to indicate static import
-                    }
-                }
+                methods_found.Next() = shadow;
+                // where_found remains NULL for static imports
+                break; // Found one matching method from this import
             }
         }
     }
@@ -1281,7 +1276,8 @@ MethodShadowSymbol* Semantic::FindMethodInEnvironment(SemanticEnvironment*& wher
                        methods_found[i] -> method_symbol -> containing_type -> ExternalName());
     }
 
-    if (method_symbol -> containing_type != where_found -> Type())
+    // Java 5: where_found can be NULL for static imports
+    if (where_found && method_symbol -> containing_type != where_found -> Type())
     {
         //
         // The method was inherited.
@@ -1620,20 +1616,12 @@ void Semantic::FindVariableInEnvironment(Tuple<VariableSymbol*>& variables_found
     }
 
     // Java 5: If not found in environment, check single static imports
-    if (variables_found.Length() == 0 &&
+    // TODO: Implement lazy lookup using StaticImportInfo
+    // For now, disabled while testing
+    if (false && variables_found.Length() == 0 &&
         control.option.source >= JikesOption::SDK1_5)
     {
-        for (unsigned i = 0; i < single_static_imports.Length(); i++)
-        {
-            Symbol* imported_member = single_static_imports[i];
-            VariableSymbol* var = imported_member -> VariableCast();
-            if (var && var -> Identity() == name_symbol)
-            {
-                variables_found.Next() = var;
-                // where_found remains NULL to indicate static import
-                break;
-            }
-        }
+        // Will implement lazy lookup here
     }
 }
 
@@ -2605,14 +2593,54 @@ void Semantic::ProcessAmbiguousName(AstName* name)
             NameSymbol* name_symbol = lex_stream -> NameSymbol(name -> identifier_token);
             Symbol* static_member = NULL;
 
-            // First check single static imports
+            // First check single static imports (lazy lookup)
             for (unsigned i = 0; i < single_static_imports.Length(); i++)
             {
-                Symbol* member = single_static_imports[i];
-                if (member -> Identity() == name_symbol)
+                StaticImportInfo* info = single_static_imports[i];
+                if (!info || !info -> type || !info -> member_name)
+                    continue;
+
+                if (info -> member_name != name_symbol)
+                    continue;
+
+                // Lazy resolution: look up the member in the type now
+                TypeSymbol* import_type = info -> type;
+
+                // Skip if type is bad or not ready
+                if (import_type -> Bad())
+                    continue;
+
+                // For types that are still being processed, skip them for now
+                // They will be resolved in a later pass or we'll get a proper error
+                if (import_type -> SourcePending())
+                    continue;
+
+                // Make sure the type has been processed enough to have members
+                if (!import_type -> FieldMembersProcessed())
+                    continue;
+
+                // Compute field closure if needed
+                if (!import_type -> expanded_field_table)
                 {
-                    static_member = member;
-                    break;
+                    ComputeFieldsClosure(import_type, name -> identifier_token);
+                }
+
+                // Double-check the table exists after computation
+                if (!import_type -> expanded_field_table)
+                    continue;
+
+                VariableShadowSymbol* var_shadow =
+                    import_type -> expanded_field_table -> FindVariableShadowSymbol(name_symbol);
+                if (var_shadow && var_shadow -> variable_symbol)
+                {
+                    VariableSymbol* var = var_shadow -> variable_symbol;
+                    if (var -> ACC_STATIC())
+                    {
+                        if (!var -> IsTyped())
+                            var -> ProcessVariableSignature(this, name -> identifier_token);
+                        static_member = var;
+                        break;
+                    }
                 }
             }
 
@@ -3236,7 +3264,8 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         }
         else
         {
-            base_type = where_found -> Type();
+            // Java 5: where_found can be NULL for static imports
+            base_type = where_found ? where_found -> Type() : method_shadow -> method_symbol -> containing_type;
             MethodSymbol* method = method_shadow -> method_symbol;
             assert(method -> IsTyped());
 
@@ -3277,8 +3306,9 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             //
             // If the method is a private method belonging to an outer type,
             // give the ast simple_name access to its read_method.
+            // Java 5: where_found is NULL for static imports, no accessor needed
             //
-            if (where_found != state_stack.Top())
+            if (where_found && where_found != state_stack.Top())
                 CreateAccessToScopedMethod(method_call, where_found -> Type());
         }
     }
