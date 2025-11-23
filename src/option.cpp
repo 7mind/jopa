@@ -167,8 +167,8 @@ const wchar_t* OptionError::GetErrorMessage()
         if (ENABLE_SOURCE_15)
         {
             s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 "
-              << "features), 1.4 (assert statement), and 1.5 (partial "
-              << "support beta, see NEWS for supported features).";
+              << "features), 1.4 (assert statement), 1.5 (partial "
+              << "support beta, see NEWS for supported features), 1.6, and 1.7.";
             break;
         }
         s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 features) "
@@ -176,7 +176,7 @@ const wchar_t* OptionError::GetErrorMessage()
         break;
     case INVALID_TARGET_ARGUMENT:
         s << "\"-target\" only recognizes Java releases 1.1, 1.2, 1.3, 1.4, "
-          << "and 1.4.2.";
+          << "1.4.2, 1.5, 1.6, and 1.7.";
         break;
     case INVALID_K_OPTION:
         s << "No argument specified for +K option. The proper form is "
@@ -609,6 +609,11 @@ Option::Option(ArgumentExpander& arguments,
                 {
                     source = SDK1_6;
                 }
+                else if (ENABLE_SOURCE_15 &&
+                         ! strcmp(arguments.argv[i], "1.7"))
+                {
+                    source = SDK1_7;
+                }
                 else
                 {
                     bad_options.Next() =
@@ -657,6 +662,8 @@ Option::Option(ArgumentExpander& arguments,
                     target = SDK1_5;
                 else if (! strcmp(arguments.argv[i], "1.6"))
                     target = SDK1_6;
+                else if (! strcmp(arguments.argv[i], "1.7"))
+                    target = SDK1_7;
                 else
                 {
                     bad_options.Next() =
@@ -967,6 +974,12 @@ Option::Option(ArgumentExpander& arguments,
             break;
         case SDK1_5:
             source = ENABLE_SOURCE_15 ? SDK1_5 : SDK1_4;
+            break;
+        case SDK1_6:
+            source = ENABLE_SOURCE_15 ? SDK1_6 : SDK1_4;
+            break;
+        case SDK1_7:
+            source = ENABLE_SOURCE_15 ? SDK1_7 : SDK1_4;
             break;
         default:
             assert(false && "Unexpected target level");

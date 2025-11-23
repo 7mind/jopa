@@ -1049,10 +1049,17 @@ void Scanner::ClassifyNumericLiteral()
 {
     //
     // Scan the initial sequence of digits, if any.
+    // Java 7: Allow underscores in numeric literals
     //
     const wchar_t* ptr = cursor - 1;
     const wchar_t* tmp;
-    while (Code::IsDecimalDigit(*++ptr));
+    while (Code::IsDecimalDigit(*++ptr) || *ptr == U_UNDERSCORE)
+    {
+        if (*ptr == U_UNDERSCORE)
+        {
+            // Skip underscore, validation happens later
+        }
+    }
 
     //
     // We now take an initial crack at classifying the numeric token.
@@ -1079,21 +1086,61 @@ void Scanner::ClassifyNumericLiteral()
     if (*ptr == U_DOT)
     {
         current_token -> SetKind(TK_DoubleLiteral);
-        while (Code::IsDecimalDigit(*++ptr));
+        while (Code::IsDecimalDigit(*++ptr) || *ptr == U_UNDERSCORE);
     }
     else
     {
         current_token -> SetKind(TK_IntegerLiteral);
         if (*cursor == U_0)
         {
-            if (*ptr == U_x || *ptr == U_X)
+            if (*ptr == U_b || *ptr == U_B)
+            {
+                // Binary literal (Java 7)
+                while (Code::IsBinaryDigit(*++ptr) || *ptr == U_UNDERSCORE)
+                {
+                    if (*ptr == U_UNDERSCORE)
+                    {
+                        // Skip underscore but check for consecutive/trailing underscores
+                        const wchar_t* next = ptr + 1;
+                        if (*next == U_UNDERSCORE ||
+                            (!Code::IsBinaryDigit(*next) && *next != U_l && *next != U_L))
+                        {
+                            // Let the error be caught later if needed
+                        }
+                    }
+                }
+                // Skip the 'b'.
+                if (ptr == cursor + 2) // Found a runt "0b".
+                {
+                    tmp = (*ptr == U_l || *ptr == U_L) ? ptr : ptr - 1;
+                    lex -> ReportMessage(StreamError::INVALID_HEX_CONSTANT,
+                                         current_token -> Location(),
+                                         tmp - lex -> InputBuffer());
+                }
+            }
+            else if (*ptr == U_x || *ptr == U_X)
             {
                 // Don't use isxdigit, it's not platform independent.
-                while (Code::IsHexDigit(*++ptr)); // Skip the 'x'.
+                while (Code::IsHexDigit(*++ptr) || *ptr == U_UNDERSCORE)
+                {
+                    if (*ptr == U_UNDERSCORE)
+                    {
+                        // Skip underscore
+                        const wchar_t* next = ptr + 1;
+                        if (*next == U_UNDERSCORE ||
+                            (!Code::IsHexDigit(*next) && *next != U_DOT &&
+                             *next != U_p && *next != U_P &&
+                             *next != U_l && *next != U_L))
+                        {
+                            // Let the error be caught later if needed
+                        }
+                    }
+                }
+                // Skip the 'x'.
                 if (*ptr == U_DOT)
                 {
                     current_token -> SetKind(TK_DoubleLiteral);
-                    while (Code::IsHexDigit(*++ptr));
+                    while (Code::IsHexDigit(*++ptr) || *ptr == U_UNDERSCORE);
                     if (*ptr != U_p && *ptr != U_P)
                     {
                         // Missing required 'p' exponent.
@@ -1108,7 +1155,7 @@ void Scanner::ClassifyNumericLiteral()
                         if (Code::IsSign(*++tmp)) // Skip the exponent letter.
                             tmp++; // Skip the '+' or '-'.
                         if (Code::IsHexDigit(*tmp))
-                            while (Code::IsHexDigit(*++tmp));
+                            while (Code::IsHexDigit(*++tmp) || *tmp == U_UNDERSCORE);
                         if (*tmp != U_d && *tmp != U_D &&
                             *tmp != U_f && *tmp != U_F)
                         {
@@ -1128,7 +1175,7 @@ void Scanner::ClassifyNumericLiteral()
                         if (Code::IsSign(*++tmp)) // Skip the exponent letter.
                             tmp++; // Skip the '+' or '-'.
                         if (Code::IsHexDigit(*tmp))
-                            while (Code::IsHexDigit(*++tmp));
+                            while (Code::IsHexDigit(*++tmp) || *tmp == U_UNDERSCORE);
                         if (*tmp != U_d && *tmp != U_D &&
                             *tmp != U_f && *tmp != U_F)
                         {
@@ -1153,7 +1200,7 @@ void Scanner::ClassifyNumericLiteral()
                      *ptr != U_f && *ptr != U_F)
             {
                 tmp = cursor;
-                while (Code::IsOctalDigit(*++tmp)); // Skip leading '0'.
+                while (Code::IsOctalDigit(*++tmp) || *tmp == U_UNDERSCORE); // Skip leading '0'.
                 if (tmp != ptr)
                 {
                     tmp = (*ptr == U_l || *ptr == U_L) ? ptr : ptr - 1;
@@ -1195,7 +1242,7 @@ void Scanner::ClassifyNumericLiteral()
             if (Code::IsSign(*++tmp)) // Skip the exponent letter.
                 tmp++; // Skip the '+' or '-'.
             if (Code::IsDecimalDigit(*tmp))
-                while (Code::IsDecimalDigit(*++tmp));
+                while (Code::IsDecimalDigit(*++tmp) || *tmp == U_UNDERSCORE);
             if (*tmp != U_d && *tmp != U_D && *tmp != U_f && *tmp != U_F)
                 tmp--;
             lex -> ReportMessage(StreamError::INVALID_FLOATING_HEX_PREFIX,
@@ -1205,7 +1252,7 @@ void Scanner::ClassifyNumericLiteral()
         if (Code::IsSign(*++ptr)) // Skip the exponent letter.
             ptr++; // Skip the '+' or '-'.
         if (Code::IsDecimalDigit(*ptr))
-            while (Code::IsDecimalDigit(*++ptr));
+            while (Code::IsDecimalDigit(*++ptr) || *ptr == U_UNDERSCORE);
         else
         {
             tmp = (*ptr == U_d || *ptr == U_D || *ptr == U_f || *ptr == U_F)

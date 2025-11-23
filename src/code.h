@@ -99,6 +99,10 @@ public:
     {
         return c <= U_7 && c >= U_0;
     }
+    static inline bool IsBinaryDigit(wchar_t c)
+    {
+        return c == U_0 || c == U_1;
+    }
     static inline bool IsHexDigit(wchar_t c)
     {
         return c <= U_f && (c >= U_a ||

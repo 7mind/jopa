@@ -633,12 +633,17 @@ LiteralValue* IntLiteralTable::FindOrInsertHexInt(LiteralSymbol* literal)
 
     u4 uvalue = 0;
 
-    for (++head; tail > head && *head == U_0; head++)
-        ; // skip leading zeroes
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++)
+        ; // skip leading zeroes and underscores
     head--;
 
-    for (int i = 0; i < 32 && tail > head; i += 4, tail--)
+    for (int i = 0; i < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
         uvalue |= Code::Value(*tail) << i;
+        i += 4;
+    }
     return tail > head ? bad_value : FindOrInsert((i4) uvalue);
 }
 
@@ -649,29 +654,58 @@ LiteralValue* IntLiteralTable::FindOrInsertOctalInt(LiteralSymbol* literal)
     const wchar_t* tail = &head[literal -> NameLength() - 1];
 
     u4 uvalue = 0;
-    for (++head; tail > head && *head == U_0; head++) // skip leading zeroes
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++) // skip leading zeroes and underscores
         ;
     head--;
 
-    for (int i = 0; i < 30 && tail > head; i += 3, tail--)
+    for (int i = 0; i < 30 && tail > head; tail--)
     {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
         u4 d = *tail - U_0;
         uvalue |= (d << i);
+        i += 3;
     }
 
     if (tail > head)
     {
-        u4 d = *tail - U_0;
-
-        if (d <= 3) // max number that can fit in 2 bits
-        {
+        if (*tail == U_UNDERSCORE)
             tail--;
-            uvalue |= (d << 30);
+        if (tail > head)
+        {
+            u4 d = *tail - U_0;
+
+            if (d <= 3) // max number that can fit in 2 bits
+            {
+                tail--;
+                uvalue |= (d << 30);
+            }
         }
     }
     return tail > head ? bad_value : FindOrInsert((i4) uvalue);
 }
 
+
+LiteralValue* IntLiteralTable::FindOrInsertBinaryInt(LiteralSymbol* literal)
+{
+    const wchar_t* head = literal -> Name() + 1; // point to B
+    const wchar_t* tail = &literal -> Name()[literal -> NameLength() - 1];
+
+    u4 uvalue = 0;
+
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++)
+        ; // skip leading zeroes and underscores
+    head--;
+
+    for (int i = 0; i < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
+        uvalue |= (*tail - U_0) << i;
+        i++;
+    }
+    return tail > head ? bad_value : FindOrInsert((i4) uvalue);
+}
 
 LiteralValue* IntLiteralTable::FindOrInsertInt(LiteralSymbol* literal)
 {
@@ -680,7 +714,9 @@ LiteralValue* IntLiteralTable::FindOrInsertInt(LiteralSymbol* literal)
     if (name[0] == U_0)
         literal -> value = (name[1] == U_x || name[1] == U_X
                             ? FindOrInsertHexInt(literal)
-                            : FindOrInsertOctalInt(literal));
+                            : (name[1] == U_b || name[1] == U_B // Java 7 binary literals
+                               ? FindOrInsertBinaryInt(literal)
+                               : FindOrInsertOctalInt(literal)));
     else
     {
         i4 value = 0;
@@ -688,13 +724,15 @@ LiteralValue* IntLiteralTable::FindOrInsertInt(LiteralSymbol* literal)
         const wchar_t* p;
         for (p = name; *p; p++)
         {
+            if (*p == U_UNDERSCORE) // Java 7: skip underscores
+                continue;
             int digit = *p - U_0;
             if (value > int32_limit || (value == int32_limit && digit > 7))
                 break;
             value = value * 10 + digit;
         }
 
-        literal -> value = (*p ? bad_value : FindOrInsert(value));
+        literal -> value = (*p && *p != U_UNDERSCORE ? bad_value : FindOrInsert(value));
     }
     return literal -> value;
 }
@@ -838,14 +876,24 @@ LiteralValue* LongLiteralTable::FindOrInsertHexLong(LiteralSymbol* literal)
     // -2 to skip the 'L' suffix
     const wchar_t* tail = &literal -> Name()[literal -> NameLength() - 2];
 
-    for (++head; tail > head && *head == U_0; head++) // skip leading zeroes
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++) // skip leading zeroes and underscores
         ;
     head--;
 
-    for (int i = 0; i < 32 && tail > head; i += 4, tail--)
+    for (int i = 0; i < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
         low |= Code::Value(*tail) << i;
-    for (int j = 0; j < 32 && tail > head; j += 4, tail--)
+        i += 4;
+    }
+    for (int j = 0; j < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
         high |= Code::Value(*tail) << j;
+        j += 4;
+    }
     return tail > head ? bad_value : FindOrInsert(LongInt(high, low));
 }
 
@@ -857,29 +905,66 @@ LiteralValue* LongLiteralTable::FindOrInsertOctalLong(LiteralSymbol* literal)
     const wchar_t* tail = &head[literal -> NameLength() - 2];
 
     ULongInt uvalue = 0;
-    for (++head; tail > head && *head == U_0; head++) // skip leading zeroes
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++) // skip leading zeroes and underscores
         ;
     head--;
 
-    for (int i = 0; i < 63 && tail > head; i += 3, tail--)
+    for (int i = 0; i < 63 && tail > head; tail--)
     {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
         ULongInt d = (u4) (*tail - U_0);
         uvalue |= (d << i);
+        i += 3;
     }
 
     if (tail > head)
     {
-        u4 d = *tail - U_0;
-
-        if (d <= 1) // max number that can fit in 1 bit
-        {
+        if (*tail == U_UNDERSCORE)
             tail--;
-            uvalue |= ULongInt((d << 31), 0);
+        if (tail > head)
+        {
+            u4 d = *tail - U_0;
+
+            if (d <= 1) // max number that can fit in 1 bit
+            {
+                tail--;
+                uvalue |= ULongInt((d << 31), 0);
+            }
         }
     }
     return tail > head ? bad_value : FindOrInsert((LongInt) uvalue);
 }
 
+
+LiteralValue* LongLiteralTable::FindOrInsertBinaryLong(LiteralSymbol* literal)
+{
+    u4 high = 0;
+    u4 low = 0;
+    const wchar_t* head = literal -> Name() + 1; // point to B
+    // -2 to skip the 'L' suffix
+    const wchar_t* tail = &literal -> Name()[literal -> NameLength() - 2];
+
+    for (++head; tail > head && (*head == U_0 || *head == U_UNDERSCORE); head++) // skip leading zeroes and underscores
+        ;
+    head--;
+
+    for (int i = 0; i < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
+        low |= (*tail - U_0) << i;
+        i++;
+    }
+    for (int j = 0; j < 32 && tail > head; tail--)
+    {
+        if (*tail == U_UNDERSCORE)
+            continue; // Skip underscores (Java 7)
+        high |= (*tail - U_0) << j;
+        j++;
+    }
+    return tail > head ? bad_value : FindOrInsert(LongInt(high, low));
+}
 
 LiteralValue* LongLiteralTable::FindOrInsertLong(LiteralSymbol* literal)
 {
@@ -892,7 +977,9 @@ LiteralValue* LongLiteralTable::FindOrInsertLong(LiteralSymbol* literal)
     if (name[0] == U_0)
         literal -> value = (name[1] == U_x || name[1] == U_X
                             ? FindOrInsertHexLong(literal)
-                            : FindOrInsertOctalLong(literal));
+                            : (name[1] == U_b || name[1] == U_B // Java 7 binary literals
+                               ? FindOrInsertBinaryLong(literal)
+                               : FindOrInsertOctalLong(literal)));
     else
     {
         LongInt value = 0;
@@ -900,13 +987,15 @@ LiteralValue* LongLiteralTable::FindOrInsertLong(LiteralSymbol* literal)
         const wchar_t* p;
         for (p = name; *p != U_L && *p != U_l; p++)
         {
+            if (*p == U_UNDERSCORE) // Java 7: skip underscores
+                continue;
             u4 digit = *p - U_0;
             if (value > int64_limit || (value == int64_limit && digit > 7))
                 break;
             value = value * 10 + digit;
         }
 
-        literal -> value = (*p != U_L && *p != U_l ? bad_value
+        literal -> value = ((*p != U_L && *p != U_l) ? bad_value
                             : FindOrInsert(value));
     }
     return literal -> value;

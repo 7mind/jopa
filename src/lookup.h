@@ -626,6 +626,7 @@ public:
     LiteralValue* FindOrInsertInt(LiteralSymbol*);
     LiteralValue* FindOrInsertHexInt(LiteralSymbol*);
     LiteralValue* FindOrInsertOctalInt(LiteralSymbol*);
+    LiteralValue* FindOrInsertBinaryInt(LiteralSymbol*);
     LiteralValue* FindOrInsertNegativeInt(LiteralSymbol*);
 
     IntLiteralValue* FindOrInsert(i4);
@@ -681,6 +682,7 @@ public:
     LiteralValue* FindOrInsertLong(LiteralSymbol*);
     LiteralValue* FindOrInsertHexLong(LiteralSymbol*);
     LiteralValue* FindOrInsertOctalLong(LiteralSymbol*);
+    LiteralValue* FindOrInsertBinaryLong(LiteralSymbol*);
     LiteralValue* FindOrInsertNegativeLong(LiteralSymbol*);
 
     LongLiteralValue* FindOrInsert(LongInt);

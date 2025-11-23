@@ -6676,6 +6676,10 @@ ByteCode::ByteCode(TypeSymbol* type)
         major_version = 50;
         minor_version = 0;
         break;
+    case JikesOption::SDK1_7:
+        major_version = 51;
+        minor_version = 0;
+        break;
     default:
         assert(false && "unknown version for target");
     }
