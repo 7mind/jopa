@@ -268,6 +268,12 @@ void Semantic::ProcessLocalVariableStatement(Ast* stmt)
             if (type_name && type_name -> parameterized_type)
             {
                 symbol -> parameterized_type = type_name -> parameterized_type;
+                fprintf(stderr, "DEBUG: Set parameterized_type on local var %ls\n", name_symbol -> Name());
+            }
+            else
+            {
+                fprintf(stderr, "DEBUG: No parameterized_type for local var %ls (type_name=%p, param_type=%p)\n",
+                        name_symbol -> Name(), type_name, type_name ? type_name -> parameterized_type : NULL);
             }
 
             symbol -> SetLocation();

@@ -19,18 +19,33 @@ This fork adds comprehensive Java 5 (J2SE 5.0) language features:
 
 ## Building
 
-```bash
-# With Nix
-nix develop
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
-cmake --build build -j$(nproc)
+- Requirements:
+  - CMake 3.20+ and a C++17 compiler
+  - iconv and/or ICU (uc) if encoding support stays enabled
+  - Use the repo's nix/direnv setup (`direnv exec . <cmd>`) when available
 
-# Run tests
-cd build && ctest --output-on-failure
+- With Nix:
+  ```bash
+  nix develop
+  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+  direnv exec . cmake --build build -j"$(nproc)"
+  direnv exec . sh -c "cd build && ctest --output-on-failure"
+  direnv exec . cmake --install build --prefix /usr/local
+  ```
 
-# Install
-cmake --install build --prefix /usr/local
-```
+- Generic CMake:
+  ```bash
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build
+  cmake --install build --prefix /usr/local
+  ```
+
+- Useful CMake options:
+  - `-DJIKES_ENABLE_DEBUG=ON` — Enable internal compiler debugging hooks
+  - `-DJIKES_ENABLE_NAMESPACE=ON` — Wrap classes in the Jikes namespace
+  - `-DJIKES_ENABLE_SOURCE_15=OFF` — Disable experimental -source 1.5 features
+  - `-DJIKES_ENABLE_NATIVE_FP=OFF` — Force emulated floating point
+  - `-DJIKES_ENABLE_ENCODING=OFF` — Skip iconv/ICU; otherwise CMake fails if neither is present
 
 jikes
 =====
@@ -83,3 +98,45 @@ Includes a very efficient storage allocator and memory management.
 
 The present repository includes Jikes versions 1.04 through 1.22. (Jikes 1.00 through 1.03 seem to have lost).
 The sources used were retrieved from the Sourcforge site in early July, 2012. Each version is identified by a git tag.
+
+## Authors
+
+- Originally written by Philippe Charles and David Shields of IBM Research.
+- Subsequent contributors include, but are not limited to:
+  - Chris Abbey
+  - C. Scott Ananian
+  - Musachy Barroso
+  - Joe Berkovitz
+  - Eric Blake
+  - Norris Boyd
+  - Ian P. Cardenas
+  - Pascal Davoust
+  - Mo DeJong
+  - Chris Dennis
+  - Alan Donovan
+  - Michael Ernst
+  - Bu FeiMing
+  - Max Gilead
+  - Adam Hawthorne
+  - Diane Holt
+  - Elliott Hughes
+  - Andrew M. Inggs
+  - C. Brian Jones
+  - Marko Kreen
+  - David Lum
+  - Phil Norman
+  - Takashi Okamoto
+  - Emil Ong
+  - Andrew Pimlott
+  - Daniel Resare
+  - Mark Richters
+  - Kumaran Santhanam
+  - Gregory Steuck
+  - Brian Sullivan
+  - Andrew G. Tereschenko
+  - Russ Trotter
+  - Andrew Vajoczki
+  - Jerry Veldhuis
+  - Dirk Weigenand
+  - Vadim Zaliva
+  - Henner Zeller

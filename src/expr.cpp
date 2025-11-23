@@ -3536,32 +3536,65 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     // corresponding type argument.
     //
     MethodSymbol* method = method_call -> symbol -> MethodCast();
+    fprintf(stderr, "DEBUG: ProcessMethodName end - method=%p, base=%p\n", method, base);
     if (method && base)
     {
         // Get the receiver's parameterized type (if any)
         ParameterizedType* receiver_param_type = NULL;
         VariableSymbol* var = base -> symbol -> VariableCast();
+        fprintf(stderr, "DEBUG: base->symbol=%p, var=%p\n", base -> symbol, var);
         if (var && var -> parameterized_type)
         {
             receiver_param_type = var -> parameterized_type;
+            fprintf(stderr, "DEBUG: Found parameterized receiver! var=%ls, param_type=%p\n",
+                    var -> Name(), receiver_param_type);
         }
 
         if (receiver_param_type)
         {
-            TypeSymbol* return_type = method -> Type();
             TypeSymbol* declaring_class = method -> containing_type;
+
+            // Get the original return type from the method declaration (before erasure)
+            TypeSymbol* original_return_type = NULL;
+            fprintf(stderr, "DEBUG: method->declaration=%p\n", method -> declaration);
+            if (method -> declaration)
+            {
+                AstMethodDeclaration* method_decl = method -> declaration -> MethodDeclarationCast();
+                fprintf(stderr, "DEBUG: method_decl=%p\n", method_decl);
+                if (method_decl && method_decl -> type)
+                {
+                    fprintf(stderr, "DEBUG: method_decl->type=%p, kind=%d\n",
+                            method_decl -> type, method_decl -> type -> kind);
+                    original_return_type = method_decl -> type -> symbol;
+                    fprintf(stderr, "DEBUG: Original return type from decl: %p (%ls)\n",
+                            original_return_type, original_return_type ? original_return_type -> Name() : L"NULL");
+                }
+            }
+
+            if (! original_return_type)
+            {
+                fprintf(stderr, "DEBUG: No declaration or type, using erased type\n");
+                original_return_type = method -> Type();
+            }
+
+            fprintf(stderr, "DEBUG: Checking substitution - declaring_class=%ls, num_params=%u\n",
+                    declaring_class -> Name(), declaring_class -> NumTypeParameters());
 
             // Check if the return type is a type parameter of the declaring class
             for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
             {
                 TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
-                if (return_type == (TypeSymbol*) type_param)
+                fprintf(stderr, "DEBUG: Comparing return_type %p with type_param[%u] %p (%ls)\n",
+                        original_return_type, i, type_param, type_param -> Name());
+                if (original_return_type == (TypeSymbol*) type_param)
                 {
                     // Substitute with the corresponding type argument
                     if (i < receiver_param_type -> NumTypeArguments())
                     {
                         Type* type_arg = receiver_param_type -> TypeArgument(i);
                         method_call -> resolved_type = type_arg -> Erasure();
+                        fprintf(stderr, "DEBUG: SUBSTITUTED! Setting resolved_type to %ls\n",
+                                type_arg -> Erasure() -> Name());
                     }
                     break;
                 }
