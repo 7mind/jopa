@@ -4,6 +4,45 @@ A totally Claude'd effort in modernizing `jikes`, the historical independent `ja
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
+## Java 5 Support
+
+This fork adds comprehensive Java 5 (J2SE 5.0) language features:
+
+- ✅ **Generics** - Type erasure with generic classes, methods, and bounded type parameters
+- ✅ **Enhanced For-Loop** - For-each loops for arrays and Iterable collections
+- ✅ **Varargs** - Variable-length argument lists with automatic array creation
+- ✅ **Enums** - Enumerated types with synthetic methods (values(), valueOf())
+- ✅ **Autoboxing/Unboxing** - Automatic conversions between primitives and wrappers (assignments, method args, return values, arithmetic)
+- ✅ **Static Imports** - Import static members (single field, single method, wildcard)
+
+**Test Coverage:** 36 tests (22 compile + 14 runtime) - all passing
+
+## Building
+
+### CMake (Recommended)
+
+```bash
+# With Nix
+nix develop
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+cmake --build build -j$(nproc)
+
+# Run tests
+cd build && ctest --output-on-failure
+
+# Install
+cmake --install build --prefix /usr/local
+```
+
+### Legacy Autoconf/Make
+
+```bash
+nix develop
+./configure --enable-source15
+make -j$(nproc)
+make check
+```
+
 
 jikes
 =====
