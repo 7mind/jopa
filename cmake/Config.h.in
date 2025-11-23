@@ -33,6 +33,7 @@
 #cmakedefine HAVE_GLIBC_MKDIR
 #cmakedefine HAVE_ICC_FP_BUGS
 #cmakedefine HAVE_ICONV_H
+#cmakedefine01 HAVE_ERROR_CALL_ICONV_CONST
 #cmakedefine HAVE_IEEE754
 #cmakedefine01 HAVE_INTTYPES_H
 #cmakedefine HAVE_JIKES_NAMESPACE

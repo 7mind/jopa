@@ -177,6 +177,7 @@ if(JIKES_ENABLE_ENCODING)
         set(HAVE_ICONV_H 1)
         set(HAVE_ENCODING 1)
         set(JIKES_ICONV_ENCODING "wchar_t")
+        set(HAVE_ERROR_CALL_ICONV_CONST 1)
         list(APPEND JIKES_LIBS Iconv::Iconv)
     endif()
 
