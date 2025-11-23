@@ -1248,6 +1248,57 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
                 break; // Found one matching method from this import
             }
         }
+
+        // If not found in single imports, check static-on-demand imports
+        if (methods_found.Length() == 0)
+        {
+            for (unsigned i = 0; i < static_on_demand_imports.Length(); i++)
+            {
+                TypeSymbol* import_type = static_on_demand_imports[i];
+
+                // Skip if type is bad or not ready
+                if (!import_type || import_type -> Bad() || import_type -> SourcePending())
+                    continue;
+
+                // Make sure the type has been processed enough to have members
+                if (!import_type -> MethodMembersProcessed())
+                    continue;
+
+                // Compute method closure if needed
+                if (!import_type -> expanded_method_table)
+                    ComputeMethodsClosure(import_type, id_token);
+
+                // Double-check the table exists
+                if (!import_type -> expanded_method_table)
+                    continue;
+
+                MethodShadowSymbol* method_shadow =
+                    import_type -> expanded_method_table -> FindMethodShadowSymbol(name_symbol);
+                if (!method_shadow)
+                    continue;
+
+                // Check each method in the shadow (handle overloading)
+                for (MethodShadowSymbol* shadow = method_shadow; shadow; shadow = shadow -> next_method)
+                {
+                    MethodSymbol* method = shadow -> method_symbol;
+                    if (!method || !method -> ACC_STATIC())
+                        continue;
+
+                    // Process method signature if needed
+                    if (!method -> IsTyped())
+                        method -> ProcessMethodSignature(this, id_token);
+
+                    // Check if method is applicable to the arguments
+                    unsigned num_args = method_call -> arguments -> NumArguments();
+                    if (!MethodApplicableByArity(method, num_args))
+                        continue;
+
+                    methods_found.Next() = shadow;
+                    // where_found remains NULL for static imports
+                    break; // Found one matching method from this import
+                }
+            }
+        }
     }
 }
 
@@ -2651,38 +2702,67 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                 {
                     TypeSymbol* import_type = static_on_demand_imports[i];
 
+                    // Skip if type is bad or not ready
+                    if (!import_type || import_type -> Bad() || import_type -> SourcePending())
+                        continue;
+
+                    // Make sure the type has been processed enough to have members
+                    if (!import_type -> FieldMembersProcessed())
+                        continue;
+
+                    // Compute field closure if needed
+                    if (!import_type -> expanded_field_table)
+                        ComputeFieldsClosure(import_type, name -> identifier_token);
+
                     // Check for static fields
-                    for (unsigned j = 0; j < import_type -> NumVariableSymbols(); j++)
+                    if (import_type -> expanded_field_table)
                     {
-                        VariableSymbol* var = import_type -> VariableSym(j);
-                        if (var -> Identity() == name_symbol && var -> ACC_STATIC())
+                        VariableShadowSymbol* var_shadow =
+                            import_type -> expanded_field_table -> FindVariableShadowSymbol(name_symbol);
+                        if (var_shadow && var_shadow -> variable_symbol)
                         {
-                            if (static_member)
+                            VariableSymbol* var = var_shadow -> variable_symbol;
+                            if (var -> ACC_STATIC())
                             {
-                                // Ambiguous static import
-                                ReportSemError(SemanticError::AMBIGUOUS_FIELD,
-                                             name -> identifier_token,
-                                             name_symbol -> Name());
-                                name -> symbol = control.no_type;
-                                return;
+                                if (static_member)
+                                {
+                                    // Ambiguous static import
+                                    ReportSemError(SemanticError::AMBIGUOUS_FIELD,
+                                                 name -> identifier_token,
+                                                 name_symbol -> Name());
+                                    name -> symbol = control.no_type;
+                                    return;
+                                }
+                                if (!var -> IsTyped())
+                                    var -> ProcessVariableSignature(this, name -> identifier_token);
+                                static_member = var;
                             }
-                            static_member = var;
                         }
                     }
 
-                    // Check for static methods
-                    for (unsigned j = 0; j < import_type -> NumMethodSymbols(); j++)
+                    // Check for static methods (if no field found)
+                    if (!static_member)
                     {
-                        MethodSymbol* meth = import_type -> MethodSym(j);
-                        if (meth -> Identity() == name_symbol && meth -> ACC_STATIC())
+                        if (!import_type -> MethodMembersProcessed())
+                            continue;
+
+                        if (!import_type -> expanded_method_table)
+                            ComputeMethodsClosure(import_type, name -> identifier_token);
+
+                        if (import_type -> expanded_method_table)
                         {
-                            if (static_member && static_member -> VariableCast())
+                            MethodShadowSymbol* method_shadow =
+                                import_type -> expanded_method_table -> FindMethodShadowSymbol(name_symbol);
+                            if (method_shadow && method_shadow -> method_symbol)
                             {
-                                // Field takes precedence over methods, so don't mark as ambiguous
-                                break;
+                                MethodSymbol* meth = method_shadow -> method_symbol;
+                                if (meth -> ACC_STATIC())
+                                {
+                                    if (!meth -> IsTyped())
+                                        meth -> ProcessMethodSignature(this, name -> identifier_token);
+                                    static_member = meth;
+                                }
                             }
-                            static_member = meth;
-                            break; // Methods can be overloaded, so we just note existence
                         }
                     }
                 }

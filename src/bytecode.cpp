@@ -3458,9 +3458,14 @@ TypeSymbol* ByteCode::MethodTypeResolution(AstExpression* base,
     // this is an accessor method, use the owner_type (since the base type
     // relates to the accessed expression, not the accessor method).
     //
+    // Java 5: For static imports, base is NULL but we should use owner_type,
+    // not unit_type, so the correct class is referenced in the bytecode.
+    //
     TypeSymbol* owner_type = msym -> containing_type;
     TypeSymbol* base_type = msym -> ACC_SYNTHETIC() ? owner_type
-        : base ? base -> Type() : unit_type;
+        : base ? base -> Type()
+        : msym -> ACC_STATIC() ? owner_type  // Java 5: static import
+        : unit_type;
     return owner_type == control.Object() ? owner_type : base_type;
 }
 

@@ -45,7 +45,7 @@ compile_test() {
     local test_name=$(basename "$test_file" .java)
 
     echo -n "  Compiling $test_name... "
-    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME" -d "$OUTPUT" "$test_file" 2>&1 > /tmp/jikes_compile_$$.log; then
+    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME:$SCRIPT_DIR" -classpath "$OUTPUT" -d "$OUTPUT" "$test_file" 2>&1 > /tmp/jikes_compile_$$.log; then
         echo -e "${GREEN}✓${NC}"
         return 0
     else
@@ -62,7 +62,7 @@ compile_multi() {
     local test_name=$(basename "$1" .java)
 
     echo -n "  Compiling $test_name... "
-    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME" -d "$OUTPUT" $files 2>&1 > /tmp/jikes_compile_$$.log; then
+    if "$JIKES" -source 1.5 -sourcepath "$RUNTIME:$SCRIPT_DIR" -classpath "$OUTPUT" -d "$OUTPUT" $files 2>&1 > /tmp/jikes_compile_$$.log; then
         echo -e "${GREEN}✓${NC}"
         return 0
     else
@@ -183,6 +183,13 @@ test_compile_only "${SCRIPT_DIR}/BoundedGeneric.java" || true
 echo -e "${BLUE}=== Testing Autoboxing/Unboxing ===${NC}"
 test_compile_and_run "${SCRIPT_DIR}/BasicBoxingTest.java" "BasicBoxingTest" || true
 test_compile_and_run "${SCRIPT_DIR}/AutoboxingTest.java" "AutoboxingTest" || true
+
+echo -e "${BLUE}=== Testing Static Imports ===${NC}"
+# First compile MathUtils which is needed for static import tests
+test_compile_only "${SCRIPT_DIR}/util/MathUtils.java" || true
+test_compile_and_run "${SCRIPT_DIR}/StaticFieldOnlyTest.java" "StaticFieldOnlyTest" || true
+test_compile_and_run "${SCRIPT_DIR}/StaticMethodImportTest.java" "StaticMethodImportTest" || true
+test_compile_and_run "${SCRIPT_DIR}/StaticWildcardImportTest.java" "StaticWildcardImportTest" || true
 
 # Cleanup
 rm -f /tmp/jikes_*_$$.log
