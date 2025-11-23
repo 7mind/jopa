@@ -4971,13 +4971,26 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
 
     if (source_type -> Primitive())
     {
-        return target_type -> Primitive() &&
-            (target_type == source_type ||
-             CanWideningPrimitiveConvert(target_type, source_type));
+        if (target_type -> Primitive())
+        {
+            return target_type == source_type ||
+                CanWideningPrimitiveConvert(target_type, source_type);
+        }
+        // Java 5: Boxing conversion (primitive → wrapper) for method invocation
+        if (control.option.source >= JikesOption::SDK1_5 &&
+            IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+            return true;
+        return false;
     }
 
     if (target_type -> Primitive())
+    {
+        // Java 5: Unboxing conversion (wrapper → primitive) for method invocation
+        if (control.option.source >= JikesOption::SDK1_5 &&
+            IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+            return true;
         return false;
+    }
     return source_type == control.null_type ||
         source_type -> IsSubtype(target_type);
 }
@@ -5516,6 +5529,17 @@ AstExpression* Semantic::PromoteUnaryNumericExpression(AstExpression* unary_expr
     if (type == control.no_type)
         return unary_expression;
 
+    // Java 5: Unbox wrapper types to primitives before numeric promotion
+    if (control.option.source >= JikesOption::SDK1_5)
+    {
+        TypeSymbol* unboxed_type = type -> UnboxedType(control);
+        if (unboxed_type && unboxed_type != type)
+        {
+            unary_expression = ConvertToType(unary_expression, unboxed_type);
+            type = unboxed_type;
+        }
+    }
+
     if (! control.IsNumeric(type))
     {
         ReportSemError(SemanticError::TYPE_NOT_NUMERIC, unary_expression,
@@ -5564,6 +5588,24 @@ TypeSymbol* Semantic::BinaryNumericPromotion(AstExpression*& left_expr,
 {
     TypeSymbol* left_type = left_expr -> Type();
     TypeSymbol* right_type = right_expr -> Type();
+
+    // Java 5: Unbox wrapper types to primitives before numeric promotion
+    if (control.option.source >= JikesOption::SDK1_5)
+    {
+        TypeSymbol* unboxed_left = left_type -> UnboxedType(control);
+        if (unboxed_left && unboxed_left != left_type)
+        {
+            left_expr = ConvertToType(left_expr, unboxed_left);
+            left_type = unboxed_left;
+        }
+
+        TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
+        if (unboxed_right && unboxed_right != right_type)
+        {
+            right_expr = ConvertToType(right_expr, unboxed_right);
+            right_type = unboxed_right;
+        }
+    }
 
     if (! control.IsNumeric(left_type) || ! control.IsNumeric(right_type))
     {

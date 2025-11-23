@@ -84,7 +84,11 @@ DefiniteAssignmentSet* Semantic::DefiniteBooleanExpression(AstExpression* expr,
     else if (expr -> symbol != control.no_type)
         definite = (this ->* DefiniteExpr[expr -> kind])(expr, def_pair);
 
-    assert(! definite || expr -> Type() == control.boolean_type);
+    // Java 5: Allow Boolean wrapper type (unboxing)
+    assert(! definite ||
+           expr -> Type() == control.boolean_type ||
+           (control.option.source >= JikesOption::SDK1_5 &&
+            expr -> Type() == control.Boolean()));
     return definite;
 }
 

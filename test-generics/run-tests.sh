@@ -172,6 +172,7 @@ test_compile_only "${SCRIPT_DIR}/VarargsImplicitTest.java" || true
 echo -e "${BLUE}=== Testing Enhanced For-Loops ===${NC}"
 test_compile_and_run "${SCRIPT_DIR}/ForEachTest.java" "ForEachTest" || true
 test_compile_only "${SCRIPT_DIR}/ForEachArrayTest.java" || true
+test_compile_and_run "${SCRIPT_DIR}/ForEachIterableTest.java" "ForEachIterableTest" || true
 
 echo -e "${BLUE}=== Testing Generics ===${NC}"
 test_compile_only "${SCRIPT_DIR}/GenericBox.java" || true
@@ -183,6 +184,9 @@ test_compile_only "${SCRIPT_DIR}/BoundedGeneric.java" || true
 echo -e "${BLUE}=== Testing Autoboxing/Unboxing ===${NC}"
 test_compile_and_run "${SCRIPT_DIR}/BasicBoxingTest.java" "BasicBoxingTest" || true
 test_compile_and_run "${SCRIPT_DIR}/AutoboxingTest.java" "AutoboxingTest" || true
+test_compile_and_run "${SCRIPT_DIR}/MethodBoxingSimple.java" "MethodBoxingSimple" || true
+test_compile_and_run "${SCRIPT_DIR}/ReturnBoxingSimple.java" "ReturnBoxingSimple" || true
+test_compile_and_run "${SCRIPT_DIR}/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple" || true
 
 echo -e "${BLUE}=== Testing Static Imports ===${NC}"
 # First compile MathUtils which is needed for static import tests
@@ -217,12 +221,12 @@ cat > "$RESULTS_FILE" << EOF
 **Success Rate**: $(( TESTS_PASSED * 100 / TESTS_RUN ))%
 
 #### Feature Coverage
-- ✅ Generics (Type Erasure)
-- ✅ Enhanced For-Loop (Arrays)
-- ✅ Varargs
+- ✅ Generics (Type Erasure, basic support)
+- ✅ Enhanced For-Loop (Arrays + Iterables)
+- ✅ Varargs (including implicit array creation)
 - ✅ Enums (with synthetic methods)
-- ✅ Autoboxing/Unboxing (Variable assignments)
-- ⚠️  Static Imports (Partial - 25%)
+- ✅ Autoboxing/Unboxing (Complete: assignments, method args, return values, arithmetic)
+- ✅ Static Imports (Complete: single field, single method, wildcard)
 - ❌ Annotations (Not implemented)
 EOF
 
