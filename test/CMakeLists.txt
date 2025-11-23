@@ -135,3 +135,24 @@ add_jikes_run_test(AnnotationTest "${TEST_DIR}/annotations/AnnotationTest.java" 
 add_jikes_run_test(MarkerAnnotationTest "${TEST_DIR}/annotations/MarkerAnnotationTest.java" "MarkerAnnotationTest")
 add_jikes_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotationTest.java" "CustomAnnotationTest")
 add_jikes_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")
+
+# Java 6 Tests (bytecode version 50.0 with parameter names)
+add_test(
+    NAME "compile_SimpleJava6Test"
+    COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_DIR}"
+            -d "${OUTPUT_DIR}"
+            "${TEST_DIR}/java6/SimpleJava6Test.java"
+)
+set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
+if(JIKES_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "run_SimpleJava6Test"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "SimpleJava6Test"
+    )
+    set_tests_properties("run_SimpleJava6Test" PROPERTIES
+        LABELS "run"
+        DEPENDS "compile_SimpleJava6Test"
+    )
+endif()

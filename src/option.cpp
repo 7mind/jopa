@@ -604,6 +604,11 @@ Option::Option(ArgumentExpander& arguments,
                 {
                     source = SDK1_5;
                 }
+                else if (ENABLE_SOURCE_15 &&
+                         ! strcmp(arguments.argv[i], "1.6"))
+                {
+                    source = SDK1_6;
+                }
                 else
                 {
                     bad_options.Next() =
@@ -650,6 +655,8 @@ Option::Option(ArgumentExpander& arguments,
                     target = SDK1_4_2;
                 else if (! strcmp(arguments.argv[i], "1.5"))
                     target = SDK1_5;
+                else if (! strcmp(arguments.argv[i], "1.6"))
+                    target = SDK1_6;
                 else
                 {
                     bad_options.Next() =
