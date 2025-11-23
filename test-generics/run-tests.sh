@@ -5,7 +5,17 @@
 set -e  # Exit on error unless explicitly handled
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-JIKES="${SCRIPT_DIR}/../src/jikes"
+JIKES="${JIKES:-}"
+
+if [ -z "$JIKES" ]; then
+    # Prefer CMake build output, fall back to legacy location.
+    if [ -x "${SCRIPT_DIR}/../build/src/jikes" ]; then
+        JIKES="${SCRIPT_DIR}/../build/src/jikes"
+    elif [ -x "${SCRIPT_DIR}/../src/jikes" ]; then
+        JIKES="${SCRIPT_DIR}/../src/jikes"
+    fi
+fi
+
 RUNTIME="${SCRIPT_DIR}/runtime"
 OUTPUT="${SCRIPT_DIR}"
 
@@ -30,8 +40,8 @@ echo ""
 
 # Check if jikes exists
 if [ ! -f "$JIKES" ]; then
-    echo -e "${RED}ERROR: Jikes compiler not found at $JIKES${NC}"
-    echo "Please build it first: make -C ../src"
+    echo -e "${RED}ERROR: Jikes compiler not found.${NC}"
+    echo "Build with CMake (cmake -S . -B build && cmake --build build) or set JIKES=/path/to/jikes."
     exit 1
 fi
 
