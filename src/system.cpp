@@ -1,7 +1,7 @@
 #include "platform.h"
 #include "control.h"
 #include "semantic.h"
-#include "zip.h"
+#include "zipfile.h"
 #include "option.h"
 #include "case.h"
 

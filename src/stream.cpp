@@ -1,6 +1,6 @@
 #include "stream.h"
 #include "code.h"
-#include "zip.h"
+#include "zipfile.h"
 #include "symbol.h"
 #include "control.h"
 #include "semantic.h"

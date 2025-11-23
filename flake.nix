@@ -18,10 +18,10 @@
             gcc
             cmake
             gnumake
-            autoconf
-            automake
-            libtool
             pkg-config
+
+            # Libraries
+            libzip
 
             # Development tools
             gdb
@@ -29,6 +29,8 @@
 
             # Java for testing
             openjdk8
+            zip
+            unzip
 
             # Utilities
             git
@@ -60,10 +62,12 @@
 
           nativeBuildInputs = with pkgs; [
             cmake
+            pkg-config
           ];
 
           buildInputs = with pkgs; [
             gcc
+            libzip
           ];
 
           cmakeFlags = [

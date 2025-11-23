@@ -4,7 +4,7 @@
 #include "op.h"
 #include "option.h"
 #include "semantic.h"
-#include "zip.h"
+#include "zipfile.h"
 #include "typeparam.h"
 
 #ifdef HAVE_JIKES_NAMESPACE

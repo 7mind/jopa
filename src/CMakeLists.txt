@@ -37,7 +37,6 @@ set(JIKES_SOURCES
     tab.cpp
     typeparam.cpp
     unparse.cpp
-    unzip.cpp
     zip.cpp
 )
 
@@ -164,6 +163,13 @@ set(JIKES_STAT_S_IFDIR S_IFDIR)
 unset(HAVE_ENCODING)
 unset(JIKES_ICONV_ENCODING)
 set(JIKES_LIBS)
+
+# Find libzip
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
+
+list(APPEND JIKES_LIBS PkgConfig::LIBZIP)
+
 if(JIKES_ENABLE_ENCODING)
     find_package(ICU COMPONENTS uc QUIET)
     if(ICU_UC_FOUND)
@@ -193,7 +199,10 @@ configure_file(
 )
 
 add_executable(jikes ${JIKES_SOURCES})
-target_include_directories(jikes PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/generated")
+target_include_directories(jikes PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_BINARY_DIR}/generated"
+)
 target_link_libraries(jikes PRIVATE ${JIKES_LIBS})
 
 install(TARGETS jikes RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

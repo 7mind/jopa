@@ -2,7 +2,7 @@
 #include "control.h"
 #include "semantic.h"
 #include "access.h"
-#include "zip.h"
+#include "zipfile.h"
 #include "jikesapi.h"
 #include "option.h"
 #include "code.h"

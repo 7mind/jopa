@@ -8,21 +8,29 @@ option(JIKES_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Jav
 
 # Find Java for runtime tests (only if JVM tests are enabled)
 if(JIKES_ENABLE_JVM_TESTS)
-    find_package(Java COMPONENTS Runtime REQUIRED)
+    find_package(Java COMPONENTS Runtime Development REQUIRED)
+
+    # Locate javap manually if not found
+    if(NOT Java_JAVAP_EXECUTABLE)
+        get_filename_component(JAVA_BIN_DIR ${Java_JAVA_EXECUTABLE} DIRECTORY)
+        find_program(Java_JAVAP_EXECUTABLE javap HINTS ${JAVA_BIN_DIR})
+    endif()
 endif()
 
 set(TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/runtime")
-set(RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
+set(RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
 set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Helper function to add a compile-only test
+# Note: compile-only tests may generate multiple classes, so we don't validate
+# them with javap (which requires knowing the exact class name)
 function(add_jikes_compile_test test_name source_file)
     add_test(
         NAME "compile_${test_name}"
         COMMAND $<TARGET_FILE:jikes> -source 1.5
                 -sourcepath "${TEST_DIR}"
-                -classpath "${RUNTIME_DIR}"
+                -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
                 "${source_file}"
     )
@@ -38,7 +46,7 @@ function(add_jikes_run_test test_name source_file main_class)
         NAME "compile_${test_name}"
         COMMAND $<TARGET_FILE:jikes> -source 1.5
                 -sourcepath "${TEST_DIR}"
-                -classpath "${RUNTIME_DIR}"
+                -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
                 "${source_file}"
     )
@@ -46,15 +54,26 @@ function(add_jikes_run_test test_name source_file main_class)
         LABELS "compile"
     )
 
-    # Runtime test (only if JVM tests are enabled)
+    # Javap validation and runtime test (only if JVM tests are enabled)
     if(JIKES_ENABLE_JVM_TESTS)
+        # Validate bytecode with javap
+        add_test(
+            NAME "validate_${test_name}"
+            COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${OUTPUT_DIR}/${main_class}.class"
+        )
+        set_tests_properties("validate_${test_name}" PROPERTIES
+            LABELS "validate"
+            DEPENDS "compile_${test_name}"
+        )
+
+        # Runtime test
         add_test(
             NAME "run_${test_name}"
-            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "${main_class}"
+            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
         )
         set_tests_properties("run_${test_name}" PROPERTIES
             LABELS "run"
-            DEPENDS "compile_${test_name}"
+            DEPENDS "validate_${test_name}"
         )
     endif()
 endfunction()
@@ -66,7 +85,7 @@ add_test(
     NAME "compile_EnumMethodsTest"
     COMMAND $<TARGET_FILE:jikes> -source 1.5
             -sourcepath "${TEST_DIR}"
-            -classpath "${RUNTIME_DIR}"
+            -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/enums/Color.java"
             "${TEST_DIR}/enums/EnumMethodsTest.java"
@@ -75,7 +94,7 @@ set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
 if(JIKES_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_EnumMethodsTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "EnumMethodsTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "EnumMethodsTest"
     )
     set_tests_properties("run_EnumMethodsTest" PROPERTIES
         LABELS "run"
@@ -120,7 +139,7 @@ add_test(
     NAME "compile_MathUtils"
     COMMAND $<TARGET_FILE:jikes> -source 1.5
             -sourcepath "${TEST_DIR}"
-            -classpath "${RUNTIME_DIR}"
+            -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/util/MathUtils.java"
 )
@@ -141,7 +160,7 @@ add_test(
     NAME "compile_SimpleJava6Test"
     COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
-            -classpath "${RUNTIME_DIR}"
+            -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/java6/SimpleJava6Test.java"
 )
@@ -149,7 +168,7 @@ set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
 if(JIKES_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_SimpleJava6Test"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "SimpleJava6Test"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "SimpleJava6Test"
     )
     set_tests_properties("run_SimpleJava6Test" PROPERTIES
         LABELS "run"
@@ -162,7 +181,7 @@ add_test(
     NAME "compile_ReflectionBasicTest"
     COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
-            -classpath "${RUNTIME_DIR}"
+            -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/java6/ReflectionBasicTest.java"
 )

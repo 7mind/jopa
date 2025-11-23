@@ -4,7 +4,7 @@
 #include "ast.h"
 #include "semantic.h"
 #include "table.h"
-#include "zip.h"
+#include "zipfile.h"
 #include "set.h"
 #include "case.h"
 #include "option.h"
