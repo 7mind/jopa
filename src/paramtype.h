@@ -74,14 +74,12 @@ public:
     //
     // Destructor
     //
+    // Note: We don't delete Type objects as they're managed by the symbol table.
+    // We only delete the Tuple container, not its contents.
+    //
     ~ParameterizedType()
     {
-        if (type_arguments)
-        {
-            for (unsigned i = 0; i < type_arguments -> Length(); i++)
-                delete (*type_arguments)[i];
-            delete type_arguments;
-        }
+        delete type_arguments;
         delete enclosing_type;
     }
 
@@ -163,9 +161,11 @@ public:
     //
     // Destructor
     //
+    // Note: We don't delete Type objects as they're managed by the symbol table.
+    //
     ~WildcardType()
     {
-        delete bound;
+        // bound is managed by symbol table, don't delete
     }
 
     //
@@ -234,9 +234,11 @@ public:
     //
     // Destructor
     //
+    // Note: We don't delete Type objects as they're managed by the symbol table.
+    //
     ~ArrayType()
     {
-        delete component_type;
+        // component_type is managed by symbol table, don't delete
     }
 
     //

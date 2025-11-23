@@ -22,8 +22,11 @@ include(CTest)
 
 add_subdirectory(src)
 
+# Runtime library (needed for tests)
+add_subdirectory(runtime)
+
 if(BUILD_TESTING)
-    add_subdirectory(test-generics)
+    add_subdirectory(test)
 endif()
 
 install(FILES doc/jikes.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
