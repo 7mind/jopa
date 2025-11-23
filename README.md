@@ -19,8 +19,6 @@ This fork adds comprehensive Java 5 (J2SE 5.0) language features:
 
 ## Building
 
-### CMake (Recommended)
-
 ```bash
 # With Nix
 nix develop
@@ -33,16 +31,6 @@ cd build && ctest --output-on-failure
 # Install
 cmake --install build --prefix /usr/local
 ```
-
-### Legacy Autoconf/Make
-
-```bash
-nix develop
-./configure --enable-source15
-make -j$(nproc)
-make check
-```
-
 
 jikes
 =====

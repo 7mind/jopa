@@ -18,8 +18,8 @@ This project aims to modernize the ancient Jikes Java compiler to support Java 5
 ### Prerequisites
 
 - **C++ Compiler**: GCC or Clang
-- **Build Tools**: autoconf, automake, libtool
-- **Optional**: Nix with direnv for reproducible builds
+- **Build Tools**: CMake 3.15+
+- **Recommended**: Nix with direnv for reproducible builds
 
 ### Building Jikes
 
@@ -28,13 +28,13 @@ This project aims to modernize the ancient Jikes Java compiler to support Java 5
 git clone <repository-url>
 cd jikes
 
-# Configure and build
-./configure
-cd src
-make
+# Configure and build with CMake
+nix develop  # or ensure cmake is available
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+cmake --build build -j$(nproc)
 
 # Verify build
-./jikes -version
+./build/src/jikes -version
 ```
 
 ### Running Tests
@@ -78,16 +78,16 @@ Follow these guidelines:
 
 ```bash
 # Build
-cd src
-make
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+cmake --build build -j$(nproc)
 
 # Run all tests
-cd ../test-generics
-./run-tests.sh
+cd build
+ctest --output-on-failure
 
 # Add your own tests
-# Create YourTest.java
-# Add to run-tests.sh
+# Create YourTest.java in test-generics/
+# Add to CMakeLists.txt
 ```
 
 ### 5. Commit

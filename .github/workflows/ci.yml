@@ -71,33 +71,6 @@ jobs:
             build/Testing/Temporary/LastTest.log
           retention-days: 7
 
-  build-legacy:
-    name: Build with Autoconf (Legacy)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build with Autoconf
-        run: |
-          nix develop --command bash -c "
-            ./configure --enable-source15
-            make -j$(nproc)
-          "
-
-      - name: Run legacy tests
-        run: |
-          nix develop --command bash -c "
-            make check || true
-          "
-
   check-java5-features:
     name: Java 5 Feature Matrix
     runs-on: ubuntu-latest

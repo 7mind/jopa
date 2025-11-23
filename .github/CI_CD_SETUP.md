@@ -2,76 +2,88 @@
 
 ## Overview
 
-This repository uses GitHub Actions for continuous integration and testing. The workflow automatically builds Jikes and runs the Java 5 generics test suite on every push and pull request.
+This repository uses GitHub Actions for continuous integration and testing. The workflow automatically builds Jikes using CMake and Nix, and runs the comprehensive Java 5 test suite on every push and pull request.
 
 ## Workflow: Build and Test
 
-**File**: `.github/workflows/build-and-test.yml`
+**File**: `.github/workflows/ci.yml`
 
 ### Triggers
 
-- **Push** to branches: `main`, `master`, `develop`
+- **Push** to branches: `main`, `master`, `develop`, `wip/cmake`
 - **Pull Requests** to branches: `main`, `master`, `develop`
+- **Manual**: `workflow_dispatch`
 
-### Build Matrix
+### Build Jobs
 
-Tests run on multiple platforms:
-- **Ubuntu Latest** (Linux)
-- **macOS Latest**
+The workflow consists of two jobs:
 
-### Workflow Steps
+1. **build-and-test**: Main CMake-based build with comprehensive test suite
+2. **check-java5-features**: Feature matrix testing individual Java 5 features
+
+### Workflow Steps (Main Job)
 
 1. **Checkout Repository**
-   - Uses `actions/checkout@v3`
+   - Uses `actions/checkout@v4`
 
-2. **Install Dependencies**
-   - **Ubuntu**: `build-essential`, `autoconf`, `automake`, `libtool`
-   - **macOS**: `autoconf`, `automake`, `libtool` via Homebrew
+2. **Install Nix**
+   - Uses `DeterminateSystems/nix-installer-action@v14`
+   - Enables reproducible builds
 
-3. **Configure Build**
-   - Runs `autoreconf -fi` if needed
-   - Executes `./configure`
+3. **Setup Nix Cache**
+   - Uses `DeterminateSystems/magic-nix-cache-action@v8`
+   - Speeds up builds
 
-4. **Build Jikes**
-   - Compiles the compiler in `src/` directory
-   - Creates `src/jikes` binary
+4. **Configure Build with CMake**
+   - Runs CMake configuration with Java 5 support enabled
 
-5. **Verify Binary**
-   - Checks that `jikes` binary was created
-   - Displays version/help information
+5. **Build Jikes**
+   - Compiles using CMake
+   - Creates `build/src/jikes` binary
 
-6. **Run Generics Tests**
-   - Tests simple generic classes
-   - Tests multiple type parameters
-   - Tests bounded type parameters
-   - Runs batch compilation test
+6. **Run CTest**
+   - Executes comprehensive test suite via CTest
+   - Tests all Java 5 features:
+     - Generics (type erasure, bounds, wildcards)
+     - Enhanced for-loops
+     - Varargs
+     - Enums
+     - Autoboxing/Unboxing
+     - Static imports
 
-7. **Upload Artifacts**
-   - Uploads compiled `jikes` binary
-   - Uploads test results and logs
-   - Available for 90 days
+7. **Generate Test Summary**
+   - Creates GitHub step summary with test results
+   - Always runs, even if tests fail
+
+8. **Upload Artifacts**
+   - Uploads compiled class files
+   - Uploads test logs
+   - Available for 7 days
 
 ## Local Testing
 
 ### Quick Test
 ```bash
-cd test-generics
-./run-tests.sh
+nix develop
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+cmake --build build -j$(nproc)
+cd build
+ctest --output-on-failure
 ```
 
 ### Manual Testing
 ```bash
 # Build Jikes
-cd src
-make
+nix develop
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+cmake --build build -j$(nproc)
 
 # Run individual test
-cd ../test-generics
-../src/jikes -sourcepath runtime -d . SimpleGeneric.java
+./build/src/jikes -source 1.5 -sourcepath test-generics/runtime -d test-output test-generics/GenericTest.java
 
 # Verify bytecode
-ls -la *.class
-od -c SimpleGeneric.class | grep Signature
+ls -la test-output/*.class
+javap -v test-output/GenericTest.class | grep Signature
 ```
 
 ## Test Suite
@@ -85,21 +97,27 @@ od -c SimpleGeneric.class | grep Signature
 ### Adding New Tests
 
 1. Create test file in `test-generics/`
-2. Add test case to `run-tests.sh`
-3. Add test step to `.github/workflows/build-and-test.yml`
+2. Add test to `CMakeLists.txt` in the `jikes` directory
+3. The test will automatically run in CI via CTest
 4. Commit and push
 
 Example:
-```bash
-# Add to run-tests.sh
-run_test "My New Feature" "MyNewTest.java"
+```cmake
+# Add to CMakeLists.txt
+add_test(
+  NAME compile_my_new_test
+  COMMAND ${JIKES_BINARY} -source 1.5
+          -sourcepath ${RUNTIME_PATH}:${TEST_GENERICS_PATH}
+          -classpath ${RUNTIME_PATH}
+          -d ${TEST_OUTPUT_DIR}
+          ${TEST_GENERICS_PATH}/MyNewTest.java
+)
 
-# Add to workflow YAML
-- name: Test my new feature
-  run: |
-    cd test-generics
-    ../src/jikes -sourcepath runtime -d . MyNewTest.java
-    test -f MyNewTest.class && echo "✓ MyNewTest compiled successfully"
+add_test(
+  NAME run_my_new_test
+  COMMAND java -cp ${TEST_OUTPUT_DIR}:${RUNTIME_PATH} MyNewTest
+)
+set_tests_properties(run_my_new_test PROPERTIES DEPENDS compile_my_new_test)
 ```
 
 ## Workflow Status
@@ -112,21 +130,21 @@ You can view the workflow status:
 
 ### Build Failures
 
-**Problem**: `configure` script not found
+**Problem**: CMake configuration fails
 
-**Solution**: Workflow runs `autoreconf -fi` automatically. If this fails, ensure `configure.ac` or `configure.in` exists.
-
----
-
-**Problem**: Missing dependencies
-
-**Solution**: Update the dependency installation steps in the workflow for your platform.
+**Solution**: Ensure CMake 3.15+ is available. Check that all dependencies are present in the Nix flake.
 
 ---
 
-**Problem**: Tests fail on one platform but not another
+**Problem**: Nix installation fails
 
-**Solution**: Check platform-specific behavior. May need conditional compilation or platform-specific test cases.
+**Solution**: Check Nix installer action version and logs. Ensure GitHub runner has sufficient permissions.
+
+---
+
+**Problem**: Tests fail on CI but pass locally
+
+**Solution**: Check environment differences. Verify Java version matches. Review CTest output in GitHub Actions logs.
 
 ### Test Failures
 
@@ -143,10 +161,10 @@ You can view the workflow status:
 ## Success Criteria
 
 A successful build:
-- ✅ Compiles on Ubuntu and macOS
+- ✅ Compiles on Ubuntu using Nix + CMake
 - ✅ Creates working `jikes` binary
-- ✅ All generics tests pass
-- ✅ At least 3 test classes compile successfully
+- ✅ All CTest tests pass (36 tests: 22 compile + 14 runtime)
+- ✅ Java 5 feature matrix tests all pass
 
 ## Future Enhancements
 
@@ -157,7 +175,7 @@ A successful build:
    - Upload to Codecov or Coveralls
 
 2. **Additional Platforms**
-   - Windows (MinGW or Cygwin)
+   - macOS support via Nix
    - Additional Linux distributions
 
 3. **Performance Benchmarks**
@@ -169,33 +187,16 @@ A successful build:
    - Binary releases on tags
    - Changelog generation
 
-### Test Suite Expansion
+### Test Suite Status
 
-As Phase 2 features are implemented:
+All Java 5 features are now tested via the feature matrix job:
 
-1. **Enhanced For-Loop Tests**
-   ```yaml
-   - name: Test enhanced for-loop
-     run: |
-       cd test-generics
-       ../src/jikes -sourcepath runtime -d . ForEachTest.java
-   ```
-
-2. **Varargs Tests**
-   ```yaml
-   - name: Test varargs
-     run: |
-       cd test-generics
-       ../src/jikes -sourcepath runtime -d . VarargsTest.java
-   ```
-
-3. **Enum Tests**
-   ```yaml
-   - name: Test enums
-     run: |
-       cd test-generics
-       ../src/jikes -sourcepath runtime -d . EnumTest.java
-   ```
+- ✅ **Generics** - `GenericTest.java`
+- ✅ **Enums** - `ColorTest.java`
+- ✅ **Varargs** - `VarargsTest.java`
+- ✅ **Enhanced For** - `ForEachTest.java`
+- ✅ **Autoboxing** - `BasicBoxingTest.java`
+- ✅ **Static Imports** - `StaticFieldOnlyTest.java`
 
 ## Maintenance
 
@@ -203,18 +204,19 @@ As Phase 2 features are implemented:
 
 To modify the workflow:
 
-1. Edit `.github/workflows/build-and-test.yml`
-2. Test locally first if possible
+1. Edit `.github/workflows/ci.yml`
+2. Test locally with Nix first
 3. Commit and push
 4. Monitor Actions tab for results
 
 ### Dependency Updates
 
-Dependencies are installed fresh on each run. To update versions:
+Dependencies are managed via Nix flake:
 
-- **Ubuntu**: Packages come from apt repositories
-- **macOS**: Homebrew formulas auto-update
-- **Actions**: Update `@v3` to `@v4` etc. as new versions release
+- Update `flake.nix` for dependency changes
+- Run `nix flake update` to update lock file
+- GitHub Actions uses the locked dependencies
+- Actions: Update `@v14` to newer versions as released
 
 ## Resources
 
