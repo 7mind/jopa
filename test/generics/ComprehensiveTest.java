@@ -18,7 +18,7 @@ class Box<T> {
 }
 
 // Test 2: Bounded type parameter
-class NumberBox<T extends Number> {
+class NumberBox<T extends TestNumber> {
     T value;
 
     T get() {
@@ -46,7 +46,7 @@ class Utils {
         return arg;
     }
 
-    static <T extends Number> T max(T a, T b) {
+    static <T extends TestNumber> T max(T a, T b) {
         return a; // Simplified
     }
 }
@@ -61,8 +61,8 @@ class StringBox extends Box<String> {
 // Test 6: Wildcard types
 class WildcardTest {
     Box<?> unbounded;
-    Box<? extends Number> upperBounded;
-    Box<? super Integer> lowerBounded;
+    Box<? extends TestNumber> upperBounded;
+    Box<? super TestInteger> lowerBounded;
 }
 
 // Test 7: Nested generics
@@ -71,12 +71,12 @@ class NestedBox<T> {
 }
 
 // Stub classes for testing
-class Number {
+class TestNumber {
     int value;
 }
 
-class Integer extends Number {
-    Integer(int v) {
+class TestInteger extends TestNumber {
+    TestInteger(int v) {
         value = v;
     }
 }

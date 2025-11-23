@@ -11,7 +11,7 @@ public class GenericMethodRuntimeTest {
     }
 
     // Generic method with bounded type parameter
-    static <T extends Number> T firstNumber(T a, T b) {
+    static <T extends TestNumber> T firstNumber(T a, T b) {
         return a;
     }
 
@@ -23,12 +23,12 @@ public class GenericMethodRuntimeTest {
     public static void main(String[] args) {
         // Test static generic methods
         String s = identity("hello");
-        Integer i = identity(new Integer(42));
+        TestInteger i = identity(new TestInteger(42));
 
         String key = getKey("key", "value");
-        Integer num = getKey(new Integer(1), "value");
+        TestInteger num = getKey(new TestInteger(1), "value");
 
-        Integer first = firstNumber(new Integer(10), new Integer(20));
+        TestInteger first = firstNumber(new TestInteger(10), new TestInteger(20));
 
         // Test instance generic method
         GenericMethodRuntimeTest test = new GenericMethodRuntimeTest();
@@ -44,12 +44,12 @@ public class GenericMethodRuntimeTest {
     }
 }
 
-class Number {
+class TestNumber {
     int value;
     public String toString() { return "Number"; }
 }
 
-class Integer extends Number {
-    Integer(int v) { value = v; }
+class TestInteger extends TestNumber {
+    TestInteger(int v) { value = v; }
     public String toString() { return "" + value; }
 }

@@ -1,23 +1,23 @@
 // Test covariant return types (Java 5 feature)
 class Parent {
-    Number getValue() {
-        return new Number();
+    TestNumber getValue() {
+        return new TestNumber();
     }
 
-    Number getAnotherValue() {
-        return new Number();
+    TestNumber getAnotherValue() {
+        return new TestNumber();
     }
 }
 
 class Child extends Parent {
     // Covariant return - override with more specific return type
-    Integer getValue() {
-        return new Integer(42);
+    TestInteger getValue() {
+        return new TestInteger(42);
     }
 
     // Another covariant return
-    Integer getAnotherValue() {
-        return new Integer(100);
+    TestInteger getAnotherValue() {
+        return new TestInteger(100);
     }
 }
 
@@ -26,13 +26,13 @@ public class CovariantReturnTest {
         Child child = new Child();
 
         // These should work with covariant returns
-        Integer i1 = child.getValue();
-        Integer i2 = child.getAnotherValue();
+        TestInteger i1 = child.getValue();
+        TestInteger i2 = child.getAnotherValue();
 
         // Polymorphism should also work
         Parent p = child;
-        Number n1 = p.getValue();
-        Number n2 = p.getAnotherValue();
+        TestNumber n1 = p.getValue();
+        TestNumber n2 = p.getAnotherValue();
 
         System.out.println("Covariant return tests passed!");
         System.out.println("i1 = " + i1);
@@ -42,16 +42,16 @@ public class CovariantReturnTest {
     }
 }
 
-class Number {
+class TestNumber {
     int value;
 
-    Number() {
+    TestNumber() {
         value = 0;
     }
 }
 
-class Integer extends Number {
-    Integer(int v) {
+class TestInteger extends TestNumber {
+    TestInteger(int v) {
         value = v;
     }
 }

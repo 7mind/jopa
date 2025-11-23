@@ -15,8 +15,8 @@ public class GenericMethodInferenceTest {
         // Should infer <String>
         String s = Utils.identity("hello");
 
-        // Should infer <Integer>
-        Integer i = Utils.identity(42);
+        // Should infer <TestInteger>
+        TestInteger i = Utils.identity(42);
 
         // Should infer <String>
         String s2 = Utils.first("hello", "world");
@@ -29,6 +29,6 @@ class String {
     // Stub for compilation
 }
 
-class Integer {
+class TestInteger {
     // Stub for compilation
 }

@@ -1,8 +1,8 @@
 // Test 2: Generic class with bounded type parameter
-class NumberBox<T extends Number> {
+class TestNumberBox<T extends TestNumber> {
     private T value;
 
-    public NumberBox(T value) {
+    public TestNumberBox(T value) {
         this.value = value;
     }
 

@@ -23,14 +23,14 @@ public class WildcardRuntimeTest {
     }
 
     // Test upper bounded wildcard
-    static void printNumberBox(Box<? extends Number> box) {
-        Number value = box.get();
+    static void printNumberBox(Box<? extends TestNumber> box) {
+        TestNumber value = box.get();
         System.out.println("Number box: " + value);
     }
 
     public static void main(String[] args) {
         Box<String> stringBox = new Box<String>("Hello");
-        Box<Integer> intBox = new Box<Integer>(new Integer(42));
+        Box<TestInteger> intBox = new Box<TestInteger>(new TestInteger(42));
 
         printBox(stringBox);
         printBox(intBox);
@@ -40,10 +40,10 @@ public class WildcardRuntimeTest {
     }
 }
 
-class Number {
+class TestNumber {
     int value;
 
-    Number() {
+    TestNumber() {
         value = 0;
     }
 
@@ -52,8 +52,8 @@ class Number {
     }
 }
 
-class Integer extends Number {
-    Integer(int v) {
+class TestInteger extends TestNumber {
+    TestInteger(int v) {
         value = v;
     }
 

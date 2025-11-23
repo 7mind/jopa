@@ -16,26 +16,26 @@ class TestWildcards {
     // Unbounded wildcard: ? erases to Object
     Container<?> unbounded;
 
-    // Upper bounded wildcard: ? extends Number erases to Number
-    Container<? extends Number> upperBounded;
+    // Upper bounded wildcard: ? extends TestNumber erases to TestNumber
+    Container<? extends TestNumber> upperBounded;
 
-    // Lower bounded wildcard: ? super Integer erases to Object
-    Container<? super Integer> lowerBounded;
+    // Lower bounded wildcard: ? super TestInteger erases to Object
+    Container<? super TestInteger> lowerBounded;
 
     void test() {
         // Local variables with wildcards
         Container<?> c1 = new Container<Object>(new Object());
-        Container<? extends Number> c2 = new Container<Number>(new Integer(42));
-        Container<? super Integer> c3 = new Container<Object>(new Object());
+        Container<? extends TestNumber> c2 = new Container<TestNumber>(new TestInteger(42));
+        Container<? super TestInteger> c3 = new Container<Object>(new Object());
     }
 }
 
-class Number {
+class TestNumber {
     int value;
 }
 
-class Integer extends Number {
-    Integer(int v) {
+class TestInteger extends TestNumber {
+    TestInteger(int v) {
         value = v;
     }
 }

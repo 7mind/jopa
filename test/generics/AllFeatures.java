@@ -22,7 +22,7 @@ class Box<T> {
 }
 
 // ===== FEATURE 2: Bounded Type Parameters =====
-class NumericBox<T extends Number> {
+class NumericBox<T extends TestNumber> {
     private T number;
 
     public T getNumber() {
@@ -49,7 +49,7 @@ interface Comparable<T> {
     int compareTo(T other);
 }
 
-class BoundedPair<T extends Number & Comparable<T>> {
+class BoundedPair<T extends TestNumber & Comparable<T>> {
     private T first;
     private T second;
 }
@@ -62,7 +62,7 @@ class Utils {
     }
 
     // Generic method with bounded type parameter
-    public static <T extends Number> T max(T a, T b) {
+    public static <T extends TestNumber> T max(T a, T b) {
         return a;  // Simplified
     }
 
@@ -110,21 +110,21 @@ class WildcardExamples {
     Box<?> unknownBox;
 
     // Upper bounded wildcard
-    Box<? extends Number> numberBox;
+    Box<? extends TestNumber> numberBox;
 
     // Lower bounded wildcard
-    Box<? super Integer> integerSuperBox;
+    Box<? super TestInteger> integerSuperBox;
 
     // Method with wildcards
-    public void processBox(Box<? extends Number> box) {
+    public void processBox(Box<? extends TestNumber> box) {
     }
 }
 
 // ===== FEATURE 9: Nested Generics =====
 class NestedGenerics {
     Box<Box<String>> boxOfBoxes;
-    Pair<Box<Integer>, Box<String>> pairOfBoxes;
-    Box<Pair<String, Integer>> boxOfPair;
+    Pair<Box<TestInteger>, Box<String>> pairOfBoxes;
+    Box<Pair<String, TestInteger>> boxOfPair;
 }
 
 // ===== FEATURE 10: Raw Types (with warnings) =====
@@ -137,16 +137,16 @@ class RawTypeExample {
 }
 
 // ===== Supporting Classes =====
-class Number {
+class TestNumber {
     protected int value;
 
-    public Number() {
+    public TestNumber() {
         value = 0;
     }
 }
 
-class Integer extends Number implements Comparable<Integer> {
-    public Integer(int v) {
+class TestInteger extends TestNumber implements Comparable<TestInteger> {
+    public TestInteger(int v) {
         value = v;
     }
 
@@ -155,10 +155,10 @@ class Integer extends Number implements Comparable<Integer> {
     }
 }
 
-class Double extends Number {
+class TestDouble extends TestNumber {
     private double dvalue;
 
-    public Double(double v) {
+    public TestDouble(double v) {
         dvalue = v;
     }
 }
@@ -202,19 +202,19 @@ class TestClient {
     public void testAllFeatures() {
         // Test parameterized types
         Box<String> stringBox = new Box<String>("hello");
-        Box<Integer> intBox = new Box<Integer>(new Integer(42));
+        Box<TestInteger> intBox = new Box<TestInteger>(new TestInteger(42));
 
         // Test generic methods
         String s = Utils.identity("test");
-        Integer i = Utils.max(new Integer(1), new Integer(2));
+        TestInteger i = Utils.max(new TestInteger(1), new TestInteger(2));
 
         // Test wildcards
-        Box<? extends Number> numBox = intBox;
+        Box<? extends TestNumber> numBox = intBox;
 
         // Test nested generics
         Box<Box<String>> nested = new Box<Box<String>>(stringBox);
 
         // Test pairs
-        Pair<String, Integer> pair = new Pair<String, Integer>("age", new Integer(25));
+        Pair<String, TestInteger> pair = new Pair<String, TestInteger>("age", new TestInteger(25));
     }
 }

@@ -20,7 +20,7 @@ class GenericMethodTest {
     }
 
     // Generic method with bounded type parameter
-    static <T extends Number> T max(T a, T b) {
+    static <T extends TestNumber> T max(T a, T b) {
         return a;  // Simplified - would need actual comparison
     }
 
@@ -35,7 +35,7 @@ class GenericMethodTest {
     }
 }
 
-class Number {
+class TestNumber {
     int value;
 }
 
