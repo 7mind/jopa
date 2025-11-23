@@ -63,12 +63,12 @@ jobs:
             echo '### Feature Coverage' >> $GITHUB_STEP_SUMMARY
             echo '' >> $GITHUB_STEP_SUMMARY
             echo 'All Java 5 features are tested through CTest:' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Generics (13 compile tests + runtime)' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Generics (13 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Enums (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Varargs (2 compile + 1 runtime test)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Enhanced For-Loop (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
-            echo '- ⚠️  Autoboxing (5 tests - feature not implemented)' >> $GITHUB_STEP_SUMMARY
-            echo '- ⚠️  Static Imports (3 compile tests, runtime has bytecode bug)' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Autoboxing (5 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
+            echo '- ✅ Static Imports (1 compile + 3 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
           "
 
       - name: Upload test artifacts

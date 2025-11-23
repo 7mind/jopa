@@ -3,8 +3,13 @@
 
 enable_testing()
 
-# Find Java for runtime tests
-find_package(Java COMPONENTS Runtime REQUIRED)
+# Option to enable/disable JVM validation tests
+option(JIKES_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
+
+# Find Java for runtime tests (only if JVM tests are enabled)
+if(JIKES_ENABLE_JVM_TESTS)
+    find_package(Java COMPONENTS Runtime REQUIRED)
+endif()
 
 set(TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/runtime")
@@ -41,15 +46,17 @@ function(add_jikes_run_test test_name source_file main_class)
         LABELS "compile"
     )
 
-    # Runtime test
-    add_test(
-        NAME "run_${test_name}"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "${main_class}"
-    )
-    set_tests_properties("run_${test_name}" PROPERTIES
-        LABELS "run"
-        DEPENDS "compile_${test_name}"
-    )
+    # Runtime test (only if JVM tests are enabled)
+    if(JIKES_ENABLE_JVM_TESTS)
+        add_test(
+            NAME "run_${test_name}"
+            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "${main_class}"
+        )
+        set_tests_properties("run_${test_name}" PROPERTIES
+            LABELS "run"
+            DEPENDS "compile_${test_name}"
+        )
+    endif()
 endfunction()
 
 # Enum Tests
@@ -65,14 +72,16 @@ add_test(
             "${TEST_DIR}/enums/EnumMethodsTest.java"
 )
 set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
-add_test(
-    NAME "run_EnumMethodsTest"
-    COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "EnumMethodsTest"
-)
-set_tests_properties("run_EnumMethodsTest" PROPERTIES
-    LABELS "run"
-    DEPENDS "compile_EnumMethodsTest"
-)
+if(JIKES_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "run_EnumMethodsTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_DIR}" "EnumMethodsTest"
+    )
+    set_tests_properties("run_EnumMethodsTest" PROPERTIES
+        LABELS "run"
+        DEPENDS "compile_EnumMethodsTest"
+    )
+endif()
 
 # Varargs Tests
 add_jikes_run_test(VarargsTest "${TEST_DIR}/varargs/VarargsTest.java" "VarargsTest")
