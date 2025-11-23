@@ -1,4 +1,7 @@
 # JOPA: Java Object Program Assembler
+[![CI](https://github.com/7mind/jopa/actions/workflows/ci.yml/badge.svg)](https://github.com/7mind/jopa/actions/workflows/ci.yml)
+[![License: IBM-PL 1.0](https://img.shields.io/github/license/7mind/jopa)](LICENSE)
+[![Built with Nix](https://img.shields.io/badge/built%20with-nix-5277C3?logo=nixos&logoColor=white)](https://nixos.org/)
 
 A totally Claude'd effort in modernizing `jikes`, the historical independent `javac` implementation in C++.
 
