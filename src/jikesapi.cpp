@@ -5,7 +5,6 @@
 
 
 using namespace Jikes;
-#endif
 
 // Note: JikesAPI classes only use the Jikes namespace, they
 // are never defined in the Jikes namespace. The use of the Jikes

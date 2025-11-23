@@ -2275,4 +2275,3 @@ void AstAssignmentExpression::Print(LexStream& lex_stream)
 
 
 } // Close namespace Jikes block
-#endif

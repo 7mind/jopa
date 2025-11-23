@@ -1664,4 +1664,3 @@ void Scanner::ClassifyBadToken()
 
 
 } // Close namespace Jikes block
-#endif

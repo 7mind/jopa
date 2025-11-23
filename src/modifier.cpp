@@ -447,4 +447,3 @@ AccessFlags Semantic::ProcessEnumConstantModifiers(AstEnumConstant* decl)
 
 
 } // Close namespace Jikes block
-#endif

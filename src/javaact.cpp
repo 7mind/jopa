@@ -4989,4 +4989,3 @@ void Parser::MakeTypeBound()
 //
 
 } // Close namespace Jikes block
-#endif

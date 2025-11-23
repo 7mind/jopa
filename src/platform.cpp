@@ -1470,4 +1470,3 @@ Ostream Coutput;
 
 
 } // Close namespace Jikes block
-#endif

@@ -272,4 +272,3 @@ void Zip::ReadDirectory()
 
 
 } // Close namespace Jikes block
-#endif

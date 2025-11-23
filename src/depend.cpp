@@ -526,4 +526,3 @@ void Semantic::AddDependence(TypeSymbol* base_type, TypeSymbol* parent_type,
 
 
 } // Close namespace Jikes block
-#endif

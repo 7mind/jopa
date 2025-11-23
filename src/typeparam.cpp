@@ -182,4 +182,3 @@ void TypeParameterSymbol::GenerateSignature(Control& control)
 
 
 } // Close namespace Jikes block
-#endif

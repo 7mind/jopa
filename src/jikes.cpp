@@ -13,7 +13,6 @@
 
 
 using namespace Jikes;
-#endif
 
 int main(int argc, char *argv[])
 {

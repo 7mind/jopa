@@ -337,4 +337,3 @@ Type* Type::Clone()
 
 
 } // Close namespace Jikes block
-#endif

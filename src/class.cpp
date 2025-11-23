@@ -2091,4 +2091,3 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
 
 
 } // Close namespace Jikes block
-#endif
