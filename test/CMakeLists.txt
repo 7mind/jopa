@@ -7,7 +7,8 @@ enable_testing()
 find_package(Java COMPONENTS Runtime REQUIRED)
 
 set(TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(RUNTIME_DIR "${CMAKE_SOURCE_DIR}/runtime")
+set(RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/runtime")
+set(RUNTIME_DIR "${CMAKE_BINARY_DIR}/runtime")
 set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Helper function to add a compile-only test
@@ -15,7 +16,7 @@ function(add_jikes_compile_test test_name source_file)
     add_test(
         NAME "compile_${test_name}"
         COMMAND $<TARGET_FILE:jikes> -source 1.5
-                -sourcepath "${RUNTIME_DIR}:${TEST_DIR}"
+                -sourcepath "${RUNTIME_SRC_DIR}:${TEST_DIR}"
                 -classpath "${RUNTIME_DIR}"
                 -d "${OUTPUT_DIR}"
                 "${source_file}"
@@ -31,7 +32,7 @@ function(add_jikes_run_test test_name source_file main_class)
     add_test(
         NAME "compile_${test_name}"
         COMMAND $<TARGET_FILE:jikes> -source 1.5
-                -sourcepath "${RUNTIME_DIR}:${TEST_DIR}"
+                -sourcepath "${RUNTIME_SRC_DIR}:${TEST_DIR}"
                 -classpath "${RUNTIME_DIR}"
                 -d "${OUTPUT_DIR}"
                 "${source_file}"
@@ -57,7 +58,7 @@ add_jikes_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest")
 add_test(
     NAME "compile_EnumMethodsTest"
     COMMAND $<TARGET_FILE:jikes> -source 1.5
-            -sourcepath "${RUNTIME_DIR}:${TEST_DIR}"
+            -sourcepath "${RUNTIME_SRC_DIR}:${TEST_DIR}"
             -classpath "${RUNTIME_DIR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/enums/Color.java"
@@ -107,7 +108,7 @@ add_jikes_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxi
 add_test(
     NAME "compile_MathUtils"
     COMMAND $<TARGET_FILE:jikes> -source 1.5
-            -sourcepath "${RUNTIME_DIR}:${TEST_DIR}"
+            -sourcepath "${RUNTIME_SRC_DIR}:${TEST_DIR}"
             -classpath "${RUNTIME_DIR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/util/MathUtils.java"

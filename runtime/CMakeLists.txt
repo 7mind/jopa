@@ -2,28 +2,30 @@
 # Minimal Java runtime classes for testing the Jikes compiler
 # These are stub implementations, not a complete Java runtime
 
-set(RUNTIME_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+set(RUNTIME_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RUNTIME_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
-# List of runtime source files
-set(RUNTIME_SOURCES
-    "${RUNTIME_DIR}/java/util/Iterator.java"
-    "${RUNTIME_DIR}/java/lang/Iterable.java"
-    "${RUNTIME_DIR}/java/util/ArrayList.java"
-)
+# Find all runtime source files
+file(GLOB_RECURSE RUNTIME_SOURCES "${RUNTIME_SRC_DIR}/*.java")
 
-# Compile runtime classes
+# Generate list of expected .class files
+set(RUNTIME_CLASSES "")
+foreach(src ${RUNTIME_SOURCES})
+    # Convert .java path to .class path
+    string(REPLACE "${RUNTIME_SRC_DIR}" "${RUNTIME_OUTPUT_DIR}" class_path "${src}")
+    string(REPLACE ".java" ".class" class_path "${class_path}")
+    list(APPEND RUNTIME_CLASSES "${class_path}")
+endforeach()
+
+# Compile all runtime classes to build directory
 add_custom_command(
-    OUTPUT "${RUNTIME_DIR}/java/util/Iterator.class"
-           "${RUNTIME_DIR}/java/lang/Iterable.class"
-           "${RUNTIME_DIR}/java/util/ArrayList.class"
-    COMMAND $<TARGET_FILE:jikes> -source 1.5 -sourcepath "${RUNTIME_DIR}" -d "${RUNTIME_DIR}" ${RUNTIME_SOURCES}
+    OUTPUT ${RUNTIME_CLASSES}
+    COMMAND $<TARGET_FILE:jikes> -source 1.5 -sourcepath "${RUNTIME_SRC_DIR}" -d "${RUNTIME_OUTPUT_DIR}" ${RUNTIME_SOURCES}
     DEPENDS jikes ${RUNTIME_SOURCES}
-    COMMENT "Compiling Jikes mini runtime library"
+    COMMENT "Compiling Jikes mini runtime library (${RUNTIME_SOURCES})"
+    VERBATIM
 )
 
 add_custom_target(runtime ALL
-    DEPENDS "${RUNTIME_DIR}/java/util/Iterator.class"
-            "${RUNTIME_DIR}/java/lang/Iterable.class"
-            "${RUNTIME_DIR}/java/util/ArrayList.class"
+    DEPENDS ${RUNTIME_CLASSES}
 )
