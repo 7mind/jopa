@@ -1544,6 +1544,7 @@ class VariableSymbol : public Symbol, public AccessFlags
 
 public:
     AstVariableDeclarator* declarator;
+    Ast* field_declaration; // AstFieldDeclaration for field variables, NULL for locals
     FileLocation* file_location;
     const NameSymbol* name_symbol;
     Symbol* owner;
@@ -1611,6 +1612,7 @@ public:
 
     VariableSymbol(const NameSymbol* name_symbol_)
         : declarator(NULL)
+        , field_declaration(NULL)
         , file_location(NULL)
         , name_symbol(name_symbol_)
         , owner(NULL)

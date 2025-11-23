@@ -1,6 +1,6 @@
 // Test type substitution - method return types should be substituted
 class Box<T> {
-    T value;
+    public T value;  // Made public for direct access
 
     void set(T v) {
         value = v;
@@ -15,10 +15,12 @@ public class TypeSubstitutionTest {
     public static void main(String[] args) {
         Box<String> stringBox = new Box<String>();
 
-        // This should work - get() should return String, not Object
+        // Method call - this should work
         String s = stringBox.get();
 
-        // This should work - set() should take String, not Object
+        // Field access - this should ALSO work if type substitution is implemented
+        String s2 = stringBox.value;
+
         stringBox.set("hello");
 
         System.out.println("Type substitution works!");

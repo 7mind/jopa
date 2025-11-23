@@ -2715,6 +2715,7 @@ void Semantic::ProcessFieldDeclaration(AstFieldDeclaration* field_declaration)
             variable -> SetFlags(access_flags);
             variable -> SetOwner(this_type);
             variable -> declarator = variable_declarator;
+            variable -> field_declaration = field_declaration;
 
             // Copy parameterized type information if present
             AstTypeName* type_name = field_declaration -> type -> TypeNameCast();
@@ -4085,6 +4086,13 @@ void Semantic::ProcessFormalParameters(BlockSymbol* block,
         symbol -> SetFlags(access_flags);
         symbol -> MarkComplete();
         symbol -> MarkInitialized();
+
+        // Copy parameterized type information if present
+        AstTypeName* type_name = parameter -> type -> TypeNameCast();
+        if (type_name && type_name -> parameterized_type)
+        {
+            symbol -> parameterized_type = type_name -> parameterized_type;
+        }
 
         parameter -> formal_declarator -> symbol = symbol;
     }

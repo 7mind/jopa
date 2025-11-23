@@ -122,6 +122,8 @@ add_jikes_compile_test(GenericMethods "GenericMethods.java")
 add_jikes_compile_test(CovariantReturnTest "CovariantReturnTest.java")
 add_jikes_compile_test(BridgeTest "BridgeTest.java")
 add_jikes_compile_test(SimpleSameFileTest "SimpleSameFileTest.java")
+add_jikes_compile_test(TypeSubstitutionTest "TypeSubstitutionTest.java")
+add_jikes_compile_test(FieldAccessTest "FieldAccessTest.java")
 
 # Autoboxing/Unboxing Tests
 add_jikes_run_test(BasicBoxingTest "BasicBoxingTest.java" "BasicBoxingTest")
