@@ -195,3 +195,5 @@ configure_file(
 add_executable(jikes ${JIKES_SOURCES})
 target_include_directories(jikes PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(jikes PRIVATE ${JIKES_LIBS})
+
+install(TARGETS jikes RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

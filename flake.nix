@@ -16,6 +16,7 @@
           buildInputs = with pkgs; [
             # Build tools
             gcc
+            cmake
             gnumake
             autoconf
             automake
@@ -40,17 +41,18 @@
             echo "Jikes Java 5 Development Environment"
             echo "================================================"
             echo "C++ Compiler: $(gcc --version | head -1)"
+            echo "CMake: $(${pkgs.cmake}/bin/cmake --version | head -1)"
             echo "Java: $(java -version 2>&1 | head -1)"
             echo ""
             echo "Available commands:"
-            echo "  - Build Jikes: cd jikes && ./configure && make"
-            echo "  - Run tests: make check"
-            echo "  - Test Java 5: cd test-generics && ./run-tests.sh"
+            echo "  - Build with CMake: cmake -S . -B build && cmake --build build"
+            echo "  - Run tests: cd build && ctest"
+            echo "  - Legacy build: ./configure && make"
             echo ""
           '';
         };
 
-        # Package definition for building Jikes
+        # Package definition for building Jikes with CMake
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "jikes";
           version = "1.22-java5";
@@ -58,35 +60,19 @@
           src = ./.;
 
           nativeBuildInputs = with pkgs; [
-            autoconf
-            automake
-            libtool
+            cmake
           ];
 
           buildInputs = with pkgs; [
             gcc
           ];
 
-          preConfigure = ''
-            # Run autoreconf if configure doesn't exist
-            if [ ! -f configure ]; then
-              autoreconf -fi
-            fi
-          '';
-
-          configureFlags = [
-            "--enable-source-15"
+          cmakeFlags = [
+            "-DJIKES_ENABLE_SOURCE_15=ON"
+            "-DCMAKE_BUILD_TYPE=Release"
           ];
 
-          buildPhase = ''
-            cd src
-            make
-          '';
-
-          installPhase = ''
-            mkdir -p $out/bin
-            install -m 755 src/jikes $out/bin/jikes
-          '';
+          # CMake will handle the build automatically
 
           meta = with pkgs.lib; {
             description = "Jikes Java compiler with Java 5 (generics, foreach, varargs, enums) support";

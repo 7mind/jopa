@@ -2,7 +2,7 @@ name: Jikes Java 5 CI
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, wip/cmake ]
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
@@ -28,33 +28,38 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
+      - name: Configure with CMake
+        run: |
+          nix develop --command bash -c "
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+          "
+
       - name: Build Jikes
         run: |
           nix develop --command bash -c "
-            ./configure --enable-source15
-            make -j$(nproc)
+            cmake --build build -j$(nproc)
           "
 
-      - name: Run unit tests
+      - name: Run CTest
         run: |
           nix develop --command bash -c "
-            make check || true
+            cd build
+            ctest --output-on-failure --verbose
           "
 
-      - name: Run Java 5 feature tests
-        run: |
-          nix develop --command bash -c "
-            cd test-generics
-            bash ./run-tests.sh
-          "
-
-      - name: Test summary
+      - name: Generate test summary
         if: always()
         run: |
-          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-          if [ -f test-generics/.test-results ]; then
-            cat test-generics/.test-results >> $GITHUB_STEP_SUMMARY
-          fi
+          nix develop --command bash -c "
+            cd build
+            echo '## Test Results' >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo '### CTest Summary' >> $GITHUB_STEP_SUMMARY
+            echo '' >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            ctest --output-on-failure 2>&1 | tail -20 >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          "
 
       - name: Upload test artifacts
         if: always()
@@ -62,9 +67,36 @@ jobs:
         with:
           name: test-results
           path: |
-            test-generics/*.class
-            test-generics/*.log
+            build/test-generics/*.class
+            build/Testing/Temporary/LastTest.log
           retention-days: 7
+
+  build-legacy:
+    name: Build with Autoconf (Legacy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build with Autoconf
+        run: |
+          nix develop --command bash -c "
+            ./configure --enable-source15
+            make -j$(nproc)
+          "
+
+      - name: Run legacy tests
+        run: |
+          nix develop --command bash -c "
+            make check || true
+          "
 
   check-java5-features:
     name: Java 5 Feature Matrix
@@ -74,12 +106,22 @@ jobs:
         feature:
           - name: "Generics"
             test: "test-generics/GenericTest.java"
+            class: "GenericTest"
           - name: "Enums"
             test: "test-generics/ColorTest.java"
+            class: "ColorTest"
           - name: "Varargs"
             test: "test-generics/VarargsTest.java"
+            class: "VarargsTest"
           - name: "Enhanced For"
             test: "test-generics/ForEachTest.java"
+            class: "ForEachTest"
+          - name: "Autoboxing"
+            test: "test-generics/BasicBoxingTest.java"
+            class: "BasicBoxingTest"
+          - name: "Static Imports"
+            test: "test-generics/StaticFieldOnlyTest.java"
+            class: "StaticFieldOnlyTest"
       fail-fast: false
 
     steps:
@@ -95,13 +137,24 @@ jobs:
       - name: Build Jikes
         run: |
           nix develop --command bash -c "
-            ./configure --enable-source15
-            make -j$(nproc)
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+            cmake --build build -j$(nproc)
+          "
+
+      - name: Compile runtime classes
+        run: |
+          nix develop --command bash -c "
+            mkdir -p test-output
+            ./build/src/jikes -source 1.5 -sourcepath test-generics/runtime -d test-generics/runtime \
+              test-generics/runtime/java/util/Iterator.java \
+              test-generics/runtime/java/lang/Iterable.java \
+              test-generics/runtime/java/util/ArrayList.java || true
           "
 
       - name: Test ${{ matrix.feature.name }}
         run: |
           nix develop --command bash -c "
-            ./src/jikes -source 1.5 -sourcepath test-generics/runtime:test-generics -d test-generics ${{ matrix.feature.test }}
-            java -cp test-generics $(basename ${{ matrix.feature.test }} .java)
+            mkdir -p test-output
+            ./build/src/jikes -source 1.5 -sourcepath test-generics/runtime:test-generics -classpath test-generics/runtime -d test-output ${{ matrix.feature.test }}
+            java -cp test-output:test-generics/runtime ${{ matrix.feature.class }}
           "

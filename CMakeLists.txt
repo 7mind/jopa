@@ -18,7 +18,13 @@ set(PACKAGE_TARNAME "${PACKAGE_NAME}")
 set(PACKAGE_STRING "${PACKAGE_NAME} ${PROJECT_VERSION}")
 
 include(GNUInstallDirs)
+include(CTest)
+
 add_subdirectory(src)
+
+if(BUILD_TESTING)
+    add_subdirectory(test-generics)
+endif()
 
 install(FILES doc/jikes.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
 install(FILES doc/license.htm DESTINATION "${CMAKE_INSTALL_DOCDIR}")
