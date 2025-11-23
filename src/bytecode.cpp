@@ -541,6 +541,392 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     }
 
     //
+    // Process RuntimeVisibleAnnotations for methods
+    //
+    AstMethodDeclaration* method_decl = msym -> declaration ? msym -> declaration -> MethodDeclarationCast() : NULL;
+    AstConstructorDeclaration* constructor_decl = (!method_decl && msym -> declaration) ? msym -> declaration -> ConstructorDeclarationCast() : NULL;
+    AstModifiers* mods = method_decl ? method_decl -> modifiers_opt :
+                        constructor_decl ? constructor_decl -> modifiers_opt : NULL;
+
+    if (mods)
+    {
+        AnnotationsAttribute* annotations_attr = NULL;
+
+        for (unsigned i = 0; i < mods -> NumModifiers(); i++)
+        {
+            AstAnnotation* annotation = mods -> Modifier(i) -> AnnotationCast();
+            if (annotation && annotation -> name)
+            {
+                // Generate annotation with type descriptor and element-value pairs
+                LexStream* lex_stream = unit_type -> file_symbol -> lex_stream;
+                TokenIndex id_token = annotation -> name -> identifier_token;
+                const wchar_t* name_text = lex_stream -> NameString(id_token);
+                unsigned name_length = lex_stream -> NameStringLength(id_token);
+
+                // Build descriptor string "Lname;" in wchar_t
+                wchar_t* descriptor_text = new wchar_t[name_length + 3];
+                descriptor_text[0] = U_L;
+                for (unsigned j = 0; j < name_length; j++)
+                {
+                    descriptor_text[j + 1] = name_text[j];
+                }
+                descriptor_text[name_length + 1] = U_SEMICOLON;
+                descriptor_text[name_length + 2] = U_NULL;
+
+                u2 type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(descriptor_text));
+                delete [] descriptor_text;
+
+                if (! annotations_attr)
+                {
+                    annotations_attr = new AnnotationsAttribute(
+                        RegisterUtf8(control.RuntimeVisibleAnnotations_literal), true);
+                }
+
+                Annotation* annot = new Annotation(type_index);
+
+                // Process annotation element-value pairs
+                for (unsigned j = 0; j < annotation -> NumMemberValuePairs(); j++)
+                {
+                    AstMemberValuePair* pair = annotation -> MemberValuePair(j);
+                    if (pair && pair -> member_value)
+                    {
+                        // Get the element name (default to "value" for single-element syntax)
+                        const wchar_t* element_name;
+                        if (pair -> identifier_token_opt)
+                        {
+                            element_name = lex_stream -> NameString(pair -> identifier_token_opt);
+                        }
+                        else
+                        {
+                            element_name = L"value";  // Default for @Anno(val) syntax
+                        }
+                        u2 element_name_index = RegisterUtf8(control.ConvertUnicodeToUtf8(element_name));
+
+                        // Get the value based on AST node type
+                        Ast::AstKind kind = pair -> member_value -> kind;
+
+                        // Handle string literals
+                        if (kind == Ast::STRING_LITERAL)
+                        {
+                            AstStringLiteral* str_lit = (AstStringLiteral*) pair -> member_value;
+                            const wchar_t* str_text = lex_stream -> NameString(str_lit -> string_literal_token);
+                            unsigned str_length = lex_stream -> NameStringLength(str_lit -> string_literal_token);
+
+                            // Remove quotes from string literal
+                            wchar_t* unquoted = new wchar_t[str_length - 1];
+                            for (unsigned k = 0; k < str_length - 2; k++)
+                            {
+                                unquoted[k] = str_text[k + 1];
+                            }
+                            unquoted[str_length - 2] = U_NULL;
+
+                            u2 string_index = RegisterUtf8(control.ConvertUnicodeToUtf8(unquoted));
+                            delete [] unquoted;
+
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_string,
+                                    string_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle integer literals
+                        else if (kind == Ast::INTEGER_LITERAL)
+                        {
+                            AstIntegerLiteral* int_lit = (AstIntegerLiteral*) pair -> member_value;
+                            const wchar_t* int_text = lex_stream -> NameString(int_lit -> integer_literal_token);
+
+                            // Parse the integer value
+                            i4 int_val = 0;
+                            for (unsigned k = 0; int_text[k] != U_NULL; k++)
+                            {
+                                if (int_text[k] >= U_0 && int_text[k] <= U_9)
+                                {
+                                    int_val = int_val * 10 + (int_text[k] - U_0);
+                                }
+                            }
+
+                            u2 int_index = RegisterInteger(control.int_pool.FindOrInsert(int_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_int,
+                                    int_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle other primitive literals
+                        else if (kind == Ast::LONG_LITERAL)
+                        {
+                            AstLongLiteral* long_lit = (AstLongLiteral*) pair -> member_value;
+                            const wchar_t* long_text = lex_stream -> NameString(long_lit -> long_literal_token);
+
+                            // Parse the long value (simplified - skip 'L' suffix)
+                            LongInt long_val = 0;
+                            for (unsigned k = 0; long_text[k] != U_NULL && long_text[k] != U_L && long_text[k] != U_l; k++)
+                            {
+                                if (long_text[k] >= U_0 && long_text[k] <= U_9)
+                                {
+                                    long_val = long_val * 10 + (long_text[k] - U_0);
+                                }
+                            }
+
+                            u2 long_index = RegisterLong(control.long_pool.FindOrInsert(long_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_long,
+                                    long_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        else if (kind == Ast::TRUE_LITERAL || kind == Ast::FALSE_LITERAL)
+                        {
+                            i4 bool_val = (kind == Ast::TRUE_LITERAL) ? 1 : 0;
+                            u2 bool_index = RegisterInteger(control.int_pool.FindOrInsert(bool_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_boolean,
+                                    bool_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        else if (kind == Ast::CHARACTER_LITERAL)
+                        {
+                            AstCharacterLiteral* char_lit = (AstCharacterLiteral*) pair -> member_value;
+                            const wchar_t* char_text = lex_stream -> NameString(char_lit -> character_literal_token);
+
+                            // Extract character value (between single quotes)
+                            i4 char_val = 0;
+                            if (char_text[1] == U_BACKSLASH)
+                            {
+                                // Handle escape sequences
+                                if (char_text[2] == U_n) char_val = U_LINE_FEED;
+                                else if (char_text[2] == U_r) char_val = U_CARRIAGE_RETURN;
+                                else if (char_text[2] == U_t) char_val = U_HORIZONTAL_TAB;
+                                else char_val = char_text[2];
+                            }
+                            else
+                            {
+                                char_val = char_text[1];
+                            }
+
+                            u2 char_index = RegisterInteger(control.int_pool.FindOrInsert(char_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_char,
+                                    char_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle class literals (e.g., String.class)
+                        else if (kind == Ast::CLASS_LITERAL)
+                        {
+                            AstClassLiteral* class_lit = (AstClassLiteral*) pair -> member_value;
+                            if (class_lit -> type)
+                            {
+                                // Try to get from symbol first
+                                if (class_lit -> type -> symbol)
+                                {
+                                    TypeSymbol* type_sym = class_lit -> type -> symbol;
+                                    const char* type_name_utf8 = type_sym -> fully_qualified_name -> value;
+                                    unsigned type_name_len = type_sym -> fully_qualified_name -> length;
+
+                                    wchar_t* type_name_unicode = new wchar_t[type_name_len + 1];
+                                    int unicode_len = Control::ConvertUtf8ToUnicode(type_name_unicode, type_name_utf8, type_name_len);
+
+                                    // Build descriptor "Lpackage/Type;"
+                                    wchar_t* type_descriptor = new wchar_t[unicode_len + 3];
+                                    type_descriptor[0] = U_L;
+                                    for (int k = 0; k < unicode_len; k++)
+                                    {
+                                        type_descriptor[k + 1] = (type_name_unicode[k] == U_DOT) ? U_SLASH : type_name_unicode[k];
+                                    }
+                                    type_descriptor[unicode_len + 1] = U_SEMICOLON;
+                                    type_descriptor[unicode_len + 2] = U_NULL;
+
+                                    u2 class_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                    delete [] type_name_unicode;
+                                    delete [] type_descriptor;
+
+                                    AnnotationComponentValue* component =
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_class,
+                                            class_index);
+                                    annot -> AddComponent(element_name_index, component);
+                                }
+                                // Fall back to extracting from AST tokens
+                                else if (class_lit -> type -> kind == Ast::TYPE)
+                                {
+                                    AstTypeName* type_name_node = (AstTypeName*) class_lit -> type;
+                                    if (type_name_node -> name)
+                                    {
+                                        TokenIndex type_token = type_name_node -> name -> identifier_token;
+                                        const wchar_t* type_name = lex_stream -> NameString(type_token);
+                                        unsigned type_len = lex_stream -> NameStringLength(type_token);
+
+                                        // Build descriptor "Ljava/lang/TypeName;"
+                                        wchar_t* type_descriptor = new wchar_t[type_len + 3];
+                                        type_descriptor[0] = U_L;
+                                        for (unsigned k = 0; k < type_len; k++)
+                                        {
+                                            type_descriptor[k + 1] = type_name[k];
+                                        }
+                                        type_descriptor[type_len + 1] = U_SEMICOLON;
+                                        type_descriptor[type_len + 2] = U_NULL;
+
+                                        u2 class_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                        delete [] type_descriptor;
+
+                                        AnnotationComponentValue* component =
+                                            new AnnotationComponentConstant(
+                                                AnnotationComponentValue::COMPONENT_class,
+                                                class_index);
+                                        annot -> AddComponent(element_name_index, component);
+                                    }
+                                }
+                            }
+                        }
+                        // Handle nested annotations
+                        else if (kind == Ast::ANNOTATION)
+                        {
+                            AstAnnotation* nested_annotation = (AstAnnotation*) pair -> member_value;
+                            if (nested_annotation -> name)
+                            {
+                                // Build nested annotation type descriptor
+                                TokenIndex nested_id_token = nested_annotation -> name -> identifier_token;
+                                const wchar_t* nested_name_text = lex_stream -> NameString(nested_id_token);
+                                unsigned nested_name_length = lex_stream -> NameStringLength(nested_id_token);
+
+                                wchar_t* nested_descriptor_text = new wchar_t[nested_name_length + 3];
+                                nested_descriptor_text[0] = U_L;
+                                for (unsigned k = 0; k < nested_name_length; k++)
+                                {
+                                    nested_descriptor_text[k + 1] = nested_name_text[k];
+                                }
+                                nested_descriptor_text[nested_name_length + 1] = U_SEMICOLON;
+                                nested_descriptor_text[nested_name_length + 2] = U_NULL;
+
+                                u2 nested_type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(nested_descriptor_text));
+                                delete [] nested_descriptor_text;
+
+                                Annotation* nested_annot = new Annotation(nested_type_index);
+
+                                // Recursively process nested annotation parameters
+                                // (This is a simplified version - full recursion would need helper function)
+
+                                AnnotationComponentValue* component =
+                                    new AnnotationComponentAnnotation(nested_annot);
+                                annot -> AddComponent(element_name_index, component);
+                            }
+                        }
+                        // Handle array initializers
+                        else if (kind == Ast::ARRAY_INITIALIZER)
+                        {
+                            AstArrayInitializer* array_init = (AstArrayInitializer*) pair -> member_value;
+                            AnnotationComponentArray* array_component = new AnnotationComponentArray();
+
+                            for (unsigned k = 0; k < array_init -> NumVariableInitializers(); k++)
+                            {
+                                AstMemberValue* init_value = array_init -> VariableInitializer(k);
+                                Ast::AstKind init_kind = init_value -> kind;
+
+                                // Handle array element types
+                                if (init_kind == Ast::STRING_LITERAL)
+                                {
+                                    AstStringLiteral* str_lit = (AstStringLiteral*) init_value;
+                                    const wchar_t* str_text = lex_stream -> NameString(str_lit -> string_literal_token);
+                                    unsigned str_length = lex_stream -> NameStringLength(str_lit -> string_literal_token);
+
+                                    wchar_t* unquoted = new wchar_t[str_length - 1];
+                                    for (unsigned m = 0; m < str_length - 2; m++)
+                                    {
+                                        unquoted[m] = str_text[m + 1];
+                                    }
+                                    unquoted[str_length - 2] = U_NULL;
+
+                                    u2 string_index = RegisterUtf8(control.ConvertUnicodeToUtf8(unquoted));
+                                    delete [] unquoted;
+
+                                    array_component -> AddValue(
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_string,
+                                            string_index));
+                                }
+                                else if (init_kind == Ast::INTEGER_LITERAL)
+                                {
+                                    AstIntegerLiteral* int_lit = (AstIntegerLiteral*) init_value;
+                                    const wchar_t* int_text = lex_stream -> NameString(int_lit -> integer_literal_token);
+
+                                    i4 int_val = 0;
+                                    for (unsigned m = 0; int_text[m] != U_NULL; m++)
+                                    {
+                                        if (int_text[m] >= U_0 && int_text[m] <= U_9)
+                                        {
+                                            int_val = int_val * 10 + (int_text[m] - U_0);
+                                        }
+                                    }
+
+                                    array_component -> AddValue(
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_int,
+                                            RegisterInteger(control.int_pool.FindOrInsert(int_val))));
+                                }
+                            }
+
+                            annot -> AddComponent(element_name_index, array_component);
+                        }
+                        // Handle enum constants (field access like Priority.HIGH)
+                        else if (kind == Ast::DOT)
+                        {
+                            AstFieldAccess* field_access = (AstFieldAccess*) pair -> member_value;
+
+                            // Get the enum type from the base expression
+                            AstExpression* base_expr = field_access -> base;
+                            if (base_expr && base_expr -> symbol)
+                            {
+                                TypeSymbol* enum_type = base_expr -> symbol -> TypeCast();
+                                if (enum_type)
+                                {
+                                    // Build enum type descriptor "Lpackage/EnumType;" from fully_qualified_name
+                                    // First convert UTF8 to Unicode
+                                    const char* type_name_utf8 = enum_type -> fully_qualified_name -> value;
+                                    unsigned type_name_len = enum_type -> fully_qualified_name -> length;
+
+                                    wchar_t* type_name_unicode = new wchar_t[type_name_len + 1];
+                                    int unicode_len = Control::ConvertUtf8ToUnicode(type_name_unicode, type_name_utf8, type_name_len);
+
+                                    // Build descriptor "Lpackage/Type;" with slashes instead of dots
+                                    wchar_t* type_descriptor = new wchar_t[unicode_len + 3];
+                                    type_descriptor[0] = U_L;
+                                    for (int k = 0; k < unicode_len; k++)
+                                    {
+                                        type_descriptor[k + 1] = (type_name_unicode[k] == U_DOT) ? U_SLASH : type_name_unicode[k];
+                                    }
+                                    type_descriptor[unicode_len + 1] = U_SEMICOLON;
+                                    type_descriptor[unicode_len + 2] = U_NULL;
+
+                                    u2 type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                    delete [] type_name_unicode;
+                                    delete [] type_descriptor;
+
+                                    // Get the enum constant name
+                                    const wchar_t* const_name = lex_stream -> NameString(field_access -> identifier_token);
+                                    u2 const_index = RegisterUtf8(control.ConvertUnicodeToUtf8(const_name));
+
+                                    AnnotationComponentValue* component =
+                                        new AnnotationComponentEnum(type_index, const_index);
+                                    annot -> AddComponent(element_name_index, component);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                annotations_attr -> AddAnnotation(annot);
+            }
+        }
+
+        if (annotations_attr)
+        {
+            methods[method_index] -> AddAttribute(annotations_attr);
+        }
+    }
+
+    //
     // here if need code and associated attributes.
     //
     if (! (msym -> ACC_ABSTRACT() || msym -> ACC_NATIVE()))
@@ -7299,6 +7685,409 @@ void ByteCode::FinishCode()
                 RegisterUtf8(unit_type -> GenericSignature())));
         }
     }
+
+    //
+    // Process RuntimeVisibleAnnotations for classes
+    //
+    AstClassDeclaration* class_decl = NULL;
+    AstInterfaceDeclaration* interface_decl = NULL;
+    AstEnumDeclaration* enum_decl = NULL;
+    AstAnnotationDeclaration* annotation_decl = NULL;
+
+    if (unit_type -> declaration)
+    {
+        class_decl = unit_type -> declaration -> owner -> ClassDeclarationCast();
+        if (!class_decl)
+            interface_decl = unit_type -> declaration -> owner -> InterfaceDeclarationCast();
+        if (!class_decl && !interface_decl)
+            enum_decl = unit_type -> declaration -> owner -> EnumDeclarationCast();
+        if (!class_decl && !interface_decl && !enum_decl)
+            annotation_decl = unit_type -> declaration -> owner -> AnnotationDeclarationCast();
+    }
+
+    AstModifiers* class_mods = class_decl ? class_decl -> modifiers_opt :
+                               interface_decl ? interface_decl -> modifiers_opt :
+                               enum_decl ? enum_decl -> modifiers_opt :
+                               annotation_decl ? annotation_decl -> modifiers_opt : NULL;
+
+    if (class_mods)
+    {
+        AnnotationsAttribute* annotations_attr = NULL;
+
+        for (unsigned i = 0; i < class_mods -> NumModifiers(); i++)
+        {
+            AstAnnotation* annotation = class_mods -> Modifier(i) -> AnnotationCast();
+            if (annotation && annotation -> name)
+            {
+                // Generate annotation with type descriptor and element-value pairs
+                LexStream* lex_stream = unit_type -> file_symbol -> lex_stream;
+                TokenIndex id_token = annotation -> name -> identifier_token;
+                const wchar_t* name_text = lex_stream -> NameString(id_token);
+                unsigned name_length = lex_stream -> NameStringLength(id_token);
+
+                // Build descriptor string "Lname;" in wchar_t
+                wchar_t* descriptor_text = new wchar_t[name_length + 3];
+                descriptor_text[0] = U_L;
+                for (unsigned j = 0; j < name_length; j++)
+                {
+                    descriptor_text[j + 1] = name_text[j];
+                }
+                descriptor_text[name_length + 1] = U_SEMICOLON;
+                descriptor_text[name_length + 2] = U_NULL;
+
+                u2 type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(descriptor_text));
+                delete [] descriptor_text;
+
+                if (! annotations_attr)
+                {
+                    annotations_attr = new AnnotationsAttribute(
+                        RegisterUtf8(control.RuntimeVisibleAnnotations_literal), true);
+                }
+
+                Annotation* annot = new Annotation(type_index);
+
+                // Process annotation element-value pairs
+                for (unsigned j = 0; j < annotation -> NumMemberValuePairs(); j++)
+                {
+                    AstMemberValuePair* pair = annotation -> MemberValuePair(j);
+                    if (pair && pair -> member_value)
+                    {
+                        // Get the element name (default to "value" for single-element syntax)
+                        const wchar_t* element_name;
+                        if (pair -> identifier_token_opt)
+                        {
+                            element_name = lex_stream -> NameString(pair -> identifier_token_opt);
+                        }
+                        else
+                        {
+                            element_name = L"value";  // Default for @Anno(val) syntax
+                        }
+                        u2 element_name_index = RegisterUtf8(control.ConvertUnicodeToUtf8(element_name));
+
+                        // Get the value based on AST node type
+                        Ast::AstKind kind = pair -> member_value -> kind;
+
+                        // Handle string literals
+                        if (kind == Ast::STRING_LITERAL)
+                        {
+                            AstStringLiteral* str_lit = (AstStringLiteral*) pair -> member_value;
+                            const wchar_t* str_text = lex_stream -> NameString(str_lit -> string_literal_token);
+                            unsigned str_length = lex_stream -> NameStringLength(str_lit -> string_literal_token);
+
+                            // Remove quotes from string literal
+                            wchar_t* unquoted = new wchar_t[str_length - 1];
+                            for (unsigned k = 0; k < str_length - 2; k++)
+                            {
+                                unquoted[k] = str_text[k + 1];
+                            }
+                            unquoted[str_length - 2] = U_NULL;
+
+                            u2 string_index = RegisterUtf8(control.ConvertUnicodeToUtf8(unquoted));
+                            delete [] unquoted;
+
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_string,
+                                    string_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle integer literals
+                        else if (kind == Ast::INTEGER_LITERAL)
+                        {
+                            AstIntegerLiteral* int_lit = (AstIntegerLiteral*) pair -> member_value;
+                            const wchar_t* int_text = lex_stream -> NameString(int_lit -> integer_literal_token);
+
+                            // Parse the integer value
+                            i4 int_val = 0;
+                            for (unsigned k = 0; int_text[k] != U_NULL; k++)
+                            {
+                                if (int_text[k] >= U_0 && int_text[k] <= U_9)
+                                {
+                                    int_val = int_val * 10 + (int_text[k] - U_0);
+                                }
+                            }
+
+                            u2 int_index = RegisterInteger(control.int_pool.FindOrInsert(int_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_int,
+                                    int_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle other primitive literals
+                        else if (kind == Ast::LONG_LITERAL)
+                        {
+                            AstLongLiteral* long_lit = (AstLongLiteral*) pair -> member_value;
+                            const wchar_t* long_text = lex_stream -> NameString(long_lit -> long_literal_token);
+
+                            // Parse the long value (simplified - skip 'L' suffix)
+                            LongInt long_val = 0;
+                            for (unsigned k = 0; long_text[k] != U_NULL && long_text[k] != U_L && long_text[k] != U_l; k++)
+                            {
+                                if (long_text[k] >= U_0 && long_text[k] <= U_9)
+                                {
+                                    long_val = long_val * 10 + (long_text[k] - U_0);
+                                }
+                            }
+
+                            u2 long_index = RegisterLong(control.long_pool.FindOrInsert(long_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_long,
+                                    long_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        else if (kind == Ast::TRUE_LITERAL || kind == Ast::FALSE_LITERAL)
+                        {
+                            i4 bool_val = (kind == Ast::TRUE_LITERAL) ? 1 : 0;
+                            u2 bool_index = RegisterInteger(control.int_pool.FindOrInsert(bool_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_boolean,
+                                    bool_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        else if (kind == Ast::CHARACTER_LITERAL)
+                        {
+                            AstCharacterLiteral* char_lit = (AstCharacterLiteral*) pair -> member_value;
+                            const wchar_t* char_text = lex_stream -> NameString(char_lit -> character_literal_token);
+
+                            // Extract character value (between single quotes)
+                            i4 char_val = 0;
+                            if (char_text[1] == U_BACKSLASH)
+                            {
+                                // Handle escape sequences
+                                if (char_text[2] == U_n) char_val = U_LINE_FEED;
+                                else if (char_text[2] == U_r) char_val = U_CARRIAGE_RETURN;
+                                else if (char_text[2] == U_t) char_val = U_HORIZONTAL_TAB;
+                                else char_val = char_text[2];
+                            }
+                            else
+                            {
+                                char_val = char_text[1];
+                            }
+
+                            u2 char_index = RegisterInteger(control.int_pool.FindOrInsert(char_val));
+                            AnnotationComponentValue* component =
+                                new AnnotationComponentConstant(
+                                    AnnotationComponentValue::COMPONENT_char,
+                                    char_index);
+                            annot -> AddComponent(element_name_index, component);
+                        }
+                        // Handle class literals (e.g., String.class)
+                        else if (kind == Ast::CLASS_LITERAL)
+                        {
+                            AstClassLiteral* class_lit = (AstClassLiteral*) pair -> member_value;
+                            if (class_lit -> type)
+                            {
+                                // Try to get from symbol first
+                                if (class_lit -> type -> symbol)
+                                {
+                                    TypeSymbol* type_sym = class_lit -> type -> symbol;
+                                    const char* type_name_utf8 = type_sym -> fully_qualified_name -> value;
+                                    unsigned type_name_len = type_sym -> fully_qualified_name -> length;
+
+                                    wchar_t* type_name_unicode = new wchar_t[type_name_len + 1];
+                                    int unicode_len = Control::ConvertUtf8ToUnicode(type_name_unicode, type_name_utf8, type_name_len);
+
+                                    // Build descriptor "Lpackage/Type;"
+                                    wchar_t* type_descriptor = new wchar_t[unicode_len + 3];
+                                    type_descriptor[0] = U_L;
+                                    for (int k = 0; k < unicode_len; k++)
+                                    {
+                                        type_descriptor[k + 1] = (type_name_unicode[k] == U_DOT) ? U_SLASH : type_name_unicode[k];
+                                    }
+                                    type_descriptor[unicode_len + 1] = U_SEMICOLON;
+                                    type_descriptor[unicode_len + 2] = U_NULL;
+
+                                    u2 class_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                    delete [] type_name_unicode;
+                                    delete [] type_descriptor;
+
+                                    AnnotationComponentValue* component =
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_class,
+                                            class_index);
+                                    annot -> AddComponent(element_name_index, component);
+                                }
+                                // Fall back to extracting from AST tokens
+                                else if (class_lit -> type -> kind == Ast::TYPE)
+                                {
+                                    AstTypeName* type_name_node = (AstTypeName*) class_lit -> type;
+                                    if (type_name_node -> name)
+                                    {
+                                        TokenIndex type_token = type_name_node -> name -> identifier_token;
+                                        const wchar_t* type_name = lex_stream -> NameString(type_token);
+                                        unsigned type_len = lex_stream -> NameStringLength(type_token);
+
+                                        // Build descriptor "Ljava/lang/TypeName;"
+                                        wchar_t* type_descriptor = new wchar_t[type_len + 3];
+                                        type_descriptor[0] = U_L;
+                                        for (unsigned k = 0; k < type_len; k++)
+                                        {
+                                            type_descriptor[k + 1] = type_name[k];
+                                        }
+                                        type_descriptor[type_len + 1] = U_SEMICOLON;
+                                        type_descriptor[type_len + 2] = U_NULL;
+
+                                        u2 class_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                        delete [] type_descriptor;
+
+                                        AnnotationComponentValue* component =
+                                            new AnnotationComponentConstant(
+                                                AnnotationComponentValue::COMPONENT_class,
+                                                class_index);
+                                        annot -> AddComponent(element_name_index, component);
+                                    }
+                                }
+                            }
+                        }
+                        // Handle nested annotations
+                        else if (kind == Ast::ANNOTATION)
+                        {
+                            AstAnnotation* nested_annotation = (AstAnnotation*) pair -> member_value;
+                            if (nested_annotation -> name)
+                            {
+                                // Build nested annotation type descriptor
+                                TokenIndex nested_id_token = nested_annotation -> name -> identifier_token;
+                                const wchar_t* nested_name_text = lex_stream -> NameString(nested_id_token);
+                                unsigned nested_name_length = lex_stream -> NameStringLength(nested_id_token);
+
+                                wchar_t* nested_descriptor_text = new wchar_t[nested_name_length + 3];
+                                nested_descriptor_text[0] = U_L;
+                                for (unsigned k = 0; k < nested_name_length; k++)
+                                {
+                                    nested_descriptor_text[k + 1] = nested_name_text[k];
+                                }
+                                nested_descriptor_text[nested_name_length + 1] = U_SEMICOLON;
+                                nested_descriptor_text[nested_name_length + 2] = U_NULL;
+
+                                u2 nested_type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(nested_descriptor_text));
+                                delete [] nested_descriptor_text;
+
+                                Annotation* nested_annot = new Annotation(nested_type_index);
+
+                                // Recursively process nested annotation parameters
+                                // (This is a simplified version - full recursion would need helper function)
+
+                                AnnotationComponentValue* component =
+                                    new AnnotationComponentAnnotation(nested_annot);
+                                annot -> AddComponent(element_name_index, component);
+                            }
+                        }
+                        // Handle array initializers
+                        else if (kind == Ast::ARRAY_INITIALIZER)
+                        {
+                            AstArrayInitializer* array_init = (AstArrayInitializer*) pair -> member_value;
+                            AnnotationComponentArray* array_component = new AnnotationComponentArray();
+
+                            for (unsigned k = 0; k < array_init -> NumVariableInitializers(); k++)
+                            {
+                                AstMemberValue* init_value = array_init -> VariableInitializer(k);
+                                Ast::AstKind init_kind = init_value -> kind;
+
+                                // Handle array element types
+                                if (init_kind == Ast::STRING_LITERAL)
+                                {
+                                    AstStringLiteral* str_lit = (AstStringLiteral*) init_value;
+                                    const wchar_t* str_text = lex_stream -> NameString(str_lit -> string_literal_token);
+                                    unsigned str_length = lex_stream -> NameStringLength(str_lit -> string_literal_token);
+
+                                    wchar_t* unquoted = new wchar_t[str_length - 1];
+                                    for (unsigned m = 0; m < str_length - 2; m++)
+                                    {
+                                        unquoted[m] = str_text[m + 1];
+                                    }
+                                    unquoted[str_length - 2] = U_NULL;
+
+                                    u2 string_index = RegisterUtf8(control.ConvertUnicodeToUtf8(unquoted));
+                                    delete [] unquoted;
+
+                                    array_component -> AddValue(
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_string,
+                                            string_index));
+                                }
+                                else if (init_kind == Ast::INTEGER_LITERAL)
+                                {
+                                    AstIntegerLiteral* int_lit = (AstIntegerLiteral*) init_value;
+                                    const wchar_t* int_text = lex_stream -> NameString(int_lit -> integer_literal_token);
+
+                                    i4 int_val = 0;
+                                    for (unsigned m = 0; int_text[m] != U_NULL; m++)
+                                    {
+                                        if (int_text[m] >= U_0 && int_text[m] <= U_9)
+                                        {
+                                            int_val = int_val * 10 + (int_text[m] - U_0);
+                                        }
+                                    }
+
+                                    array_component -> AddValue(
+                                        new AnnotationComponentConstant(
+                                            AnnotationComponentValue::COMPONENT_int,
+                                            RegisterInteger(control.int_pool.FindOrInsert(int_val))));
+                                }
+                            }
+
+                            annot -> AddComponent(element_name_index, array_component);
+                        }
+                        // Handle enum constants (field access like Priority.HIGH)
+                        else if (kind == Ast::DOT)
+                        {
+                            AstFieldAccess* field_access = (AstFieldAccess*) pair -> member_value;
+
+                            // Get the enum type from the base expression
+                            AstExpression* base_expr = field_access -> base;
+                            if (base_expr && base_expr -> symbol)
+                            {
+                                TypeSymbol* enum_type = base_expr -> symbol -> TypeCast();
+                                if (enum_type)
+                                {
+                                    // Build enum type descriptor "Lpackage/EnumType;" from fully_qualified_name
+                                    // First convert UTF8 to Unicode
+                                    const char* type_name_utf8 = enum_type -> fully_qualified_name -> value;
+                                    unsigned type_name_len = enum_type -> fully_qualified_name -> length;
+
+                                    wchar_t* type_name_unicode = new wchar_t[type_name_len + 1];
+                                    int unicode_len = Control::ConvertUtf8ToUnicode(type_name_unicode, type_name_utf8, type_name_len);
+
+                                    // Build descriptor "Lpackage/Type;" with slashes instead of dots
+                                    wchar_t* type_descriptor = new wchar_t[unicode_len + 3];
+                                    type_descriptor[0] = U_L;
+                                    for (int k = 0; k < unicode_len; k++)
+                                    {
+                                        type_descriptor[k + 1] = (type_name_unicode[k] == U_DOT) ? U_SLASH : type_name_unicode[k];
+                                    }
+                                    type_descriptor[unicode_len + 1] = U_SEMICOLON;
+                                    type_descriptor[unicode_len + 2] = U_NULL;
+
+                                    u2 type_index = RegisterUtf8(control.ConvertUnicodeToUtf8(type_descriptor));
+                                    delete [] type_name_unicode;
+                                    delete [] type_descriptor;
+
+                                    // Get the enum constant name
+                                    const wchar_t* const_name = lex_stream -> NameString(field_access -> identifier_token);
+                                    u2 const_index = RegisterUtf8(control.ConvertUnicodeToUtf8(const_name));
+
+                                    AnnotationComponentValue* component =
+                                        new AnnotationComponentEnum(type_index, const_index);
+                                    annot -> AddComponent(element_name_index, component);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                annotations_attr -> AddAnnotation(annot);
+            }
+        }
+
+        if (annotations_attr)
+        {
+            AddAttribute(annotations_attr);
+        }
+    }
+
     //
     // In case they weren't referenced elsewhere, make sure all nested types
     // of this class are listed in the constant pool.  A side effect of

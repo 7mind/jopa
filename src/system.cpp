@@ -335,6 +335,9 @@ void Control::ProcessGlobals()
                                strlen(U8S_EnclosingMethod));
     Signature_literal = Utf8_pool.FindOrInsert(U8S_Signature,
                                                strlen(U8S_Signature));
+    RuntimeVisibleAnnotations_literal =
+        Utf8_pool.FindOrInsert(U8S_RuntimeVisibleAnnotations,
+                               strlen(U8S_RuntimeVisibleAnnotations));
 }
 
 

@@ -2246,7 +2246,7 @@ public:
     {
         out.PutU2(type_index);
         unsigned i = components.Length();
-        out.PutU1(i);
+        out.PutU2(i);  // Fixed: should be U2, not U1 (matches GetU2 in constructor)
         while (i--)
         {
             out.PutU2(components[i].component_name_index);
