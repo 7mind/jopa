@@ -5,7 +5,9 @@
 
 #pragma once
 
-#define ENABLE_SOURCE_15 @ENABLE_SOURCE_15@
+// Always enable Java 5 support
+#define ENABLE_SOURCE_15 1
+
 #cmakedefine JIKES_DEBUG
 
 #define JIKES_VERSION_STRING "@JIKES_VERSION_STRING@"
@@ -36,7 +38,8 @@
 #cmakedefine01 HAVE_ERROR_CALL_ICONV_CONST
 #cmakedefine HAVE_IEEE754
 #cmakedefine01 HAVE_INTTYPES_H
-#cmakedefine HAVE_JIKES_NAMESPACE
+// Always use Jikes namespace
+#define HAVE_JIKES_NAMESPACE 1
 #cmakedefine HAVE_LIBC5_MKDIR
 #cmakedefine HAVE_LIBICU_UC
 #cmakedefine HAVE_LIMITS_H

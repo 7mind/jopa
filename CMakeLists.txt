@@ -7,8 +7,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(JIKES_ENABLE_DEBUG "Enable internal compiler debugging traces" OFF)
-option(JIKES_ENABLE_NAMESPACE "Place Jikes classes inside the Jikes namespace" OFF)
-option(JIKES_ENABLE_SOURCE_15 "Enable experimental -source 1.5 features" ON)
 option(JIKES_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON)
 option(JIKES_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 

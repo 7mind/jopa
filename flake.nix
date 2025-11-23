@@ -71,7 +71,6 @@
           ];
 
           cmakeFlags = [
-            "-DJIKES_ENABLE_SOURCE_15=ON"
             "-DCMAKE_BUILD_TYPE=Release"
           ];
 

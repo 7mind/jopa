@@ -4,16 +4,22 @@ A totally Claude'd effort in modernizing `jikes`, the historical independent `ja
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
-## Java 5 Support
+## Java 5 & 6 Support
 
-This fork adds comprehensive Java 5 (J2SE 5.0) language features:
+This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language features:
 
+### Java 5 Features
 - ✅ **Generics** - Type erasure with generic classes, methods, and bounded type parameters
 - ✅ **Enhanced For-Loop** - For-each loops for arrays and Iterable collections
 - ✅ **Varargs** - Variable-length argument lists with automatic array creation
 - ✅ **Enums** - Enumerated types with synthetic methods (values(), valueOf())
 - ✅ **Autoboxing/Unboxing** - Automatic conversions between primitives and wrappers (assignments, method args, return values, arithmetic)
 - ✅ **Static Imports** - Import static members (single field, single method, wildcard)
+- ✅ **Annotations** - Marker, single-element, and full annotations
+
+### Java 6 Features
+- ✅ **Class file version 50.0** - Generate Java 6 bytecode with `-target 1.6`
+- ✅ **Debug information** - Enhanced debugging with `-g` flag for parameter names and local variables
 
 ## Building
 
@@ -25,7 +31,7 @@ This fork adds comprehensive Java 5 (J2SE 5.0) language features:
 - With Nix:
   ```bash
   nix develop
-  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
   direnv exec . cmake --build build -j"$(nproc)"
   direnv exec . sh -c "cd build && ctest --output-on-failure"
   direnv exec . cmake --install build --prefix /usr/local
@@ -40,10 +46,9 @@ This fork adds comprehensive Java 5 (J2SE 5.0) language features:
 
 - Useful CMake options:
   - `-DJIKES_ENABLE_DEBUG=ON` — Enable internal compiler debugging hooks
-  - `-DJIKES_ENABLE_NAMESPACE=ON` — Wrap classes in the Jikes namespace
-  - `-DJIKES_ENABLE_SOURCE_15=OFF` — Disable experimental -source 1.5 features
   - `-DJIKES_ENABLE_NATIVE_FP=OFF` — Force emulated floating point
   - `-DJIKES_ENABLE_ENCODING=OFF` — Skip iconv/ICU; otherwise CMake fails if neither is present
+  - `-DJIKES_ENABLE_JVM_TESTS=OFF` — Disable runtime validation tests (javap/JVM execution)
 
 jikes
 =====

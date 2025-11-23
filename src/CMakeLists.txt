@@ -130,10 +130,9 @@ if(IS_BIG_ENDIAN)
     set(WORDS_BIGENDIAN 1)
 endif()
 
-set(ENABLE_SOURCE_15 0)
-if(JIKES_ENABLE_SOURCE_15)
-    set(ENABLE_SOURCE_15 1)
-endif()
+# Always enable Java 5 support and namespaces
+set(ENABLE_SOURCE_15 1)
+set(HAVE_JIKES_NAMESPACE 1)
 
 if(JIKES_ENABLE_NATIVE_FP)
     set(HAVE_IEEE754 1)
@@ -141,10 +140,6 @@ endif()
 
 if(JIKES_ENABLE_DEBUG)
     set(JIKES_DEBUG 1)
-endif()
-
-if(JIKES_ENABLE_NAMESPACE)
-    set(HAVE_JIKES_NAMESPACE 1)
 endif()
 
 set(HAVE_STD 1)
