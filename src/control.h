@@ -5,6 +5,7 @@
 #include "symbol.h"
 #include "tuple.h"
 #include "set.h"
+#include <memory>
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -17,6 +18,7 @@ class LexStream;
 class AstPackageDeclaration;
 class AstName;
 class TypeDependenceChecker;
+class IParserFacade;
 
 //
 // This class represents the control information common across all compilation
@@ -57,6 +59,7 @@ public:
 
     Parser* parser;
     Scanner* scanner;
+    std::unique_ptr<IParserFacade> parser_facade;
 
     //
     // Tables for hashing everything we've seen so far.

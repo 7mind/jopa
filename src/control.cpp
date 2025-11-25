@@ -6,6 +6,9 @@
 #include "bytecode.h"
 #include "case.h"
 #include "option.h"
+#include "parser_facade.h"
+#include "ast_serializer.h"
+#include <fstream>
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -149,6 +152,7 @@ Control::Control(char** arguments, Option& option_)
     //
     scanner = new Scanner(*this);
     parser = new Parser();
+    parser_facade = createParserFacade(*this);
     SemanticError::StaticInitializer();
 
     //
@@ -177,8 +181,8 @@ Control::Control(char** arguments, Option& option_)
         if (file_symbol -> lex_stream) // did we have a successful scan!
         {
             AstPackageDeclaration* package_declaration =
-                parser -> PackageHeaderParse(file_symbol -> lex_stream,
-                                             ast_pool);
+                parser_facade->packageHeaderParse(file_symbol -> lex_stream,
+                                                  ast_pool);
             ProcessPackageDeclaration(file_symbol, package_declaration);
             ast_pool -> Reset();
         }
@@ -194,56 +198,95 @@ Control::Control(char** arguments, Option& option_)
 
     //
     // Handle parse-only mode
+    // This mode performs full parsing (header + body) and outputs JSON
     //
     if (option.parse_only)
     {
-        bool parse_success = true;
+        nlohmann::json output_json;
+        output_json["files"] = nlohmann::json::array();
+
+        bool overall_success = true;
         int total_errors = 0;
 
-        // Parse each file fully
+        // Parse each file fully (header + body) and serialize to JSON
         for (int j = 0; j < num_files; j++)
         {
             FileSymbol* file_symbol = input_files[j];
-            if (file_symbol -> lex_stream)
+            nlohmann::json file_json;
+            file_json["filename"] = file_symbol->FileName() ? file_symbol->FileName() : "";
+
+            if (file_symbol->lex_stream)
             {
-                file_symbol -> lex_stream -> Reset();
-                file_symbol -> compilation_unit =
-                    parser -> HeaderParse(file_symbol -> lex_stream, ast_pool);
-                if (! file_symbol -> compilation_unit ||
-                    file_symbol -> compilation_unit -> BadCompilationUnitCast())
-                {
-                    parse_success = false;
+                ParseResult result = parser_facade->parseCompilationUnit(file_symbol);
+
+                file_json["success"] = result.success;
+                file_json["ast"] = result.ast;
+
+                nlohmann::json errors_json = nlohmann::json::array();
+                for (const auto& err : result.errors) {
+                    errors_json.push_back(err.toJson());
                 }
-                total_errors += file_symbol -> lex_stream -> NumBadTokens();
+                file_json["errors"] = errors_json;
+
+                if (!result.success) {
+                    overall_success = false;
+                }
+                total_errors += static_cast<int>(result.errors.size());
             }
             else
             {
-                parse_success = false;
+                file_json["success"] = false;
+                file_json["ast"] = nullptr;
+
+                nlohmann::json err;
+                err["line"] = 0;
+                err["column"] = 0;
+                err["message"] = "Failed to read source file";
+                err["severity"] = "error";
+                file_json["errors"] = nlohmann::json::array({err});
+
+                overall_success = false;
+                total_errors++;
             }
+
+            output_json["files"].push_back(file_json);
         }
 
-        // Also check for IO errors
+        // Add IO errors
         if (general_io_errors.Length() > 0)
         {
-            parse_success = false;
+            overall_success = false;
+            nlohmann::json io_errors = nlohmann::json::array();
+            for (unsigned i = 0; i < general_io_errors.Length(); i++)
+            {
+                nlohmann::json err;
+                err["line"] = 0;
+                err["column"] = 0;
+                // Convert wchar_t* to string
+                const wchar_t* wstr = general_io_errors[i];
+                std::string msg;
+                while (*wstr) {
+                    msg.push_back(static_cast<char>(*wstr));
+                    wstr++;
+                }
+                err["message"] = msg;
+                err["severity"] = "error";
+                io_errors.push_back(err);
+                total_errors++;
+            }
+            output_json["io_errors"] = io_errors;
         }
 
-        // Write the result to the output file
-        FILE* outfile = SystemFopen(option.parse_only_output, "w");
-        if (outfile)
+        output_json["success"] = overall_success;
+        output_json["total_errors"] = total_errors;
+
+        // Write the JSON result to the output file
+        std::ofstream outfile(option.parse_only_output);
+        if (outfile.is_open())
         {
-            if (parse_success && total_errors == 0)
-            {
-                fprintf(outfile, "OK\n");
-                return_code = 0;
-            }
-            else
-            {
-                fprintf(outfile, "FAIL\n");
-                fprintf(outfile, "Errors: %d\n", total_errors);
-                return_code = 1;
-            }
-            fclose(outfile);
+            outfile << output_json.dump(2) << std::endl;
+            outfile.close();
+            return_code = overall_success ? 0 : 1;
         }
         else
         {
@@ -256,10 +299,10 @@ Control::Control(char** arguments, Option& option_)
         for (int j = 0; j < num_files; j++)
         {
             FileSymbol* file_symbol = input_files[j];
-            if (file_symbol -> compilation_unit)
+            if (file_symbol->compilation_unit)
             {
-                delete file_symbol -> compilation_unit -> ast_pool;
-                file_symbol -> compilation_unit = NULL;
+                delete file_symbol->compilation_unit->ast_pool;
+                file_symbol->compilation_unit = NULL;
             }
         }
         delete ast_pool;
@@ -492,8 +535,8 @@ Control::Control(char** arguments, Option& option_)
                     LexStream* lex_stream = file_symbol -> lex_stream;
                     if (lex_stream)
                     {
-                        AstPackageDeclaration* package_declaration = parser ->
-                            PackageHeaderParse(lex_stream, ast_pool);
+                        AstPackageDeclaration* package_declaration =
+                            parser_facade->packageHeaderParse(lex_stream, ast_pool);
                         ProcessPackageDeclaration(file_symbol,
                                                   package_declaration);
                         ast_pool -> Reset();
@@ -1276,7 +1319,7 @@ void Control::ProcessHeaders(FileSymbol* file_symbol)
     {
         if (! file_symbol -> compilation_unit)
             file_symbol -> compilation_unit =
-                parser -> HeaderParse(file_symbol -> lex_stream);
+                parser_facade->headerParse(file_symbol -> lex_stream);
         //
         // If we have a compilation unit, analyze it, process its types.
         //
@@ -1426,8 +1469,8 @@ void Control::ProcessBodies(TypeSymbol* type)
 
         if (type -> declaration -> UnparsedClassBodyCast())
         {
-            if (! parser -> InitializerParse(sem -> lex_stream,
-                                             type -> declaration))
+            if (! parser_facade->initializerParse(sem -> lex_stream,
+                                                  type -> declaration))
             {
                 // Mark that syntax errors were detected.
                 sem -> compilation_unit -> MarkBad();
@@ -1435,7 +1478,7 @@ void Control::ProcessBodies(TypeSymbol* type)
             else
             {
                 type -> CompleteSymbolTable();
-                if (! parser -> BodyParse(sem -> lex_stream, type -> declaration))
+                if (! parser_facade->bodyParse(sem -> lex_stream, type -> declaration))
                 {
                     // Mark that syntax errors were detected.
                     sem -> compilation_unit -> MarkBad();

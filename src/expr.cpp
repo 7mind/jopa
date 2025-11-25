@@ -1,6 +1,5 @@
 #include "platform.h"
 #include "double.h"
-#include "parser.h"
 #include "semantic.h"
 #include "control.h"
 #include "table.h"
@@ -10,6 +9,7 @@
 #include "stream.h"
 #include "typeparam.h"
 #include "paramtype.h"
+#include "parser_facade.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -4444,7 +4444,7 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
     //
     if (class_body -> UnparsedClassBodyCast())
     {
-        if (! control.parser -> InitializerParse(lex_stream, class_body))
+        if (! control.parser_facade->initializerParse(lex_stream, class_body))
              compilation_unit -> MarkBad();
         else
         {
@@ -4452,7 +4452,7 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
             CompleteSymbolTable(class_body);
         }
 
-        if (! control.parser -> BodyParse(lex_stream, class_body))
+        if (! control.parser_facade->bodyParse(lex_stream, class_body))
             compilation_unit -> MarkBad();
         else ProcessExecutableBodies(class_body);
     }

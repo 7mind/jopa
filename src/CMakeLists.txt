@@ -1,5 +1,6 @@
 set(JOPA_SOURCES
     ast.cpp
+    ast_serializer.cpp
     body.cpp
     bytecode.cpp
     case.cpp
@@ -16,6 +17,7 @@ set(JOPA_SOURCES
     expr.cpp
     incrmnt.cpp
     init.cpp
+    jast.cpp
     grammar/javaact.cpp
     jikes.cpp
     jikesapi.cpp
@@ -27,6 +29,7 @@ set(JOPA_SOURCES
     option.cpp
     paramtype.cpp
     parser.cpp
+    parser_facade.cpp
     platform.cpp
     scanner.cpp
     segment.cpp
@@ -44,6 +47,18 @@ include(CheckIncludeFileCXX)
 include(CheckSymbolExists)
 include(CheckTypeSize)
 include(TestBigEndian)
+include(FetchContent)
+
+# Fetch nlohmann_json for AST serialization
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+    GIT_SHALLOW TRUE
+)
+set(JSON_BuildTests OFF CACHE INTERNAL "")
+set(JSON_Install OFF CACHE INTERNAL "")
+FetchContent_MakeAvailable(nlohmann_json)
 
 function(require_header header var)
     check_include_file_cxx(${header} ${var})
@@ -218,7 +233,7 @@ target_include_directories(jopa PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_BINARY_DIR}/generated"
 )
-target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
+target_link_libraries(jopa PRIVATE ${JOPA_LIBS} nlohmann_json::nlohmann_json)
 
 # Enable strict warnings
 target_compile_options(jopa PRIVATE

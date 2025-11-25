@@ -1,10 +1,10 @@
 #include "platform.h"
 #include "control.h"
 #include "scanner.h"
-#include "parser.h"
 #include "semantic.h"
 #include "case.h"
 #include "set.h"
+#include "parser_facade.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -255,7 +255,7 @@ void Control::ComputeRecompilationSet(TypeDependenceChecker& dependence_checker)
                 if (lex_stream) // did we have a successful scan!
                 {
                     AstPackageDeclaration* package_declaration
-                        = parser -> PackageHeaderParse(lex_stream, ast_pool);
+                        = parser_facade->packageHeaderParse(lex_stream, ast_pool);
                     PackageSymbol* package
                         = (package_declaration
                            ? FindOrInsertPackage(lex_stream,
