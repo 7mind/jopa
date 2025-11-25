@@ -1,5 +1,5 @@
 #include "option.h"
-#include "javasym.h"
+#include "grammar/javasym.h"
 #include "error.h"
 #include "case.h"
 #include "tab.h"

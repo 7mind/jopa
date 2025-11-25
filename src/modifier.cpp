@@ -1,7 +1,7 @@
 #include "platform.h"
 #include "semantic.h"
 #include "option.h"
-#include "javasym.h"
+#include "grammar/javasym.h"
 #include "stream.h"
 
 

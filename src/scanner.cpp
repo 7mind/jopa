@@ -1,8 +1,8 @@
 #include "scanner.h"
 #include "control.h"
 #include "error.h"
-#include "javadef.h"
-#include "javasym.h"
+#include "grammar/javadef.h"
+#include "grammar/javasym.h"
 #include "option.h"
 #include "code.h"
 
