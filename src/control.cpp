@@ -252,6 +252,16 @@ Control::Control(char** arguments, Option& option_)
             return_code = 1;
         }
 
+        // Clean up compilation units and their ast_pools
+        for (int j = 0; j < num_files; j++)
+        {
+            FileSymbol* file_symbol = input_files[j];
+            if (file_symbol -> compilation_unit)
+            {
+                delete file_symbol -> compilation_unit -> ast_pool;
+                file_symbol -> compilation_unit = NULL;
+            }
+        }
         delete ast_pool;
         delete [] input_files;
         return;

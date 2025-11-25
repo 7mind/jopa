@@ -157,72 +157,19 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Configure with CMake
-        run: |
-          nix develop --command bash -c "
-            cmake -S . -B build \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DJOPA_ENABLE_SANITIZERS=OFF \
-              -DJOPA_ENABLE_CPPTRACE=OFF \
-              -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
-              -DJOPA_PARSER_TESTS_JDK7=ON \
-              -DJOPA_PARSER_TESTS_JDK8=OFF
-          "
-
-      - name: Build Jopa
-        run: |
-          nix develop --command bash -c "
-            cmake --build build -j\$(nproc)
-          "
-
       - name: Run JDK7 Parser Tests
-        id: parser_tests
         run: |
-          nix develop --command bash -c "
-            cd build
-            # Run tests in parallel, capture results
-            ctest -R '^parse_jdk7_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
+          nix develop --command bash ./scripts/test-java7-parser.sh --build
 
-            # Extract statistics using ctest -N for total count
-            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 0)
-            # Extract failed count from 'X tests failed out of Y' format
-            FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
-            PASSED=\$((\$TOTAL - \$FAILED))
-
-            echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
-            echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
-            echo \"failed=\$FAILED\" >> \$GITHUB_OUTPUT
-          "
-
-      - name: Generate parser test summary
+      - name: Upload test artifacts
         if: always()
-        run: |
-          nix develop --command bash -c "
-            cd build
-            echo '## JDK7 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-
-            # Count tests using 'Total Tests: N' format
-            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 'N/A')
-
-            # Get pass/fail from last run
-            if [ -f parser_results.txt ]; then
-              echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
-              echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
-              echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
-              # Extract failed count from 'X tests failed out of Y' format
-              FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
-              PASSED=\$((\$TOTAL - \${FAILED:-0}))
-              echo \"| Passed | \$PASSED |\" >> \$GITHUB_STEP_SUMMARY
-              echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
-            fi
-
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '### Last 30 lines of output' >> \$GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-            tail -30 parser_results.txt >> \$GITHUB_STEP_SUMMARY 2>/dev/null || echo 'No results available'
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-          "
+        uses: actions/upload-artifact@v4
+        with:
+          name: parser-results-jdk7
+          path: |
+            build/parser_results.txt
+            build/parser_jdk7_results.env
+          retention-days: 7
 
   parser-tests-jdk8:
     name: JDK8 Parser Tests
@@ -244,69 +191,16 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Configure with CMake
-        run: |
-          nix develop --command bash -c "
-            cmake -S . -B build \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DJOPA_ENABLE_SANITIZERS=OFF \
-              -DJOPA_ENABLE_CPPTRACE=OFF \
-              -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
-              -DJOPA_PARSER_TESTS_JDK7=OFF \
-              -DJOPA_PARSER_TESTS_JDK8=ON
-          "
-
-      - name: Build Jopa
-        run: |
-          nix develop --command bash -c "
-            cmake --build build -j\$(nproc)
-          "
-
       - name: Run JDK8 Parser Tests
-        id: parser_tests
         run: |
-          nix develop --command bash -c "
-            cd build
-            # Run tests in parallel, capture results
-            ctest -R '^parse_jdk8_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
+          nix develop --command bash ./scripts/test-java8-parser.sh --build
 
-            # Extract statistics using ctest -N for total count
-            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 0)
-            # Extract failed count from 'X tests failed out of Y' format
-            FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
-            PASSED=\$((\$TOTAL - \$FAILED))
-
-            echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
-            echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
-            echo \"failed=\$FAILED\" >> \$GITHUB_OUTPUT
-          "
-
-      - name: Generate parser test summary
+      - name: Upload test artifacts
         if: always()
-        run: |
-          nix develop --command bash -c "
-            cd build
-            echo '## JDK8 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-
-            # Count tests using 'Total Tests: N' format
-            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 'N/A')
-
-            # Get pass/fail from last run
-            if [ -f parser_results.txt ]; then
-              echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
-              echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
-              echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
-              # Extract failed count from 'X tests failed out of Y' format
-              FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
-              PASSED=\$((\$TOTAL - \${FAILED:-0}))
-              echo \"| Passed | \$PASSED |\" >> \$GITHUB_STEP_SUMMARY
-              echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
-            fi
-
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '### Last 30 lines of output' >> \$GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-            tail -30 parser_results.txt >> \$GITHUB_STEP_SUMMARY 2>/dev/null || echo 'No results available'
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-          "
+        uses: actions/upload-artifact@v4
+        with:
+          name: parser-results-jdk8
+          path: |
+            build/parser_results.txt
+            build/parser_jdk8_results.env
+          retention-days: 7
