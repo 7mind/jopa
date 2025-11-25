@@ -65,23 +65,23 @@ public:
     {
         unsigned hash_value = 0;
         while (--len >= 0)
-            hash_value = (hash_value << 5) - hash_value + *head++;
+            hash_value = (hash_value << 5) - hash_value + static_cast<unsigned char>(*head++);
         return hash_value;
     }
 
     inline static unsigned Function(LongInt value)
     {
-        return value.hashCode();
+        return static_cast<unsigned>(value.hashCode());
     }
 
     inline static unsigned Function(IEEEfloat value)
     {
-        return value.hashCode();
+        return static_cast<unsigned>(value.hashCode());
     }
 
     inline static unsigned Function(IEEEdouble value)
     {
-        return value.hashCode();
+        return static_cast<unsigned>(value.hashCode());
     }
 };
 

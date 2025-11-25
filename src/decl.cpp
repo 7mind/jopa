@@ -3503,7 +3503,7 @@ void Semantic::CheckMethodOverride(MethodSymbol* method,
     method -> ProcessMethodThrows(this, left_tok);
     hidden_method -> ProcessMethodThrows(this, left_tok);
 
-    for (int i = method -> NumThrows() - 1; i >= 0; i--)
+    for (int i = static_cast<int>(method -> NumThrows()) - 1; i >= 0; i--)
     {
         TypeSymbol* exception = method -> Throws(i);
 
@@ -3511,7 +3511,7 @@ void Semantic::CheckMethodOverride(MethodSymbol* method,
             continue;
 
         int k;
-        for (k = hidden_method -> NumThrows() - 1; k >= 0; k--)
+        for (k = static_cast<int>(hidden_method -> NumThrows()) - 1; k >= 0; k--)
         {
             if (exception -> IsSubclass(hidden_method -> Throws(k)))
                 break;

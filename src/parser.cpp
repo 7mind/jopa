@@ -13,26 +13,29 @@ void Parser::ReallocateStacks()
     assert(stack_length <= SHRT_MAX);
 
     int* old_stack = stack;
-    stack = (int*) memcpy(new int[stack_length], stack,
-                          old_stack_length * sizeof(int));
+    stack = new int[stack_length];
+    if (old_stack_length > 0)
+        memcpy(stack, old_stack, old_stack_length * sizeof(int));
     delete [] old_stack;
 
     Location* old_location_stack = location_stack;
-    location_stack = (Location*) memcpy(new Location[stack_length],
-                                        location_stack,
-                                        old_stack_length * sizeof(Location));
+    location_stack = new Location[stack_length];
+    if (old_stack_length > 0)
+        memcpy(location_stack, old_location_stack, old_stack_length * sizeof(Location));
     delete [] old_location_stack;
 
     Ast** old_parse_stack = parse_stack;
-    parse_stack = (Ast**) memcpy(new Ast*[stack_length], parse_stack,
-                                 old_stack_length * sizeof(Ast*));
+    parse_stack = new Ast*[stack_length];
+    if (old_stack_length > 0)
+        memcpy(parse_stack, old_parse_stack, old_stack_length * sizeof(Ast*));
     delete [] old_parse_stack;
     // The first time through, we initialize parse_stack[0] to NULL.
     parse_stack[old_stack_length] = NULL;
 
     int* old_temp_stack = temp_stack;
-    temp_stack = (int*) memcpy(new int[stack_length], temp_stack,
-                               old_stack_length * sizeof(int));
+    temp_stack = new int[stack_length];
+    if (old_stack_length > 0)
+        memcpy(temp_stack, old_temp_stack, old_stack_length * sizeof(int));
     delete [] old_temp_stack;
 }
 

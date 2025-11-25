@@ -11,11 +11,17 @@
 #include "jikesapi.h"
 #include "error.h"
 
+#ifdef JOPA_HAS_CPPTRACE
+#include <cpptrace/cpptrace.hpp>
+#endif
 
 using namespace Jopa;
 
 int main(int argc, char *argv[])
 {
+#ifdef JOPA_HAS_CPPTRACE
+    cpptrace::register_terminate_handler();
+#endif
     // Here we are creating instance of default API
     JopaAPI *compiler = new JopaAPI();
 

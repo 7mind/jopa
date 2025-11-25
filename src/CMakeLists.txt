@@ -188,6 +188,25 @@ if(JOPA_ENABLE_ENCODING)
     endif()
 endif()
 
+if(JOPA_ENABLE_CPPTRACE)
+    find_package(cpptrace REQUIRED)
+    list(APPEND JOPA_LIBS cpptrace::cpptrace)
+    set(JOPA_HAS_CPPTRACE 1)
+endif()
+
+set(JOPA_SANITIZER_FLAGS)
+if(JOPA_ENABLE_SANITIZERS)
+    list(APPEND JOPA_SANITIZER_FLAGS
+        -fsanitize=address
+        -fsanitize=undefined
+        -fsanitize=float-divide-by-zero
+        -fsanitize=nullability
+        -fsanitize=implicit-conversion
+        -fno-sanitize-recover=all
+        -fno-omit-frame-pointer
+    )
+endif()
+
 configure_file(
     "${CMAKE_SOURCE_DIR}/cmake/Config.h.in"
     "${CMAKE_BINARY_DIR}/generated/config.h"
@@ -207,6 +226,11 @@ target_compile_options(jopa PRIVATE
     -Wextra
     -Wpedantic
     -Werror
+    ${JOPA_SANITIZER_FLAGS}
 )
+
+if(JOPA_ENABLE_SANITIZERS)
+    target_link_options(jopa PRIVATE ${JOPA_SANITIZER_FLAGS})
+endif()
 
 install(TARGETS jopa RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

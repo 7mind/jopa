@@ -23,6 +23,7 @@
 
             # Libraries
             libzip
+            cpptrace
 
             # Development tools
             lldb

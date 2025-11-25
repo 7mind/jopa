@@ -506,7 +506,7 @@ public:
     //
     void SetUniverse()
     {
-        memset(s, ~((CELL) 0),
+        memset(s, 0xFF,
                (set_size + cell_size - 1) / cell_size * sizeof(CELL));
     }
 

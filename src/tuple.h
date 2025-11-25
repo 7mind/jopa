@@ -110,7 +110,7 @@ public:
         {
             // slot is the index of the base element whose block
             // will contain the (n-1)th element.
-            int slot = (n == 0 ? -1 : (n - 1) >> log_blksize);
+            int slot = (n == 0) ? -1 : static_cast<int>((n - 1) >> log_blksize);
 
             for (int k = (size >> log_blksize) - 1; k > slot; k--)
             {

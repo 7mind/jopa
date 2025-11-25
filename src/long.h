@@ -23,18 +23,15 @@ public:
     // Min value of i4
     static inline i4 MIN_INT()
     {
-        return 0x80000000;
+        return static_cast<i4>(0x80000000U);
     }
 };
 
 class BaseLong
 {
 protected:
-    enum
-    {
-        SHORT_MASK = 0xFFFF, // mask for lower half of i4
-        SIGN_BIT = 0x80000000 // sign bit
-    };
+    static constexpr u4 SHORT_MASK = 0xFFFF; // mask for lower half of i4
+    static constexpr u4 SIGN_BIT = 0x80000000U; // sign bit
 
     union
     {
@@ -174,7 +171,7 @@ public:
     operator ULongInt() const;         // Cast to ULongInt
 
     // mirrors java.lang.Long, useful in hashing
-    inline i4 hashCode() const { return HighWord() ^ LowWord(); }
+    inline i4 hashCode() const { return static_cast<i4>(HighWord() ^ LowWord()); }
 };
 
 

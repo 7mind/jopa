@@ -56,8 +56,23 @@ CPInfo* CPInfo::AllocateCPInfo(ClassFile& buffer)
         return new CPMemberInfo((ConstantPoolTag) tag, buffer);
     case CONSTANT_NameAndType:
         return new CPNameAndTypeInfo(buffer);
-    default:
+    case CONSTANT_MethodHandle:
+        buffer.SkipN(3);
+        return new CPInfo(CONSTANT_MethodHandle);
+    case CONSTANT_MethodType:
+        buffer.SkipN(2);
+        return new CPInfo(CONSTANT_MethodType);
+    case CONSTANT_Dynamic:
+    case CONSTANT_InvokeDynamic:
+        buffer.SkipN(4);
         return new CPInfo((ConstantPoolTag) tag);
+    case CONSTANT_Module:
+    case CONSTANT_Package:
+        buffer.SkipN(2);
+        return new CPInfo((ConstantPoolTag) tag);
+    default:
+        buffer.MarkInvalid("unknown constant pool tag");
+        return new CPInfo(CONSTANT_Utf8);
     }
 }
 
@@ -281,7 +296,7 @@ FieldInfo::FieldInfo(ClassFile& buffer)
     , attr_invisible_annotations(NULL)
 {
     unsigned count = buffer.GetU2();
-    while (count--)
+    for (unsigned i = 0; i < count; i++)
     {
         AttributeInfo* attr = AttributeInfo::AllocateAttributeInfo(buffer);
         attributes.Next() = attr;
@@ -370,7 +385,7 @@ MethodInfo::MethodInfo(ClassFile& buffer)
     , attr_annotation_default(NULL)
 {
     unsigned count = buffer.GetU2();
-    while (count--)
+    for (unsigned i = 0; i < count; i++)
     {
         AttributeInfo* attr = AttributeInfo::AllocateAttributeInfo(buffer);
         attributes.Next() = attr;
@@ -647,7 +662,7 @@ CodeAttribute::CodeAttribute(ClassFile& buffer)
 
     u2 exception_table_length = buffer.GetU2();
     remaining -= exception_table_length * 8;
-    while (exception_table_length--)
+    for (u2 _i = 0; _i < exception_table_length; _i++)
     {
         ExceptionElement& entry = exception_table.Next();
         entry.start_pc = buffer.GetU2();
@@ -662,7 +677,7 @@ CodeAttribute::CodeAttribute(ClassFile& buffer)
     }
 
     u2 attributes_count = buffer.GetU2();
-    while (attributes_count--)
+    for (u2 _j = 0; _j < attributes_count; _j++)
     {
         AttributeInfo* attr = AllocateAttributeInfo(buffer);
         remaining -= 6 + attr -> AttributeLength();
@@ -744,7 +759,7 @@ ExceptionsAttribute::ExceptionsAttribute(ClassFile& buffer)
     unsigned count = buffer.GetU2();
     if (attribute_length != count * 2 + 2)
         buffer.MarkInvalid("bad exceptions attribute length");
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         u2 index = buffer.GetU2();
         exception_index_table.Next() = index;
@@ -761,7 +776,7 @@ InnerClassesAttribute::InnerClassesAttribute(ClassFile& buffer)
     unsigned count = buffer.GetU2();
     if (attribute_length != count * 8 + 2)
         buffer.MarkInvalid("bad inner classes attribute length");
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         InnerClassesElement& entry = classes.Next();
         entry.inner_class_info_index = buffer.GetU2();
@@ -810,7 +825,7 @@ LineNumberTableAttribute::LineNumberTableAttribute(ClassFile& buffer)
     unsigned count = buffer.GetU2();
     if(attribute_length != count * 4 + 2)
         buffer.MarkInvalid("bad line number table length");
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         LineNumberElement& entry = line_number_table.Next();
         entry.start_pc = buffer.GetU2();
@@ -828,7 +843,7 @@ LocalVariableTableAttribute::LocalVariableTableAttribute(ClassFile& buffer,
     unsigned count = buffer.GetU2();
     if (attribute_length != count * 10 + 2)
         buffer.MarkInvalid("bad local variable table length");
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         LocalVariableElement& entry = local_variable_table.Next();
         entry.start_pc = buffer.GetU2();
@@ -902,14 +917,14 @@ StackMapAttribute::StackMapFrame::StackMapFrame(ClassFile& buffer)
     // +2 for offset, +2 for locals_size, +2 for stack_size
 {
     unsigned count = buffer.GetU2();
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         unsigned index = locals.NextIndex();
         locals[index].Read(buffer);
         frame_size += locals[index].Size();
     }
     count = buffer.GetU2();
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         unsigned index = stack.NextIndex();
         stack[index].Read(buffer);
@@ -923,7 +938,7 @@ StackMapAttribute::StackMapAttribute(ClassFile& buffer)
 {
     unsigned remaining = attribute_length - 2; // -2 for frame_count
     unsigned count = buffer.GetU2();
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         unsigned index = frames.NextIndex();
         frames[index] = new StackMapFrame(buffer);
@@ -1045,7 +1060,7 @@ AnnotationComponentArray::AnnotationComponentArray(ClassFile& buffer)
     , len(3) // +1 tag, +2 num_values
 {
     unsigned count = buffer.GetU2();
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
         AddValue(AllocateAnnotationComponentValue(buffer));
 }
 
@@ -1056,8 +1071,8 @@ Annotation::Annotation(ClassFile& buffer)
 {
     if (buffer.Pool()[type_index] -> Tag() != CPInfo::CONSTANT_Utf8)
         buffer.MarkInvalid("bad type for annotation");
-    unsigned i = buffer.GetU2();
-    while (i--)
+    unsigned num_components = buffer.GetU2();
+    for (unsigned _i = 0; _i < num_components; _i++)
     {
         Component& component = components.Next();
         u2 index = buffer.GetU2();
@@ -1077,7 +1092,7 @@ AnnotationsAttribute::AnnotationsAttribute(ClassFile& buffer, bool visible)
 {
     unsigned count = buffer.GetU2();
     unsigned length = 2; // +2 num_annotations
-    while (count--)
+    for (unsigned _i = 0; _i < count; _i++)
     {
         Annotation* value = new Annotation(buffer);
         annotations.Next() = value;
@@ -1102,7 +1117,7 @@ ParameterAnnotationsAttribute::ParameterAnnotationsAttribute(ClassFile& buffer,
     for (unsigned i = 0; i < num_parameters; i++)
     {
         unsigned count = buffer.GetU2();
-        while (count--)
+        for (unsigned _i = 0; _i < count; _i++)
         {
             Annotation* value = new Annotation(buffer);
             parameters[i].Next() = value;
@@ -1192,7 +1207,7 @@ ClassFile::ClassFile(const char* buf, unsigned buf_size)
         MarkInvalid("illegal super class");
     }
     count = GetU2();
-    while (count--)
+    for (u2 i = 0; i < count; i++)
     {
         u2 inter = GetU2();
         if (constant_pool[inter] -> Tag() != CPInfo::CONSTANT_Class)
@@ -1201,13 +1216,13 @@ ClassFile::ClassFile(const char* buf, unsigned buf_size)
     }
 
     count = GetU2();
-    while (count--)
+    for (u2 i = 0; i < count; i++)
         fields.Next() = new FieldInfo(*this);
     count = GetU2();
-    while (count--)
+    for (u2 i = 0; i < count; i++)
         methods.Next() = new MethodInfo(*this);
     count = GetU2();
-    while (count--)
+    for (u2 i = 0; i < count; i++)
     {
         AttributeInfo* attr = AttributeInfo::AllocateAttributeInfo(*this);
         attributes.Next() = attr;

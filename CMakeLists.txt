@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Use clang as the default compiler if not specified
+if(NOT DEFINED CMAKE_C_COMPILER AND NOT DEFINED CMAKE_CXX_COMPILER)
+    find_program(CLANG_C_COMPILER clang)
+    find_program(CLANG_CXX_COMPILER clang++)
+    if(CLANG_C_COMPILER AND CLANG_CXX_COMPILER)
+        set(CMAKE_C_COMPILER "${CLANG_C_COMPILER}" CACHE STRING "C compiler")
+        set(CMAKE_CXX_COMPILER "${CLANG_CXX_COMPILER}" CACHE STRING "C++ compiler")
+    endif()
+endif()
+
 # Read version from flake.nix
 file(READ "${CMAKE_SOURCE_DIR}/flake.nix" FLAKE_NIX_CONTENT)
 string(REGEX MATCH "version = \"([^\"]+)\"" _ "${FLAKE_NIX_CONTENT}")
@@ -17,6 +27,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(JOPA_ENABLE_DEBUG "Enable internal compiler debugging traces" OFF)
 option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON)
 option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
+option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ON)
+option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ON)
 
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
 set(PACKAGE_NAME "jopa")
