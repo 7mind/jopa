@@ -19,6 +19,7 @@ set(JOPA_SOURCES
     init.cpp
     jast.cpp
     jast2.cpp
+    jast_semantic.cpp
     grammar/javaact.cpp
     jikes.cpp
     jikesapi.cpp

@@ -27,6 +27,21 @@ class SymbolSet;
 class SymbolMap;
 class Zip;
 
+// Forward declarations for jast2 (new AST)
+namespace jast2 {
+class CompilationUnit;
+class ClassDeclaration;
+class InterfaceDeclaration;
+class EnumDeclaration;
+class AnnotationDeclaration;
+class ClassBody;
+class MethodDeclaration;
+class ConstructorDeclaration;
+class FieldDeclaration;
+class VariableDeclarator;
+class FormalParameter;
+}
+
 // Forward declarations for generics support
 class TypeParameterSymbol;
 class ParameterizedType;
@@ -198,6 +213,9 @@ public:
     LexStream* lex_stream;
     AstCompilationUnit* compilation_unit;
     Semantic* semantic;
+
+    // jast2 compilation unit (new AST) - used when processing via jast2 pipeline
+    jast2::CompilationUnit* jast2_compilation_unit = nullptr;
 
     Tuple<TypeSymbol*> types;
 
@@ -413,6 +431,11 @@ class MethodSymbol : public Symbol, public AccessFlags
 
 public:
     Ast* declaration; // AstMethodDeclaration or AstConstructorDeclaration
+
+    // jast2 declarations (new AST) - used when processing via jast2 pipeline
+    jast2::MethodDeclaration* jast2_method_decl = nullptr;
+    jast2::ConstructorDeclaration* jast2_constructor_decl = nullptr;
+
     const NameSymbol* name_symbol;
     TypeSymbol* containing_type;
     BlockSymbol* block_symbol;
@@ -749,6 +772,12 @@ class TypeSymbol : public Symbol, public AccessFlags
 public:
     SemanticEnvironment* semantic_environment;
     AstClassBody* declaration;
+
+    // jast2 declaration (new AST) - used when processing via jast2 pipeline
+    jast2::ClassDeclaration* jast2_class_decl = nullptr;
+    jast2::InterfaceDeclaration* jast2_interface_decl = nullptr;
+    jast2::EnumDeclaration* jast2_enum_decl = nullptr;
+    jast2::AnnotationDeclaration* jast2_annotation_decl = nullptr;
 
     FileSymbol* file_symbol;
     FileLocation* file_location;
@@ -1550,6 +1579,12 @@ class VariableSymbol : public Symbol, public AccessFlags
 public:
     AstVariableDeclarator* declarator;
     Ast* field_declaration; // AstFieldDeclaration for field variables, NULL for locals
+
+    // jast2 declarations (new AST) - used when processing via jast2 pipeline
+    jast2::VariableDeclarator* jast2_declarator = nullptr;
+    jast2::FieldDeclaration* jast2_field_decl = nullptr;
+    jast2::FormalParameter* jast2_parameter = nullptr;
+
     FileLocation* file_location;
     const NameSymbol* name_symbol;
     Symbol* owner;
