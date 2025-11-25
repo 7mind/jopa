@@ -4275,6 +4275,9 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         type_param -> owner = method;  // Update owner from temp to real method
         method -> AddTypeParameter(type_param);
     }
+    // Detach type parameters and delete temp_method (type params now owned by real method)
+    temp_method -> DetachTypeParameters();
+    delete temp_method;
 
     // Propagate varargs flag from last parameter to method
     if (method -> NumFormalParameters() > 0)
@@ -4288,9 +4291,6 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     }
 
     method -> SetSignature(control);
-
-    // Note: temp_method is not deleted to avoid issues with transferred type_parameters
-    // This is a small memory leak but acceptable for compilation phase
 
     for (unsigned k = 0; k < method_declaration -> NumThrows(); k++)
     {

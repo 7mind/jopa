@@ -499,6 +499,7 @@ DefiniteAssignmentSet* Semantic::DefiniteConditionalExpression(AstExpression* ex
     delete after_condition;
     delete before_expressions;
     delete after_false;
+    delete after_true_pair;
     return after_true;
 }
 
@@ -952,6 +953,7 @@ void Semantic::DefiniteIfStatement(Ast* stmt)
 
     // harmless if NULL
     delete starting_pair;
+    delete after_expr;
 }
 
 
