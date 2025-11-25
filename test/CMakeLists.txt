@@ -347,6 +347,7 @@ if(JOPA_ENABLE_JDK_PARSER_TESTS)
             )
             set_tests_properties("parse_jdk${jdk_version}_${test_name}" PROPERTIES
                 LABELS "parser;jdk${jdk_version}"
+                TIMEOUT 10
             )
 
             math(EXPR test_count "${test_count} + 1")
