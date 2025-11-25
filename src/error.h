@@ -462,6 +462,7 @@ public:
     static void StaticInitializer();
     static void InitializeMessages();
     static void InitializeMessageGroups();
+    static void CleanupMessageGroups();
     static void SetWarningLevel(SemanticErrorKind, WarningLevel);
 
     static bool ProcessWarningSwitch(const char*);

@@ -35,8 +35,7 @@ function(add_jopa_compile_test test_name source_file)
     file(MAKE_DIRECTORY "${TEST_OUTPUT_DIR}")
     add_test(
         NAME "compile_${test_name}"
-        COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-                $<TARGET_FILE:jopa> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${TEST_OUTPUT_DIR}"
@@ -56,8 +55,7 @@ function(add_jopa_run_test test_name source_file main_class)
     # Compilation test - compiles main source plus any extra sources
     add_test(
         NAME "compile_${test_name}"
-        COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-                $<TARGET_FILE:jopa> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${TEST_OUTPUT_DIR}"
@@ -98,8 +96,7 @@ set(EnumMethodsTest_OUTPUT "${OUTPUT_DIR}/EnumMethodsTest")
 file(MAKE_DIRECTORY "${EnumMethodsTest_OUTPUT}")
 add_test(
     NAME "compile_EnumMethodsTest"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${EnumMethodsTest_OUTPUT}"
@@ -155,8 +152,7 @@ set(MathUtils_OUTPUT "${OUTPUT_DIR}/MathUtils")
 file(MAKE_DIRECTORY "${MathUtils_OUTPUT}")
 add_test(
     NAME "compile_MathUtils"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MathUtils_OUTPUT}"
@@ -179,8 +175,7 @@ set(SimpleJava6Test_OUTPUT "${OUTPUT_DIR}/SimpleJava6Test")
 file(MAKE_DIRECTORY "${SimpleJava6Test_OUTPUT}")
 add_test(
     NAME "compile_SimpleJava6Test"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${SimpleJava6Test_OUTPUT}"
@@ -203,8 +198,7 @@ set(ReflectionBasicTest_OUTPUT "${OUTPUT_DIR}/ReflectionBasicTest")
 file(MAKE_DIRECTORY "${ReflectionBasicTest_OUTPUT}")
 add_test(
     NAME "compile_ReflectionBasicTest"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${ReflectionBasicTest_OUTPUT}"
@@ -227,8 +221,7 @@ set(DiamondTest_OUTPUT "${OUTPUT_DIR}/DiamondTest")
 file(MAKE_DIRECTORY "${DiamondTest_OUTPUT}")
 add_test(
     NAME "compile_DiamondTest"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.7 -target 1.7
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.7
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DiamondTest_OUTPUT}"
@@ -252,8 +245,7 @@ set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-            $<TARGET_FILE:jopa> -source 1.8 -target 1.8
+    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DefaultMethodTest_OUTPUT}"
@@ -360,8 +352,7 @@ if(JOPA_ENABLE_JDK_PARSER_TESTS)
             # Add the parse test with appropriate source level
             add_test(
                 NAME "parse_jdk${jdk_version}_${test_name}"
-                COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
-                        $<TARGET_FILE:jopa> -source "1.${jdk_version}" --parse-only "${output_file}" "${java_file}"
+                COMMAND $<TARGET_FILE:jopa> -source "1.${jdk_version}" --parse-only "${output_file}" "${java_file}"
             )
             set_tests_properties("parse_jdk${jdk_version}_${test_name}" PROPERTIES
                 LABELS "parser;jdk${jdk_version}"

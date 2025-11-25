@@ -3,6 +3,7 @@
 
 #include "platform.h"
 #include "depend.h"
+#include <vector>
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -4328,6 +4329,13 @@ public:
 
     inline size_t Blksize() { return 1U << log_blksize; }
 
+    // Register a BlockSymbol for cleanup when this pool is destroyed.
+    // This is needed because AST destructors are not called.
+    void RegisterBlockSymbol(BlockSymbol* symbol)
+    {
+        block_symbols_to_delete.push_back(symbol);
+    }
+
 private:
     Cell** base;
     unsigned base_size; // number of segment slots in base
@@ -4336,6 +4344,10 @@ private:
 
     unsigned log_blksize; // log2(words per segment)
     unsigned base_increment; // number of segment slots to add when growing
+
+    // BlockSymbol objects that need to be deleted when this pool is destroyed.
+    // These are stored in AST nodes but AST destructors are never called.
+    std::vector<BlockSymbol*> block_symbols_to_delete;
 
     //
     // Allocate another block of storage for the storage pool. block_size
@@ -4436,13 +4448,7 @@ public:
     // Destructor of a storage pool. This frees the memory of all of the AST
     // nodes allocated in this pool.
     //
-    ~StoragePool()
-    {
-        if (base)
-            for (unsigned i = 0; i <= base_index; i++)
-                delete [] base[i];
-        delete [] base;
-    }
+    ~StoragePool();
 
     //
     // Alloc allocates an object of size n in the pool and returns a pointer

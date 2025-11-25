@@ -128,5 +128,6 @@ int main(int argc, char *argv[])
     }
 
     delete compiler;
+    SemanticError::CleanupMessageGroups();
     return return_code;
 }

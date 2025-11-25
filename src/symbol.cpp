@@ -789,6 +789,7 @@ MethodSymbol::~MethodSymbol()
 
     delete block_symbol; // overload(s)
     delete [] header;
+    delete file_location;
 
     // Cleanup generics support fields
     if (type_parameters)
@@ -2270,6 +2271,7 @@ MethodSymbol* TypeSymbol::GetReadAccessMethod(MethodSymbol* member,
         block -> right_brace_token = loc;
         // the symbol table associated with this block will contain no element
         block -> block_symbol = new BlockSymbol(0);
+        ast_pool -> RegisterBlockSymbol(block -> block_symbol);
         block -> is_reachable = true;
 
         if (member -> Type() == control.void_type)
@@ -2490,6 +2492,7 @@ MethodSymbol* TypeSymbol::GetReadAccessConstructor(MethodSymbol* ctor)
         AstMethodBody* constructor_block = ast_pool -> GenMethodBody();
         // This symbol table will be empty.
         constructor_block -> block_symbol = new BlockSymbol(0);
+        ast_pool -> RegisterBlockSymbol(constructor_block -> block_symbol);
         constructor_block -> block_symbol -> max_variable_index =
             block_symbol -> max_variable_index;
         constructor_block -> left_brace_token = loc;
@@ -2661,6 +2664,7 @@ MethodSymbol* TypeSymbol::GetReadAccessMethod(VariableSymbol* member,
         block -> left_brace_token = loc;
         block -> right_brace_token = loc;
         block -> block_symbol = new BlockSymbol(0);
+        ast_pool -> RegisterBlockSymbol(block -> block_symbol);
         block -> is_reachable = true;
         block -> AllocateStatements(1);
         block -> AddStatement(return_statement);
@@ -2854,6 +2858,7 @@ MethodSymbol* TypeSymbol::GetWriteAccessMethod(VariableSymbol* member,
         block -> left_brace_token = loc;
         block -> right_brace_token = loc;
         block -> block_symbol = new BlockSymbol(0);
+        ast_pool -> RegisterBlockSymbol(block -> block_symbol);
         block -> is_reachable = true;
         block -> AllocateStatements(2);
         block -> AddStatement(expression_statement);
