@@ -168,12 +168,20 @@ void Scanner::Scan(FileSymbol* file_symbol)
         Scan();
         lex -> CompressSpace();
 
-        if (control.option.dump_errors)
+        // Always initialize error locations before destroying input
+        // This ensures line/column info is available for serialization
+        if (lex -> NumLexErrors() > 0)
         {
             lex -> SortMessages();
-            for (unsigned i = 0; i < lex -> bad_tokens.Length(); i++)
-                JopaAPI::getInstance() ->
-                    reportError(&(lex -> bad_tokens[i]));
+            for (unsigned i = 0; i < lex -> NumLexErrors(); i++)
+                lex -> LexError(i).getErrorReport();
+
+            if (control.option.dump_errors)
+            {
+                for (unsigned i = 0; i < lex -> NumLexErrors(); i++)
+                    JopaAPI::getInstance() ->
+                        reportError(&(lex -> LexError(i)));
+            }
         }
         lex -> DestroyInput(); // get rid of input buffer
     }

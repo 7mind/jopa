@@ -6,6 +6,7 @@
 #include "bytecode.h"
 #include "case.h"
 #include "option.h"
+#include "ast_json.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -228,21 +229,62 @@ Control::Control(char** arguments, Option& option_)
             parse_success = false;
         }
 
-        // Write the result to the output file
+        // Write the result as JSON to the output file
         FILE* outfile = SystemFopen(option.parse_only_output, "w");
         if (outfile)
         {
-            if (parse_success && total_errors == 0)
+            json output;
+            output["success"] = (parse_success && total_errors == 0);
+            output["total_errors"] = total_errors;
+            output["files"] = json::array();
+
+            // Serialize each compilation unit to JSON
+            for (int j = 0; j < num_files; j++)
             {
-                fprintf(outfile, "OK\n");
-                return_code = 0;
+                FileSymbol* file_symbol = input_files[j];
+                json file_entry;
+                file_entry["filename"] = file_symbol->FileName();
+
+                if (file_symbol->lex_stream)
+                {
+                    // Always include lexical errors
+                    file_entry["lexErrors"] = AstJsonSerializer::SerializeLexErrors(file_symbol->lex_stream);
+
+                    if (file_symbol->compilation_unit &&
+                        !file_symbol->compilation_unit->BadCompilationUnitCast())
+                    {
+                        AstJsonSerializer serializer(file_symbol->lex_stream);
+                        file_entry["ast"] = serializer.Serialize(file_symbol->compilation_unit);
+                    }
+                    else
+                    {
+                        file_entry["ast"] = nullptr;
+                        file_entry["parseError"] = "Parse failed";
+                    }
+                }
+                else
+                {
+                    file_entry["ast"] = nullptr;
+                    file_entry["lexErrors"] = json::array();
+                    file_entry["error"] = "Failed to read file";
+                }
+
+                output["files"].push_back(file_entry);
             }
-            else
+
+            // Add IO errors if any
+            if (general_io_errors.Length() > 0)
             {
-                fprintf(outfile, "FAIL\n");
-                fprintf(outfile, "Errors: %d\n", total_errors);
-                return_code = 1;
+                output["io_errors"] = json::array();
+                for (unsigned k = 0; k < general_io_errors.Length(); k++)
+                {
+                    output["io_errors"].push_back(general_io_errors[k]);
+                }
             }
+
+            std::string json_str = output.dump(2);
+            fprintf(outfile, "%s\n", json_str.c_str());
+            return_code = (parse_success && total_errors == 0) ? 0 : 1;
             fclose(outfile);
         }
         else

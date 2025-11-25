@@ -1,5 +1,6 @@
 set(JOPA_SOURCES
     ast.cpp
+    ast_json.cpp
     body.cpp
     bytecode.cpp
     case.cpp
@@ -193,6 +194,10 @@ if(JOPA_ENABLE_CPPTRACE)
     list(APPEND JOPA_LIBS cpptrace::cpptrace)
     set(JOPA_HAS_CPPTRACE 1)
 endif()
+
+# Find nlohmann_json for AST serialization
+find_package(nlohmann_json REQUIRED)
+list(APPEND JOPA_LIBS nlohmann_json::nlohmann_json)
 
 set(JOPA_SANITIZER_FLAGS)
 if(JOPA_ENABLE_SANITIZERS)

@@ -24,6 +24,7 @@
             # Libraries
             libzip
             cpptrace
+            nlohmann_json
 
             # Development tools
             lldb

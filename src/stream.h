@@ -34,6 +34,7 @@ public:
     virtual int getLeftColumnNo() { return left_column_no; }
     virtual int getRightLineNo() { return right_line_no; }
     virtual int getRightColumnNo() { return right_column_no; }
+    bool IsInitialized() { return initialized; }
 
     enum StreamErrorKind
     {
@@ -342,6 +343,10 @@ public:
     {
         return bad_tokens.Length() - NumBadTokens();
     }
+
+    // Access to lexical errors for serialization
+    inline unsigned NumLexErrors() { return bad_tokens.Length(); }
+    inline StreamError& LexError(unsigned i) { return bad_tokens[i]; }
 
 #ifdef JOPA_DEBUG
     bool file_read;
