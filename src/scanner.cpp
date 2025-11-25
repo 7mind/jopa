@@ -962,6 +962,26 @@ void Scanner::ClassifyIdOrKeyword()
                              current_token -> Location() + len - 1);
         current_token -> SetKind(TK_Identifier);
     }
+    // Java 8: Handle 'default' as a method modifier when not followed by ':'
+    // For switch labels, 'default:' keeps TK_default
+    // For default interface methods, 'default void foo()' becomes TK_abstract
+    // (which is a valid modifier) and we track it for semantic analysis
+    if (current_token -> Kind() == TK_default &&
+        control.option.source >= JopaOption::SDK1_8)
+    {
+        // Skip whitespace to find next non-space character
+        const wchar_t* lookahead = ptr;
+        while (Code::IsSpace(*lookahead))
+            lookahead++;
+
+        // If not followed by ':', this is likely a default method modifier
+        if (*lookahead != U_COLON)
+        {
+            // Transform to TK_abstract (a valid modifier) and track it
+            current_token -> SetKind(TK_abstract);
+            lex -> default_method_tokens.Next() = current_token_index;
+        }
+    }
     if (has_dollar && ! dollar_warning_given)
     {
         dollar_warning_given = true;
@@ -1316,8 +1336,18 @@ void Scanner::ClassifyNumericLiteral()
 
 void Scanner::ClassifyColon()
 {
-    current_token -> SetKind(TK_COLON);
     cursor++;
+    if (*cursor == U_COLON &&
+        control.option.source >= JopaOption::SDK1_8)
+    {
+        // Java 8: Method reference ::
+        cursor++;
+        current_token -> SetKind(TK_COLON_COLON);
+    }
+    else
+    {
+        current_token -> SetKind(TK_COLON);
+    }
 }
 
 
@@ -1350,6 +1380,13 @@ void Scanner::ClassifyMinus()
     {
         cursor++;
         current_token -> SetKind(TK_MINUS_EQUAL);
+    }
+    else if (*cursor == U_GREATER &&
+             control.option.source >= JopaOption::SDK1_8)
+    {
+        // Java 8: Lambda arrow ->
+        cursor++;
+        current_token -> SetKind(TK_ARROW);
     }
     else current_token -> SetKind(TK_MINUS);
 }
@@ -1400,6 +1437,28 @@ void Scanner::ClassifyLess()
             current_token -> SetKind(TK_LEFT_SHIFT_EQUAL);
         }
         else current_token -> SetKind(TK_LEFT_SHIFT);
+    }
+    else if (*cursor == U_GREATER &&
+             control.option.source >= JopaOption::SDK1_7)
+    {
+        // Diamond operator <> for Java 7+
+        // We emit < ? > so the parser accepts it as type arguments.
+        // The synthetic '?' is marked as a diamond token for semantic analysis.
+
+        // Set current token to TK_LESS
+        current_token -> SetKind(TK_LESS);
+
+        // Insert a synthetic TK_QUESTION token
+        // Use the same location as the '<' for the synthetic '?'
+        TokenIndex synth_token_index =
+            lex -> GetNextToken(cursor - 1 - lex -> InputBuffer());
+        LexStream::Token& synth_token = lex -> token_stream[synth_token_index];
+        synth_token.SetKind(TK_QUESTION);
+
+        // Mark this token as a diamond (synthetic) token
+        lex -> diamond_tokens.Next() = synth_token_index;
+
+        // cursor stays at U_GREATER, next iteration will emit TK_GREATER
     }
     else current_token -> SetKind(TK_LESS);
 }

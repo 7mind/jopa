@@ -14,6 +14,8 @@ public:
     // Each of these fields is a boolean value
     // 0 if false, non-zero if true
     int nowrite;         // Don't generate output, useful with verbose
+    int parse_only;      // Parse only, don't compile (for testing)
+    char* parse_only_output; // Output file for parse-only mode
     int deprecation;     // Warn about deprecated code
     int optimize;        // Enable optimizations
     int verbose;         // Verbosely track compilation progress
@@ -40,7 +42,8 @@ public:
         SDK1_4_2,
         SDK1_5,
         SDK1_6,
-        SDK1_7
+        SDK1_7,
+        SDK1_8
     };
 
     // This field can be 0 through 7 to represent all debug level combinations.

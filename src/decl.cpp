@@ -1036,6 +1036,26 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     if (! type_arguments)
         return NULL;
 
+    // Check for Java 7+ diamond operator <>
+    // Diamond is detected when:
+    // 1. We're in Java 7+ mode
+    // 2. There's exactly 1 type argument
+    // 3. That type argument is a wildcard
+    // 4. The wildcard's question_token is a synthetic diamond token
+    if (control.option.source >= JopaOption::SDK1_7 &&
+        type_arguments -> NumTypeArguments() == 1)
+    {
+        AstType* first_arg = type_arguments -> TypeArgument(0);
+        AstWildcard* wildcard = first_arg -> WildcardCast();
+        if (wildcard && lex_stream -> IsDiamondToken(wildcard -> question_token))
+        {
+            // Diamond operator - type arguments are inferred from context
+            // For type erasure, just return NULL (treat as raw type)
+            // The type system will use the base type's erasure
+            return NULL;
+        }
+    }
+
     // Ensure the type header is processed before checking if it's generic
     // This is necessary when the base type is defined in the same compilation unit
     // but hasn't been processed yet

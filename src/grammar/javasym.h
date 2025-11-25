@@ -116,7 +116,10 @@ enum {
       TK_const = 109,
       TK_goto = 110,
       TK_ERROR = 111,
-      TK_EOF = 96
+      TK_EOF = 96,
+      // Java 8 tokens (scanner recognizes but parser tables don't have grammar rules)
+      TK_ARROW = 112,        // -> for lambdas
+      TK_COLON_COLON = 113   // :: for method references
      };
 
 

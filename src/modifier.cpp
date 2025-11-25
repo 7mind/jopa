@@ -1,5 +1,6 @@
 #include "platform.h"
 #include "semantic.h"
+#include "control.h"
 #include "option.h"
 #include "grammar/javasym.h"
 #include "stream.h"
@@ -50,7 +51,18 @@ AccessFlags Semantic::ProcessModifiers(AstModifiers* modifiers,
         u2 flag = 0;
         switch (lex_stream -> Kind(keyword -> modifier_token))
         {
-        case TK_abstract: flag = AccessFlags::ACCESS_ABSTRACT; break;
+        case TK_abstract:
+            // Check if this is a Java 8 default method (scanner transforms 'default' to TK_abstract)
+            if (control.option.source >= JopaOption::SDK1_8 &&
+                lex_stream -> IsDefaultMethodToken(keyword -> modifier_token))
+            {
+                // Default methods are NOT abstract - they have implementations
+                // For now, we just skip setting any flag for default
+                // The method will be a regular instance method with a body
+                continue;
+            }
+            flag = AccessFlags::ACCESS_ABSTRACT;
+            break;
         case TK_final: flag = AccessFlags::ACCESS_FINAL; break;
         case TK_native: flag = AccessFlags::ACCESS_NATIVE; break;
         case TK_public: flag = AccessFlags::ACCESS_PUBLIC; break;
@@ -389,12 +401,32 @@ AccessFlags Semantic::ProcessMethodModifiers(AstMethodDeclaration* decl)
 //
 AccessFlags Semantic::ProcessInterfaceMethodModifiers(AstMethodDeclaration* method_declaration)
 {
+    // In Java 8+, interface methods can be:
+    // - abstract (default for regular interface methods without body)
+    // - default (instance methods with implementation)
+    // - static (static methods with implementation)
+    u2 valid_flags = AccessFlags::ACCESS_PUBLIC | AccessFlags::ACCESS_ABSTRACT;
+    u2 implicit_flags = AccessFlags::ACCESS_PUBLIC | AccessFlags::ACCESS_ABSTRACT;
+
+    if (control.option.source >= JopaOption::SDK1_8)
+    {
+        // Java 8+ allows static interface methods
+        valid_flags |= AccessFlags::ACCESS_STATIC;
+        // Note: 'default' is handled separately in ProcessModifiers
+        // where it's recognized as a transformed TK_abstract token
+
+        // If the method has a body (default or static method), it's not abstract
+        // Remove ACCESS_ABSTRACT from implicit flags in this case
+        if (method_declaration -> method_body_opt)
+        {
+            implicit_flags = AccessFlags::ACCESS_PUBLIC;
+        }
+    }
+
     return ProcessModifiers(method_declaration -> modifiers_opt,
                             L"an interface's member method",
-                            (AccessFlags::ACCESS_PUBLIC |
-                             AccessFlags::ACCESS_ABSTRACT),
-                            (AccessFlags::ACCESS_PUBLIC |
-                             AccessFlags::ACCESS_ABSTRACT));
+                            valid_flags,
+                            implicit_flags);
 }
 
 

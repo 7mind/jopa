@@ -5960,7 +5960,9 @@ int ByteCode::CompleteCall(MethodSymbol* msym, int stack_words,
     ChangeStack(- stack_words);
     TypeSymbol* type = (base_type ? base_type : msym -> containing_type);
     PutU2(RegisterMethodref(type, msym));
-    if (type -> ACC_INTERFACE())
+    // invokeinterface requires extra bytes (count and zero)
+    // but invokestatic doesn't, even for interface methods (Java 8+)
+    if (type -> ACC_INTERFACE() && ! msym -> ACC_STATIC())
     {
         PutU1(stack_words + 1);
         PutU1(0);
@@ -7067,6 +7069,10 @@ ByteCode::ByteCode(TypeSymbol* type)
         break;
     case JopaOption::SDK1_7:
         major_version = 51;
+        minor_version = 0;
+        break;
+    case JopaOption::SDK1_8:
+        major_version = 52;
         minor_version = 0;
         break;
     default:

@@ -3,6 +3,11 @@
 
 enable_testing()
 
+# Option to enable JDK parser tests
+option(JOPA_ENABLE_JDK_PARSER_TESTS "Enable JDK language tools parser tests" OFF)
+option(JOPA_PARSER_TESTS_JDK7 "Enable JDK7 parser tests" ON)
+option(JOPA_PARSER_TESTS_JDK8 "Enable JDK8 parser tests" ON)
+
 # Option to enable/disable JVM validation tests
 option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
 
@@ -195,4 +200,159 @@ if(JOPA_ENABLE_JVM_TESTS)
         LABELS "run"
         DEPENDS "compile_ReflectionBasicTest"
     )
+endif()
+
+# Java 7 Tests (bytecode version 51.0 with diamond operator)
+add_test(
+    NAME "compile_DiamondTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.7
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${OUTPUT_DIR}"
+            "${TEST_DIR}/java7/DiamondTest.java"
+)
+set_tests_properties("compile_DiamondTest" PROPERTIES LABELS "compile;java7")
+if(JOPA_ENABLE_JVM_TESTS)
+    # Use -noverify because StackMapTable is not yet implemented for Java 7+ bytecode
+    add_test(
+        NAME "run_DiamondTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "DiamondTest"
+    )
+    set_tests_properties("run_DiamondTest" PROPERTIES
+        LABELS "run;java7"
+        DEPENDS "compile_DiamondTest"
+    )
+endif()
+
+# Java 8 Tests (bytecode version 52.0 with default methods)
+add_test(
+    NAME "compile_DefaultMethodTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${OUTPUT_DIR}"
+            "${TEST_DIR}/java8/DefaultMethodTest.java"
+)
+set_tests_properties("compile_DefaultMethodTest" PROPERTIES LABELS "compile;java8")
+if(JOPA_ENABLE_JVM_TESTS)
+    # Use -noverify because StackMapTable is not yet implemented for Java 8 bytecode
+    add_test(
+        NAME "run_DefaultMethodTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "DefaultMethodTest"
+    )
+    set_tests_properties("run_DefaultMethodTest" PROPERTIES
+        LABELS "run;java8"
+        DEPENDS "compile_DefaultMethodTest"
+    )
+endif()
+
+# ============================================================================
+# JDK Language Tools Parser Tests
+# ============================================================================
+
+if(JOPA_ENABLE_JDK_PARSER_TESTS)
+    set(PARSER_TEST_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/parser_tests")
+    file(MAKE_DIRECTORY "${PARSER_TEST_OUTPUT_DIR}")
+
+    # Function to add parser tests for a JDK version
+    function(add_jdk_parser_tests jdk_version jdk_assets_dir)
+        if(NOT EXISTS "${jdk_assets_dir}")
+            message(WARNING "JDK${jdk_version} assets not found at ${jdk_assets_dir}")
+            return()
+        endif()
+
+        # Find all .java files
+        file(GLOB_RECURSE JAVA_FILES "${jdk_assets_dir}/*.java")
+
+        # Find all .out files (negative test markers)
+        file(GLOB_RECURSE OUT_FILES "${jdk_assets_dir}/*.out")
+
+        # Create a list of base paths for negative tests
+        set(NEGATIVE_TESTS "")
+        foreach(out_file ${OUT_FILES})
+            get_filename_component(base_path "${out_file}" DIRECTORY)
+            get_filename_component(base_name "${out_file}" NAME_WE)
+            list(APPEND NEGATIVE_TESTS "${base_path}/${base_name}")
+        endforeach()
+
+        set(test_count 0)
+        set(skipped_count 0)
+        foreach(java_file ${JAVA_FILES})
+            # Get base path without extension
+            get_filename_component(file_dir "${java_file}" DIRECTORY)
+            get_filename_component(file_name_we "${java_file}" NAME_WE)
+            set(base_path "${file_dir}/${file_name_we}")
+
+            # Skip if this is a negative test (has matching .out file)
+            list(FIND NEGATIVE_TESTS "${base_path}" is_negative)
+            if(NOT is_negative EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
+
+            # Skip files containing @compile/fail (expected to fail compilation)
+            file(READ "${java_file}" file_content)
+            string(FIND "${file_content}" "@compile/fail" compile_fail_pos)
+            if(NOT compile_fail_pos EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
+
+            # Skip diagnostic examples (key: compiler.err/warn - intentionally invalid/warning code)
+            string(FIND "${file_content}" "// key: compiler.err" diag_err_pos)
+            string(FIND "${file_content}" "// key: compiler.warn" diag_warn_pos)
+            if(NOT diag_err_pos EQUAL -1 OR NOT diag_warn_pos EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
+
+            # Skip files marked as invalid
+            string(FIND "${file_content}" "this class is invalid" invalid_marker_pos)
+            string(FIND "${file_content}" "// invalid" invalid_comment_pos)
+            if(NOT invalid_marker_pos EQUAL -1 OR NOT invalid_comment_pos EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
+
+            # Skip files in "bad" directories or named BadSource/Error/ParseErrors
+            string(FIND "${java_file}" "/bad/" bad_dir_pos)
+            string(FIND "${java_file}" "BadSource.java" bad_source_pos)
+            string(FIND "${java_file}" "ParseErrors.java" parse_errors_pos)
+            if(NOT bad_dir_pos EQUAL -1 OR NOT bad_source_pos EQUAL -1 OR NOT parse_errors_pos EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
+
+            # Create relative path for unique test name
+            file(RELATIVE_PATH rel_path "${jdk_assets_dir}" "${java_file}")
+            string(REPLACE "/" "_" test_name "${rel_path}")
+            string(REPLACE ".java" "" test_name "${test_name}")
+
+            # Create output file for this test
+            set(output_file "${PARSER_TEST_OUTPUT_DIR}/jdk${jdk_version}_${test_name}.result")
+
+            # Add the parse test with appropriate source level
+            add_test(
+                NAME "parse_jdk${jdk_version}_${test_name}"
+                COMMAND $<TARGET_FILE:jopa> -source "1.${jdk_version}" --parse-only "${output_file}" "${java_file}"
+            )
+            set_tests_properties("parse_jdk${jdk_version}_${test_name}" PROPERTIES
+                LABELS "parser;jdk${jdk_version}"
+            )
+
+            math(EXPR test_count "${test_count} + 1")
+        endforeach()
+
+        message(STATUS "Added ${test_count} JDK${jdk_version} parser tests (skipped ${skipped_count} negative tests)")
+    endfunction()
+
+    # Add JDK7 parser tests
+    if(JOPA_PARSER_TESTS_JDK7)
+        add_jdk_parser_tests(7 "${CMAKE_SOURCE_DIR}/assets/jdk7u-langtools/test")
+    endif()
+
+    # Add JDK8 parser tests
+    if(JOPA_PARSER_TESTS_JDK8)
+        add_jdk_parser_tests(8 "${CMAKE_SOURCE_DIR}/assets/jdk8u_langtools/test")
+    endif()
 endif()
