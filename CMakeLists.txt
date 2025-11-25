@@ -24,11 +24,19 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Determine if this is a debug build
+string(TOUPPER "${CMAKE_BUILD_TYPE}" _BUILD_TYPE_UPPER)
+if(_BUILD_TYPE_UPPER STREQUAL "DEBUG" OR _BUILD_TYPE_UPPER STREQUAL "")
+    set(_IS_DEBUG_BUILD TRUE)
+else()
+    set(_IS_DEBUG_BUILD FALSE)
+endif()
+
 option(JOPA_ENABLE_DEBUG "Enable internal compiler debugging traces" OFF)
 option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON)
 option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
-option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ON)
-option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ON)
+option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
+option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
 
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
 set(PACKAGE_NAME "jopa")

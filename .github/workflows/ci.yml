@@ -2,14 +2,14 @@ name: Jopa CI
 
 on:
   push:
-    branches: [ main, master, develop, wip/cmake ]
+    branches: [ main, master, develop, 'wip/**' ]
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
 
 jobs:
-  build-and-test:
-    name: Build and Test Jopa
+  build-release:
+    name: Build and Test (Release)
     runs-on: ubuntu-latest
 
     steps:
@@ -28,23 +28,26 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
-      - name: Configure with CMake
+      - name: Configure with CMake (Release)
         run: |
           nix develop --command bash -c "
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJOPA_ENABLE_SANITIZERS=OFF \
+              -DJOPA_ENABLE_CPPTRACE=OFF
           "
 
       - name: Build Jopa
         run: |
           nix develop --command bash -c "
-            cmake --build build -j$(nproc)
+            cmake --build build -j\$(nproc)
           "
 
-      - name: Run CTest
+      - name: Run Primary Tests
         run: |
           nix develop --command bash -c "
             cd build
-            ctest --output-on-failure --verbose
+            ctest --output-on-failure -j\$(nproc) -E '^parse_'
           "
 
       - name: Generate test summary
@@ -52,38 +55,260 @@ jobs:
         run: |
           nix develop --command bash -c "
             cd build
-            echo '## Test Results' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '### CTest Summary' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            ctest --output-on-failure 2>&1 | tail -30 >> $GITHUB_STEP_SUMMARY || true
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '### Feature Coverage' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo 'All Java 5+ features are tested through CTest:' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Generics (13 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Enums (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Varargs (2 compile + 1 runtime test)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Enhanced For-Loop (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Autoboxing (5 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Static Imports (1 compile + 3 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Annotations (4 compile + 4 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
-            echo '' >> $GITHUB_STEP_SUMMARY
-            echo '### Java 6+ Support' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Bytecode version 50.0 (Java 6)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Parameter names in LocalVariableTable (reflection support)' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Basic reflection (Class, Method, Field) verified with system JVM' >> $GITHUB_STEP_SUMMARY
-            echo '- ✅ Java 6 tests (2 compile + 2 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
+            echo '## Release Build Test Results' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '### Primary Test Summary' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+            ctest -E '^parse_' 2>&1 | tail -20 >> \$GITHUB_STEP_SUMMARY || true
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
           "
 
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
+          name: test-results-release
           path: |
             build/test/*.class
             build/Testing/Temporary/LastTest.log
           retention-days: 7
+
+  build-debug:
+    name: Build and Test (Debug + Sanitizers)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Configure with CMake (Debug)
+        run: |
+          nix develop --command bash -c "
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DJOPA_ENABLE_SANITIZERS=ON \
+              -DJOPA_ENABLE_CPPTRACE=ON
+          "
+
+      - name: Build Jopa
+        run: |
+          nix develop --command bash -c "
+            cmake --build build -j\$(nproc)
+          "
+
+      - name: Run Primary Tests with Sanitizers
+        run: |
+          nix develop --command bash -c "
+            cd build
+            ctest --output-on-failure -j\$(nproc) -E '^parse_'
+          "
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          nix develop --command bash -c "
+            cd build
+            echo '## Debug Build Test Results (with Sanitizers)' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '### Primary Test Summary' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+            ctest -E '^parse_' 2>&1 | tail -20 >> \$GITHUB_STEP_SUMMARY || true
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+          "
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-debug
+          path: |
+            build/test/*.class
+            build/Testing/Temporary/LastTest.log
+          retention-days: 7
+
+  parser-tests-jdk7:
+    name: JDK7 Parser Tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Configure with CMake
+        run: |
+          nix develop --command bash -c "
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJOPA_ENABLE_SANITIZERS=OFF \
+              -DJOPA_ENABLE_CPPTRACE=OFF \
+              -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
+              -DJOPA_PARSER_TESTS_JDK7=ON \
+              -DJOPA_PARSER_TESTS_JDK8=OFF
+          "
+
+      - name: Build Jopa
+        run: |
+          nix develop --command bash -c "
+            cmake --build build -j\$(nproc)
+          "
+
+      - name: Run JDK7 Parser Tests
+        id: parser_tests
+        run: |
+          nix develop --command bash -c "
+            cd build
+            # Run tests in parallel, capture results
+            ctest -R '^parse_jdk7_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
+
+            # Extract statistics
+            TOTAL=\$(grep -oP '\\d+(?= tests)' parser_results.txt | head -1 || echo 0)
+            PASSED=\$(grep -oP '\\d+(?=% tests passed)' parser_results.txt | head -1 || echo 0)
+            FAILED=\$(grep -oP '\\d+(?= tests failed)' parser_results.txt | head -1 || echo 0)
+
+            echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
+            echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
+            echo \"failed=\$FAILED\" >> \$GITHUB_OUTPUT
+          "
+
+      - name: Generate parser test summary
+        if: always()
+        run: |
+          nix develop --command bash -c "
+            cd build
+            echo '## JDK7 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+
+            # Count tests
+            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep -oP '\\d+(?= tests)' | tail -1 || echo 'N/A')
+
+            # Get pass/fail from last run
+            if [ -f parser_results.txt ]; then
+              RESULT_LINE=\$(grep -E '^[0-9]+% tests passed' parser_results.txt || echo '')
+              if [ -n \"\$RESULT_LINE\" ]; then
+                echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
+                echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
+                echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
+                PASSED=\$(echo \"\$RESULT_LINE\" | grep -oP '\\d+(?= tests failed)' | head -1)
+                FAILED=\$(echo \"\$RESULT_LINE\" | grep -oP ', \\K\\d+(?= tests failed)')
+                echo \"| Passed | \$((\$TOTAL - \${FAILED:-0})) |\" >> \$GITHUB_STEP_SUMMARY
+                echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
+              fi
+            fi
+
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '### Last 30 lines of output' >> \$GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+            tail -30 parser_results.txt >> \$GITHUB_STEP_SUMMARY 2>/dev/null || echo 'No results available'
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+          "
+
+  parser-tests-jdk8:
+    name: JDK8 Parser Tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Configure with CMake
+        run: |
+          nix develop --command bash -c "
+            cmake -S . -B build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJOPA_ENABLE_SANITIZERS=OFF \
+              -DJOPA_ENABLE_CPPTRACE=OFF \
+              -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
+              -DJOPA_PARSER_TESTS_JDK7=OFF \
+              -DJOPA_PARSER_TESTS_JDK8=ON
+          "
+
+      - name: Build Jopa
+        run: |
+          nix develop --command bash -c "
+            cmake --build build -j\$(nproc)
+          "
+
+      - name: Run JDK8 Parser Tests
+        id: parser_tests
+        run: |
+          nix develop --command bash -c "
+            cd build
+            # Run tests in parallel, capture results
+            ctest -R '^parse_jdk8_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
+
+            # Extract statistics
+            TOTAL=\$(grep -oP '\\d+(?= tests)' parser_results.txt | head -1 || echo 0)
+            PASSED=\$(grep -oP '\\d+(?=% tests passed)' parser_results.txt | head -1 || echo 0)
+            FAILED=\$(grep -oP '\\d+(?= tests failed)' parser_results.txt | head -1 || echo 0)
+
+            echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
+            echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
+            echo \"failed=\$FAILED\" >> \$GITHUB_OUTPUT
+          "
+
+      - name: Generate parser test summary
+        if: always()
+        run: |
+          nix develop --command bash -c "
+            cd build
+            echo '## JDK8 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
+            echo '' >> \$GITHUB_STEP_SUMMARY
+
+            # Count tests
+            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep -oP '\\d+(?= tests)' | tail -1 || echo 'N/A')
+
+            # Get pass/fail from last run
+            if [ -f parser_results.txt ]; then
+              RESULT_LINE=\$(grep -E '^[0-9]+% tests passed' parser_results.txt || echo '')
+              if [ -n \"\$RESULT_LINE\" ]; then
+                echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
+                echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
+                echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
+                PASSED=\$(echo \"\$RESULT_LINE\" | grep -oP '\\d+(?= tests failed)' | head -1)
+                FAILED=\$(echo \"\$RESULT_LINE\" | grep -oP ', \\K\\d+(?= tests failed)')
+                echo \"| Passed | \$((\$TOTAL - \${FAILED:-0})) |\" >> \$GITHUB_STEP_SUMMARY
+                echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
+              fi
+            fi
+
+            echo '' >> \$GITHUB_STEP_SUMMARY
+            echo '### Last 30 lines of output' >> \$GITHUB_STEP_SUMMARY
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+            tail -30 parser_results.txt >> \$GITHUB_STEP_SUMMARY 2>/dev/null || echo 'No results available'
+            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
+          "
