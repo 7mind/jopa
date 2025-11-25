@@ -5,7 +5,7 @@
 #include "case.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // This is a helper class which hueristically determines the probability
 // that one string is a match for another.  The static function Index
@@ -126,7 +126,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // spell_INCLUDED
 

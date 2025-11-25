@@ -3,7 +3,7 @@
 #include "code.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 char Code::codes[13558] =
 {
     ID_PART_CODE, ID_PART_CODE, ID_PART_CODE, ID_PART_CODE, ID_PART_CODE,
@@ -2971,5 +2971,5 @@ u2 Code::blocks[2176] =
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

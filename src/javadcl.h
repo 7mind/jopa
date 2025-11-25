@@ -4,7 +4,7 @@
 #define javadcl_INCLUDED
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 #define CLASS_HEADER javaprs_table::
 
 const unsigned char  CLASS_HEADER rhs[] = {0,
@@ -2999,6 +2999,6 @@ const unsigned short CLASS_HEADER in_symb[] = {0,
                           };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif /* javadcl_INCLUDED */

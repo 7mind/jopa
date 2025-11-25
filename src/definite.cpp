@@ -4,7 +4,7 @@
 #include "option.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // NOTE: This file is used to determine definite assignment and definite
 // unassignment rules, per JLS chapter 16.  Often, these are abbreviated
@@ -85,7 +85,7 @@ DefiniteAssignmentSet* Semantic::DefiniteBooleanExpression(AstExpression* expr,
     // Java 5: Allow Boolean wrapper type (unboxing)
     assert(! definite ||
            expr -> Type() == control.boolean_type ||
-           (control.option.source >= JikesOption::SDK1_5 &&
+           (control.option.source >= JopaOption::SDK1_5 &&
             expr -> Type() == control.Boolean()));
     return definite;
 }
@@ -791,7 +791,7 @@ void Semantic::DefiniteBlock(Ast* stmt)
     DefiniteBlockStatements(block_body);
 
 #ifdef DUMP
-    if ((control.option.g & JikesOption::VARS) &&
+    if ((control.option.g & JopaOption::VARS) &&
         block_body -> NumLocallyDefinedVariables() > 0)
     {
         Coutput << "(3) At Line "
@@ -864,7 +864,7 @@ void Semantic::DefiniteLocalVariableStatement(Ast* stmt)
         if (! variable_symbol)
             continue;
         int index = variable_symbol -> LocalVariableIndex(this);
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
 #ifdef DUMP
             Coutput << "(3.5) Local Variable \"" << variable_symbol -> Name()
@@ -1105,7 +1105,7 @@ void Semantic::DefiniteForeachStatement(Ast* stmt)
     if (variable_symbol)
     {
         int index = variable_symbol -> LocalVariableIndex(this);
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
 #ifdef DUMP
             Coutput << "(3.6) Foreach Variable \"" << variable_symbol -> Name()
@@ -1361,7 +1361,7 @@ void Semantic::DefiniteTryStatement(Ast* stmt)
         VariableSymbol* variable = clause -> parameter_symbol;
         int index = variable -> LocalVariableIndex(this);
         DefinitelyAssignedVariables() -> AddElement(index);
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
 #ifdef DUMP
             Coutput << "(7) Variable \"" << variable -> Name() << " #"
@@ -1379,7 +1379,7 @@ void Semantic::DefiniteTryStatement(Ast* stmt)
         DefinitelyAssignedVariables() -> ReclaimElement(index);
 #ifdef DUMP
         VariableSymbol* variable = clause -> parameter_symbol;
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
             Coutput << "(8) Variable \"" << variable -> Name() << " #"
                     << index << "\" goes out of scope at line "
                     << lex_stream -> Line(clause -> formal_parameter -> RightToken())
@@ -1494,7 +1494,7 @@ void Semantic::DefiniteMethodBody(AstMethodDeclaration* method_declaration)
         return;
 
 #ifdef DUMP
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
         Coutput << "(9) Processing method \""
                 << method_declaration -> method_symbol -> Name() << "\" in "
                 << ThisType() -> ContainingPackageName()
@@ -1521,7 +1521,7 @@ void Semantic::DefiniteMethodBody(AstMethodDeclaration* method_declaration)
             AssignElement(formal_declarator -> symbol ->
                           LocalVariableIndex(this));
 #ifdef DUMP
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
             VariableSymbol* variable = formal_declarator -> symbol;
             Coutput << "(10) Variable \"" << variable -> Name() << " #"
@@ -1536,7 +1536,7 @@ void Semantic::DefiniteMethodBody(AstMethodDeclaration* method_declaration)
     DefiniteBlockStatements(block_body);
 
 #ifdef DUMP
-    if ((control.option.g & JikesOption::VARS) &&
+    if ((control.option.g & JopaOption::VARS) &&
         block_body -> NumLocallyDefinedVariables() > 0)
     {
         Coutput << "(11) At Line "
@@ -1566,7 +1566,7 @@ void Semantic::DefiniteConstructorBody(AstConstructorDeclaration* constructor_de
     unsigned i;
     assert(FinalFields());
 #ifdef DUMP
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
         Coutput << "(12) Processing constructor \""
                 << constructor_declaration -> constructor_symbol -> Name()
                 << "\" in "
@@ -1596,7 +1596,7 @@ void Semantic::DefiniteConstructorBody(AstConstructorDeclaration* constructor_de
         DefinitelyAssignedVariables() ->
             AddElement(formal_declarator -> symbol -> LocalVariableIndex(this));
 #ifdef DUMP
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
             VariableSymbol* variable = formal_declarator -> symbol;
             Coutput << "(13) Variable \"" << variable -> Name() << " #"
@@ -1619,7 +1619,7 @@ void Semantic::DefiniteConstructorBody(AstConstructorDeclaration* constructor_de
     DefiniteBlockStatements(block_body);
 
 #ifdef DUMP
-    if ((control.option.g & JikesOption::VARS) &&
+    if ((control.option.g & JopaOption::VARS) &&
         block_body -> NumLocallyDefinedVariables() > 0)
     {
         Coutput << "(14) At Line "
@@ -1653,7 +1653,7 @@ void Semantic::DefiniteBlockInitializer(AstBlock* block_body, int stack_size)
 {
     assert(FinalFields());
 #ifdef DUMP
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
         Coutput << "(15) Processing Initializer block in "
                 << ThisType() -> ContainingPackageName() << "/"
                 << ThisType() -> ExternalName() << endl;
@@ -1670,7 +1670,7 @@ void Semantic::DefiniteBlockInitializer(AstBlock* block_body, int stack_size)
     DefiniteBlockStatements(block_body);
 
 #ifdef DUMP
-    if ((control.option.g & JikesOption::VARS) &&
+    if ((control.option.g & JopaOption::VARS) &&
         block_body -> NumLocallyDefinedVariables() > 0)
     {
         Coutput << "(16) At Line "
@@ -1759,4 +1759,4 @@ void Semantic::DefiniteCleanUp()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

@@ -5,7 +5,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // Process modifiers, returning the AccessFlags they represent.
 //
@@ -446,4 +446,4 @@ AccessFlags Semantic::ProcessEnumConstantModifiers(AstEnumConstant* decl)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

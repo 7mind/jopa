@@ -8,7 +8,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Semantic::PrintMessages()
 {
     if (this != control.system_semantic)
@@ -165,7 +165,7 @@ void ErrorInfo::Initialize(LexStream* l)
 
 ErrorInfo::ErrorInfo()
     : msg(NULL),
-      severity(JikesError::JIKES_ERROR)
+      severity(JopaError::JOPA_ERROR)
 {
 }
 
@@ -174,7 +174,7 @@ ErrorInfo::~ErrorInfo()
 }
 
 
-JikesError::JikesErrorSeverity ErrorInfo::getSeverity() { return severity; }
+JopaError::JopaErrorSeverity ErrorInfo::getSeverity() { return severity; }
 int ErrorInfo::getLeftLineNo() { return left_line_no; }
 int ErrorInfo::getLeftColumnNo() { return left_column_no; }
 int ErrorInfo::getRightLineNo() { return right_line_no; }
@@ -276,13 +276,13 @@ void SemanticError::Report(SemanticErrorKind msg_code,
     case NAMED_WEAK_ON:
     case WEAK_WARNING:
         warning[msg_code] =
-            control.option.tolerance & JikesOption::WARNINGS_ARE_ERRORS
+            control.option.tolerance & JopaOption::WARNINGS_ARE_ERRORS
                 ? MANDATORY_ERROR : WEAK_WARNING;
         break;
     case NAMED_STRONG_ON:
     case STRONG_WARNING:
         warning[msg_code] =
-            control.option.tolerance & JikesOption::CAUTIONS_ARE_ERRORS
+            control.option.tolerance & JopaOption::CAUTIONS_ARE_ERRORS
                 ? MANDATORY_ERROR : STRONG_WARNING;
         break;
     case MANDATORY_ERROR:
@@ -292,7 +292,7 @@ void SemanticError::Report(SemanticErrorKind msg_code,
     //
     // Don't report non-mandatory errors if we're in -nowarn mode.
     //
-    if (control.option.tolerance == JikesOption::NO_WARNINGS &&
+    if (control.option.tolerance == JopaOption::NO_WARNINGS &&
         warning[msg_code] != MANDATORY_ERROR)
     {
         return;
@@ -305,7 +305,7 @@ void SemanticError::Report(SemanticErrorKind msg_code,
     else num_errors++;
 
     error[i].msg_code = msg_code;
-    error[i].severity = (JikesError::JikesErrorSeverity) warning[msg_code];
+    error[i].severity = (JopaError::JopaErrorSeverity) warning[msg_code];
 
     int total_length = 0,
         length1 = 0,
@@ -889,7 +889,7 @@ int SemanticError::PrintMessages()
     {
         if (num_errors == 0)
         {
-            if (control.option.tolerance == JikesOption::NO_WARNINGS)
+            if (control.option.tolerance == JopaOption::NO_WARNINGS)
                 // we only had warnings and they should not be reported
                 return return_code;
 
@@ -905,7 +905,7 @@ int SemanticError::PrintMessages()
                         control.system_semantic ? " system" : " semantic")
                     << " error" << (num_errors <= 1 ? "" : "s");
             if (num_warnings > 0 &&
-                control.option.tolerance != JikesOption::NO_WARNINGS)
+                control.option.tolerance != JopaOption::NO_WARNINGS)
             {
                 Coutput << " and issued " << num_warnings
                         << " warning" << (num_warnings <= 1 ? "" : "s");
@@ -950,7 +950,7 @@ int SemanticError::PrintMessages()
         for (unsigned k = 0; k < error.Length(); k++)
         {
             if (warning[error[k].msg_code] != 1 ||
-                control.option.tolerance != JikesOption::NO_WARNINGS)
+                control.option.tolerance != JopaOption::NO_WARNINGS)
             {
                 reportError(k);
             }
@@ -1139,7 +1139,7 @@ void SemanticError::reportError(int k)
 {
     FormatError(error[k]);
     error[k].Initialize(lex_stream);
-    JikesAPI::getInstance() -> reportError(&error[k]);
+    JopaAPI::getInstance() -> reportError(&error[k]);
 }
 
 //
@@ -2107,5 +2107,5 @@ void SemanticError::InitializeMessages()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

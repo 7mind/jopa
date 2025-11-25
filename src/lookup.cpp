@@ -6,7 +6,7 @@
 #include <cwchar>
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 PackageSymbol* Symbol::PackageCast()
 {
     return DYNAMIC_CAST<PackageSymbol*> (_kind == PACKAGE ? this : NULL);
@@ -362,7 +362,7 @@ time_t DirectoryEntry::Mtime()
         strcat(file_name, this -> name);
 
         struct stat status;
-        if (JikesAPI::getInstance() -> stat(file_name, &status) == 0)
+        if (JopaAPI::getInstance() -> stat(file_name, &status) == 0)
              mtime_ = status.st_mtime;
         else assert(false && "Cannot compute system time stamp\n");
 
@@ -513,7 +513,7 @@ void TypeLookupTable::InsertType(TypeSymbol* type)
                                  type -> fully_qualified_name -> length);
     int k = hash_address % hash_size;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     for (TypeSymbol* t = base[k]; t; t = t -> next_type)
         assert (type != t && "Type was already entered in type table");
 #endif
@@ -1786,5 +1786,5 @@ bool NameSymbol::IsBadStyleForVariable() const
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

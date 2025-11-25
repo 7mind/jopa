@@ -5,7 +5,7 @@
 #include "platform.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class AccessFlags
 {
 public:
@@ -166,7 +166,7 @@ public:
         return ! IsSet(later_flags);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     enum AccessMetatype
     {
         ACCESS_TYPE,
@@ -208,11 +208,11 @@ public:
             Coutput << " annotation";
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // access_INCLUDED
 

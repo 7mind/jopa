@@ -5,7 +5,7 @@
 #include "tab.h"
 #include "stream.h"
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 
 //
 // Look for file names in an @file and add them to the passed
@@ -298,7 +298,7 @@ static inline char* makeStrippedCopy(char* value)
 Option::Option(ArgumentExpander& arguments,
                Tuple<OptionError *>& bad_options)
     : first_file_index(arguments.argc),
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
       debug_trap_op(0),
       debug_dump_lex(false),
       debug_dump_ast(false),
@@ -307,7 +307,7 @@ Option::Option(ArgumentExpander& arguments,
       debug_comments(false),
       debug_dump_class(false),
       debug_trace_stack_change(false),
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
       nocleanup(false),
       incremental(false),
       makefile(false),
@@ -371,7 +371,7 @@ Option::Option(ArgumentExpander& arguments,
                     continue;
                 }
                 // Create a clean copy of the -bootclasspath argument so we
-                // can modify this copy and delete it later in ~JikesOption
+                // can modify this copy and delete it later in ~JopaOption
                 delete [] bootclasspath;
                 bootclasspath = makeStrippedCopy(arguments.argv[++i]);
             }
@@ -387,7 +387,7 @@ Option::Option(ArgumentExpander& arguments,
                     continue;
                 }
                 // Create a clean copy of the -classpath argument so we can
-                // modify this copy and delete it later in ~JikesOption
+                // modify this copy and delete it later in ~JopaOption
                 delete [] classpath;
                 classpath = makeStrippedCopy(arguments.argv[++i]);
             }
@@ -504,7 +504,7 @@ Option::Option(ArgumentExpander& arguments,
                     continue;
                 }
                 // Create a clean copy of the -extdirs argument so we can
-                // modify this copy and delete it later in ~JikesOption
+                // modify this copy and delete it later in ~JopaOption
                 delete [] extdirs;
                 extdirs = makeStrippedCopy(arguments.argv[++i]);
             }
@@ -615,7 +615,7 @@ Option::Option(ArgumentExpander& arguments,
                     continue;
                 }
                 // Create a clean copy of the -sourcepath argument so we can
-                // modify this copy and delete it later in ~JikesOption
+                // modify this copy and delete it later in ~JopaOption
                 delete [] sourcepath;
                 sourcepath = makeStrippedCopy(arguments.argv[++i]);
             }
@@ -906,7 +906,7 @@ Option::Option(ArgumentExpander& arguments,
                                         arguments.argv[i]);
                 }
             }
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
             else if (strcmp(arguments.argv[i], "+A") == 0)
                 debug_dump_ast = true;
             else if (strcmp(arguments.argv[i], "+c") == 0)
@@ -926,7 +926,7 @@ Option::Option(ArgumentExpander& arguments,
                 debug_unparse_ast = true;
                 debug_unparse_ast_debug = true;
             }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
             else
             {
                 bad_options.Next() =
@@ -973,26 +973,26 @@ Option::Option(ArgumentExpander& arguments,
 
     if (! bootclasspath)
         // Create a clean copy of the bootclasspath envvar so we can modify
-        //   this copy and delete it later in ~JikesOption
+        //   this copy and delete it later in ~JopaOption
         bootclasspath = makeStrippedCopy(getenv("BOOTCLASSPATH"));
     if (! extdirs)
         // Create a clean copy of the extdirs envvar so we can modify
-        //   this copy and delete it later in ~JikesOption
+        //   this copy and delete it later in ~JopaOption
         extdirs = makeStrippedCopy(getenv("EXTDIRS"));
     if (! classpath)
     {
         // Create a clean copy of the jikespath envvar so we can modify
-        //   this copy and delete it later in ~JikesOption
+        //   this copy and delete it later in ~JopaOption
         classpath = makeStrippedCopy(getenv("JIKESPATH"));
         if (! classpath)
         // Create a clean copy of the classpath envvar so we can modify
-        //   this copy and delete it later in ~JikesOption
+        //   this copy and delete it later in ~JopaOption
             classpath = makeStrippedCopy(getenv("CLASSPATH"));
     }
     if (! sourcepath)
     {
         // Create a clean copy of the sourcepath envvar so we can modify
-        //   this copy and delete it later in ~JikesOption
+        //   this copy and delete it later in ~JopaOption
         sourcepath = makeStrippedCopy(getenv("SOURCEPATH"));
 
         if (! sourcepath)
@@ -1039,4 +1039,4 @@ Option::~Option()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

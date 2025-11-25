@@ -8,7 +8,7 @@
 #include "typeparam.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 
 
 
@@ -128,9 +128,9 @@ CPUtf8Info::CPUtf8Info(ClassFile& buffer)
 
 void CPUtf8Info::Init(u2 size)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     const char* tmp;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     for (u2 i = 0; i < size; i++)
     {
         switch (bytes[i])
@@ -140,15 +140,15 @@ void CPUtf8Info::Init(u2 size)
         case 0xf6: case 0xf7: case 0xf8: case 0xf9: case 0xfa: case 0xfb:
         case 0xfc: case 0xfd: case 0xfe: case 0xff: // invalid
             valid = false;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
             contents.Next() = '\\';
             contents.Next() = 'x';
             tmp = IntToString(bytes[i], 2).String();
             contents.Next() = tmp[0];
             contents.Next() = tmp[1];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
             break;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         case 0x09:
             contents.Next() = '\\';
             contents.Next() = 't';
@@ -183,30 +183,30 @@ void CPUtf8Info::Init(u2 size)
             contents.Next() = tmp[2];
             contents.Next() = tmp[3];
             break;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
         default:
-            if (bytes[i] <= 0x7f) // 1-byte (printing ASCII, if JIKES_DEBUG)
+            if (bytes[i] <= 0x7f) // 1-byte (printing ASCII, if JOPA_DEBUG)
             {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                 contents.Next() = bytes[i];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
             }
             else if (bytes[i] <= 0xdf) // 2-byte source
             {
                 if (i + 1 == size || (bytes[i + 1] & 0xc0) != 0x80)
                 {
                     valid = false;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                     contents.Next() = '\\';
                     contents.Next() = 'x';
                     tmp = IntToString(bytes[i], 2).String();
                     contents.Next() = tmp[0];
                     contents.Next() = tmp[1];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
                     break;
                 }
                 ++i;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                 u2 value = (bytes[i - 1] & 0x1f) << 6;
                 value |= bytes[i] & 0x3f;
                 contents.Next() = '\\';
@@ -216,7 +216,7 @@ void CPUtf8Info::Init(u2 size)
                 contents.Next() = tmp[1];
                 contents.Next() = tmp[2];
                 contents.Next() = tmp[3];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
             }
             else // 3-byte source
             {
@@ -226,17 +226,17 @@ void CPUtf8Info::Init(u2 size)
                     (bytes[i + 2] & 0xc0) != 0x80)
                 {
                     valid = false;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                     contents.Next() = '\\';
                     contents.Next() = 'x';
                     tmp = IntToString(bytes[i], 2).String();
                     contents.Next() = tmp[0];
                     contents.Next() = tmp[1];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
                     break;
                 }
                 i += 2;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                 u2 value = (bytes[i - 2] & 0x0f) << 12;
                 value |= (bytes[i - 1] & 0x3f) << 6;
                 value |= bytes[i] & 0x3f;
@@ -247,11 +247,11 @@ void CPUtf8Info::Init(u2 size)
                 contents.Next() = tmp[1];
                 contents.Next() = tmp[2];
                 contents.Next() = tmp[3];
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
             }
         }
     }
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (! valid)
     {
         contents.Next() = '\\';
@@ -265,7 +265,7 @@ void CPUtf8Info::Init(u2 size)
         contents.Next() = '\\';
     }
     contents.Next() = 0;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
@@ -335,7 +335,7 @@ const char* FieldInfo::Signature(const ConstantPool& pool,
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
         : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Bytes();
@@ -346,7 +346,7 @@ u2 FieldInfo::SignatureLength(const ConstantPool& pool,
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
         : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Length();
@@ -455,7 +455,7 @@ const char* MethodInfo::Signature(const ConstantPool& pool,
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
         : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Bytes();
@@ -466,7 +466,7 @@ u2 MethodInfo::SignatureLength(const ConstantPool& pool,
 {
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
     const CPUtf8Info* sig =
-        (control.option.source >= JikesOption::SDK1_5 && attr_signature)
+        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
         ? attr_signature -> Signature(pool)
         : (const CPUtf8Info*) pool[descriptor_index];
     return sig -> Length();
@@ -701,7 +701,7 @@ CodeAttribute::CodeAttribute(ClassFile& buffer)
 }
 
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 void CodeAttribute::Print(const ConstantPool& constant_pool, int fill) const
 {
     assert(! fill);
@@ -734,7 +734,7 @@ void CodeAttribute::Print(const ConstantPool& constant_pool, int fill) const
     for (unsigned j = 0; j < attributes.Length(); j++)
         attributes[j] -> Print(constant_pool, 2);
 }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
 ExceptionsAttribute::ExceptionsAttribute(ClassFile& buffer)
@@ -1031,12 +1031,12 @@ void AnnotationComponentAnnotation::Put(OutputBuffer& out) const
     attr_value -> Put(out);
 }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 void AnnotationComponentAnnotation::Print(const ConstantPool& pool) const
 {
     attr_value -> Print(pool);
 }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
 AnnotationComponentArray::AnnotationComponentArray(ClassFile& buffer)
@@ -1633,9 +1633,9 @@ TypeSymbol* Semantic::ReadTypeFromSignature(TypeSymbol* base_type,
 //
 void Semantic::ReadClassFile(TypeSymbol* type, TokenIndex tok)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     control.class_files_read++;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     FileSymbol* file_symbol = type -> file_symbol;
 
@@ -1671,8 +1671,8 @@ void Semantic::ReadClassFile(TypeSymbol* type, TokenIndex tok)
     else
     {
         // Get a ReadObject from the API that contains the file's data.
-        JikesAPI::FileReader* classFile =
-            JikesAPI::getInstance() -> read(file_symbol -> FileName());
+        JopaAPI::FileReader* classFile =
+            JopaAPI::getInstance() -> read(file_symbol -> FileName());
         if (classFile == NULL)
         {
             // this symbol table will only contain a default constructor
@@ -1867,7 +1867,7 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
     //
     // For Java 5+, parse the Signature attribute to get type parameters
     //
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         class_data -> Signature())
     {
         const CPUtf8Info* sig_info = class_data -> Signature() -> Signature(pool);
@@ -2090,4 +2090,4 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

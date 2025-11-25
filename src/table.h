@@ -5,7 +5,7 @@
 #include "symbol.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class VariableShadowSymbol
 {
 public:
@@ -466,7 +466,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // table_INCLUDED
 

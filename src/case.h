@@ -4,7 +4,7 @@
 #include "platform.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // NOTE that this class is hard-wired to work on an ASCII machine.
 // To make it universal, one should uncomment the constructor and
@@ -191,7 +191,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // case_INCLUDED
 

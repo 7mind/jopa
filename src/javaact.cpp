@@ -7,7 +7,7 @@
 #include "javaact.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //**************************************************************************//
 //**************************************************************************//
 //*                                                                        *//
@@ -4988,4 +4988,4 @@ void Parser::MakeTypeBound()
 // void MakeTypeArguments();
 //
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

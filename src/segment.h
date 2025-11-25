@@ -5,7 +5,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class SegmentPool;
 
 
@@ -193,7 +193,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // segment_INCLUDED
 

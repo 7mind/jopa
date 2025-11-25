@@ -9,14 +9,14 @@
 #include "tab.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 // Class StreamError
 
-JikesError::JikesErrorSeverity StreamError::getSeverity()
+JopaError::JopaErrorSeverity StreamError::getSeverity()
 {
     // Most Lexical errors are ERRORs.
     return kind >= StreamError::LAST_CHARACTER_NOT_NEWLINE
-        ? JikesError::JIKES_WARNING : JikesError::JIKES_ERROR;
+        ? JopaError::JOPA_WARNING : JopaError::JOPA_ERROR;
 }
 
 const char* StreamError::getFileName()
@@ -158,7 +158,7 @@ Stream::Stream()
       input_buffer_length(0)
 #if defined(HAVE_LIBICU_UC)
     , _decoder(NULL)
-#elif defined(JIKES_ICONV_ENCODING)
+#elif defined(JOPA_ICONV_ENCODING)
     , _decoder((iconv_t) - 1)
 #endif
 {
@@ -196,8 +196,8 @@ bool Stream::SetEncoding(char* encoding)
 # if defined(HAVE_LIBICU_UC)
     UErrorCode err = U_ZERO_ERROR;
     _decoder = ucnv_open(encoding, &err);
-# elif defined(JIKES_ICONV_ENCODING)
-    _decoder = iconv_open(JIKES_ICONV_ENCODING, encoding);
+# elif defined(JOPA_ICONV_ENCODING)
+    _decoder = iconv_open(JOPA_ICONV_ENCODING, encoding);
 # endif
 
     return HaveDecoder();
@@ -210,7 +210,7 @@ void Stream::DestroyEncoding()
 # if defined(HAVE_LIBICU_UC)
         ucnv_close(_decoder);
         _decoder = NULL;
-# elif defined(JIKES_ICONV_ENCODING)
+# elif defined(JOPA_ICONV_ENCODING)
         iconv_close(_decoder);
         _decoder = (iconv_t)-1;
 # endif
@@ -246,7 +246,7 @@ wchar_t Stream::DecodeNextCharacter()
         return 0;
     }
 
-# elif defined(JIKES_ICONV_ENCODING)
+# elif defined(JOPA_ICONV_ENCODING)
 
     if (!HaveDecoder()) {
         // you can't just cast a char to a wchar_t, since that would
@@ -285,7 +285,7 @@ wchar_t Stream::DecodeNextCharacter()
         }
     }
 
-#  if JIKES_ICONV_NEEDS_BYTE_SWAP
+#  if JOPA_ICONV_NEEDS_BYTE_SWAP
     char tmp;
     char* targ = (char*) &next;
 #   if SIZEOF_WCHAR_T == 2
@@ -303,9 +303,9 @@ wchar_t Stream::DecodeNextCharacter()
 #    error sizeof(wchar_t) unworkable, this should not have passed configure
 #   endif //sizeof(wchar_t)
 
-#  endif // JIKES_ICONV_NEEDS_BYTE_SWAP
+#  endif // JOPA_ICONV_NEEDS_BYTE_SWAP
 
-# endif // JIKES_ICONV_ENCODING
+# endif // JOPA_ICONV_ENCODING
 
     if (before == source_ptr)
     {
@@ -324,7 +324,7 @@ wchar_t Stream::DecodeNextCharacter()
 
 LexStream::LexStream(Control& control_, FileSymbol* file_symbol_)
     : file_symbol(file_symbol_),
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
       file_read(false),
 #endif
       index(0),
@@ -344,7 +344,7 @@ LexStream::LexStream(Control& control_, FileSymbol* file_symbol_)
 
 LexStream::~LexStream()
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (file_read)
         control.line_count += (line_location.Length() - 3);
 #endif
@@ -594,7 +594,7 @@ void LexStream::OutputLine(unsigned line_no, ErrorString& s)
 //
 // Outputs the section of source code which is in error.
 //
-void LexStream::OutputSource(JikesError* err, ErrorString& s)
+void LexStream::OutputSource(JopaError* err, ErrorString& s)
 {
     int left_line_no = err -> getLeftLineNo();
     int left_column_no = err -> getLeftColumnNo();
@@ -730,14 +730,14 @@ void LexStream::ReadInput()
     else
     {
         struct stat status;
-        JikesAPI::getInstance() -> stat(FileName(), &status);
+        JopaAPI::getInstance() -> stat(FileName(), &status);
 
         file_symbol -> mtime = status.st_mtime; // actual time stamp of file read
         file_symbol -> lex_stream = this;
 
 
-        JikesAPI::FileReader* file =
-            JikesAPI::getInstance() -> read(FileName());
+        JopaAPI::FileReader* file =
+            JopaAPI::getInstance() -> read(FileName());
         if (file)
         {
             ProcessInput(file -> getBuffer(), file -> getBufferSize());
@@ -769,12 +769,12 @@ void LexStream::RereadInput()
     else
     {
         struct stat status;
-        JikesAPI::getInstance() -> stat(FileName(), &status);
+        JopaAPI::getInstance() -> stat(FileName(), &status);
 
         if (status.st_mtime == file_symbol -> mtime)
         {
-           JikesAPI::FileReader* file =
-               JikesAPI::getInstance() -> read(FileName());
+           JopaAPI::FileReader* file =
+               JopaAPI::getInstance() -> read(FileName());
            if (file)
            {
                ProcessInput(file -> getBuffer(), file -> getBufferSize());
@@ -830,7 +830,7 @@ void LexStream::ProcessInput(const char* buffer, long filesize)
 
 void LexStream::ProcessInputAscii(const char* buffer, long filesize)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     file_read = true;
 #endif
 
@@ -970,7 +970,7 @@ void LexStream::ProcessInputAscii(const char* buffer, long filesize)
 void LexStream::ProcessInputUnicode(const char* buffer, long filesize)
 {
     //fprintf(stderr,"LexStream::ProcessInputUnicode called.\n");
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     file_read = true;
 #endif
 
@@ -1218,7 +1218,7 @@ void LexStream::ReportMessage(StreamError::StreamErrorKind kind,
                               unsigned start_location,
                               unsigned end_location)
 {
-    if (control.option.tolerance != JikesOption::NO_WARNINGS ||
+    if (control.option.tolerance != JopaOption::NO_WARNINGS ||
         kind < StreamError::DEPRECATED_IDENTIFIER_ASSERT)
     {
         bad_tokens.Next().Initialize(kind, start_location, end_location, this);
@@ -1348,13 +1348,13 @@ void LexStream::PrintMessages()
             else
             {
                 for (unsigned i = 0; i < bad_tokens.Length(); i++)
-                    JikesAPI::getInstance() -> reportError(&bad_tokens[i]);
+                    JopaAPI::getInstance() -> reportError(&bad_tokens[i]);
             }
         }
         else
         {
             for (unsigned i = 0; i < bad_tokens.Length(); i++)
-                JikesAPI::getInstance() -> reportError(&bad_tokens[i]);
+                JopaAPI::getInstance() -> reportError(&bad_tokens[i]);
         }
 
         DestroyInput();
@@ -1363,5 +1363,5 @@ void LexStream::PrintMessages()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

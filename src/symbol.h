@@ -7,7 +7,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Semantic;
 class SemanticEnvironment;
 class Ast;
@@ -2474,7 +2474,7 @@ inline SymbolTable* BlockSymbol::Table()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // symbol_INCLUDED
 

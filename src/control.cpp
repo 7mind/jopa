@@ -8,7 +8,7 @@
 #include "option.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 Control::Control(char** arguments, Option& option_)
     : return_code(0)
     , option(option_)
@@ -127,12 +127,12 @@ Control::Control(char** arguments, Option& option_)
     , float_pool(&bad_value)
     , double_pool(&bad_value)
     , Utf8_pool(&bad_value)
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     , input_files_processed(0)
     , class_files_read(0)
     , class_files_written(0)
     , line_count(0)
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     // Package cache.  unnamed and lang are initialized in constructor body.
     , annotation_package(NULL)
     , io_package(NULL)
@@ -169,7 +169,7 @@ Control::Control(char** arguments, Option& option_)
          file_symbol = (FileSymbol*) input_java_file_set.NextElement())
     {
         input_files[num_files++] = file_symbol;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         input_files_processed++;
 #endif
         errno = 0;
@@ -611,7 +611,7 @@ Control::~Control()
     delete system_semantic;
     delete system_table;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (option.debug_dump_lex || option.debug_dump_ast ||
         option.debug_unparse_ast)
     {
@@ -621,7 +621,7 @@ Control::~Control()
                 << input_files_processed << " \".java\" files processed"
                 << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
@@ -717,7 +717,7 @@ DirectorySymbol* Control::ProcessSubdirectories(wchar_t* source_name,
     DirectorySymbol* directory_symbol = NULL;
     struct stat status;
     if (SystemStat(input_name, &status) == 0 &&
-        (status.st_mode & JIKES_STAT_S_IFDIR))
+        (status.st_mode & JOPA_STAT_S_IFDIR))
     {
         directory_symbol = system_table ->
             FindDirectorySymbol(status.st_dev, status.st_ino);
@@ -1537,7 +1537,7 @@ void Control::CleanUp(FileSymbol* file_symbol)
 
     if (sem)
     {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         if (option.debug_dump_lex)
         {
             sem -> lex_stream -> Reset(); // rewind input and ...
@@ -1556,7 +1556,7 @@ void Control::CleanUp(FileSymbol* file_symbol)
             sem -> compilation_unit -> Unparse(sem -> lex_stream,
                                                "unparsed/");
         }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
         sem -> PrintMessages();
         if (sem -> return_code > 0)
             return_code = 1;
@@ -1567,5 +1567,5 @@ void Control::CleanUp(FileSymbol* file_symbol)
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

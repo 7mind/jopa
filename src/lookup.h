@@ -7,7 +7,7 @@
 #include "double.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 class Symbol;
 class PackageSymbol;
@@ -638,7 +638,7 @@ public:
     inline IntLiteralValue* Find(int i) { return Find((i4) i); }
 #endif // TYPE_I4_IS_INT
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // To prevent arithmetic conversion to allow illegal calls inadvertently.
     // Since the return type is wrong, compilation will fail !
@@ -685,7 +685,7 @@ public:
 
     LongLiteralValue* FindOrInsert(LongInt);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // To prevent arithmetic conversion to allow illegal calls inadvertently.
     //
@@ -733,7 +733,7 @@ public:
 
     FloatLiteralValue* FindOrInsert(IEEEfloat);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // To prevent arithmetic conversion to allow illegal calls inadvertently.
     //
@@ -779,7 +779,7 @@ public:
 
     DoubleLiteralValue* FindOrInsert(IEEEdouble);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // To prevent arithmetic conversion to allow illegal calls inadvertently.
     //
@@ -864,6 +864,6 @@ inline unsigned Symbol::HashCode() const
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // lookup_INCLUDED

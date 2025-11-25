@@ -4,7 +4,7 @@
 #include "control.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // Get the erased type for this type parameter
 //
@@ -181,4 +181,4 @@ void TypeParameterSymbol::GenerateSignature(Control& control)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

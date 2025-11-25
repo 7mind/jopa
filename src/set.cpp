@@ -1,7 +1,7 @@
 #include "set.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 unsigned SymbolSet::primes[] = {DEFAULT_HASH_SIZE, 101, 401, MAX_HASH_SIZE};
 
 void SymbolSet::Rehash()
@@ -266,5 +266,5 @@ SymbolMap::~SymbolMap()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

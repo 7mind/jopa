@@ -7,7 +7,7 @@
 #include "set.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class StoragePool;
 class Option;
 class Scanner;
@@ -471,12 +471,12 @@ public:                                                         \
 
     void ProcessHeaders(FileSymbol*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     int input_files_processed,
         class_files_read,
         class_files_written,
         line_count;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     PackageSymbol* ProcessPackage(const wchar_t*);
 
@@ -527,7 +527,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // control_INCLUDED
 

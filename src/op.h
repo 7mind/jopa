@@ -5,7 +5,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class ConstantPool;
 
 // code dealing with describing and listing byte code
@@ -223,7 +223,7 @@ public:
 protected:
     static int stack_effect[];
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 public:
     static void OpDmp(const ConstantPool&, const Tuple<u1>&);
     static int OpDesc(Opcode, const char** name, const char** desc);
@@ -278,10 +278,10 @@ private:
 
     static void OpLine(const ConstantPool&, char, int, const char*,
                        char*, const char*, OpInfo, unsigned);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // op_INCLUDED

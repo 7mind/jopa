@@ -11,7 +11,7 @@
 #include "paramtype.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // If this compilation unit contains a package declaration, make sure
 // the package is not also associated with a type. We used to also
@@ -493,7 +493,7 @@ void Semantic::ProcessImports()
             compilation_unit -> ImportDeclaration(i);
         if (import_declaration -> static_token_opt)
         {
-            if (control.option.source < JikesOption::SDK1_5)
+            if (control.option.source < JopaOption::SDK1_5)
             {
                 ReportSemError(SemanticError::STATIC_IMPORT_UNSUPPORTED,
                                import_declaration -> static_token_opt);
@@ -680,7 +680,7 @@ void Semantic::ProcessTypeHeader(AstEnumDeclaration* declaration)
     // Set processing_type so ThisType() works during header processing
     processing_type = type;
 
-    if (control.option.source < JikesOption::SDK1_5)
+    if (control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::ENUM_TYPE_UNSUPPORTED,
                        declaration -> enum_token);
@@ -763,7 +763,7 @@ void Semantic::ProcessTypeHeader(AstAnnotationDeclaration* declaration)
     // Set processing_type so ThisType() works during header processing
     processing_type = type;
 
-    if (control.option.source < JikesOption::SDK1_5)
+    if (control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::ANNOTATION_TYPE_UNSUPPORTED,
                        declaration -> interface_token - 1,
@@ -3280,7 +3280,7 @@ void Semantic::CheckMethodOverride(MethodSymbol* method,
             // Silent acceptance for .class files only.
             // They must work, because the 1.5 library is covariant,
             // even for -source 1.4!
-            if (control.option.source < JikesOption::SDK1_5 &&
+            if (control.option.source < JopaOption::SDK1_5 &&
                 ! hidden_method -> containing_type ->
                   file_symbol -> IsClassOnly())
             {
@@ -4074,7 +4074,7 @@ void Semantic::ProcessFormalParameters(BlockSymbol* block,
             assert(i == method_declarator -> NumFormalParameters() - 1);
             dims++;
             access_flags.SetACC_VARARGS();
-            if (control.option.source < JikesOption::SDK1_5)
+            if (control.option.source < JopaOption::SDK1_5)
             {
                 ReportSemError(SemanticError::VARARGS_UNSUPPORTED,
                                parameter -> ellipsis_token_opt);
@@ -5002,7 +5002,7 @@ void Semantic::ProcessType(AstType* type_expr)
         {
             name -> parameterized_type = ProcessTypeArguments(type, name -> type_arguments_opt);
         }
-        else if (type -> IsGeneric() && control.option.source >= JikesOption::SDK1_5)
+        else if (type -> IsGeneric() && control.option.source >= JopaOption::SDK1_5)
         {
             // Raw type usage: generic type used without type arguments
             // This is legal but generates unchecked warnings
@@ -5540,5 +5540,5 @@ void Semantic::ProcessInstanceInitializers(AstClassBody* class_body)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

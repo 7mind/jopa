@@ -4,7 +4,7 @@
 #include "platform.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Tab
 {
 public:
@@ -20,7 +20,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // tab_INCLUDED
 

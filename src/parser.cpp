@@ -3,7 +3,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Parser::ReallocateStacks()
 {
     int old_stack_length = stack_length;
@@ -655,5 +655,5 @@ int Parser::ParseCheck(int stck[], int stack_top, int first_token,
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

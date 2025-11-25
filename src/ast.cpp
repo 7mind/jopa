@@ -1,12 +1,12 @@
 #include "ast.h"
 #include "symbol.h"
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 # include "stream.h"
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
-namespace Jikes { // Open namespace Jikes block
-#ifdef JIKES_DEBUG
+namespace Jopa { // Open namespace Jopa block
+#ifdef JOPA_DEBUG
 unsigned Ast::count = 0;
 #endif
 
@@ -1242,7 +1242,7 @@ Ast* AstAssignmentExpression::Clone(StoragePool* ast_pool)
 }
 
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 
 //
 // These methods allow printing the Ast structure to Coutput (usually stdout).
@@ -2270,8 +2270,8 @@ void AstAssignmentExpression::Print(LexStream& lex_stream)
     expression -> Print(lex_stream);
 }
 
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

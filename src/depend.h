@@ -5,7 +5,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Semantic;
 class TypeSymbol;
 class FileSymbol;
@@ -115,7 +115,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // depend_INCLUDED
 

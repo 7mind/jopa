@@ -7,7 +7,7 @@
 #include "set.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Control::RemoveTrashedTypes(SymbolSet& type_trash_set)
 {
     TypeSymbol* type;
@@ -432,5 +432,5 @@ bool Control::IncrementalRecompilation()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

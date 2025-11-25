@@ -12,7 +12,7 @@
 #include "paramtype.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 template <typename T> inline void ExtremaForType(T& min, T& max);
 
 template <> inline void ExtremaForType(i4& min, i4& max)
@@ -1192,7 +1192,7 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
 
     // Java 5: If not found in environment, check single static imports
     if (methods_found.Length() == 0 &&
-        control.option.source >= JikesOption::SDK1_5)
+        control.option.source >= JopaOption::SDK1_5)
     {
         for (unsigned i = 0; i < single_static_imports.Length(); i++)
         {
@@ -1670,7 +1670,7 @@ void Semantic::FindVariableInEnvironment(Tuple<VariableSymbol*>& variables_found
     // TODO: Implement lazy lookup using StaticImportInfo
     // For now, disabled while testing
     if (false && variables_found.Length() == 0 &&
-        control.option.source >= JikesOption::SDK1_5)
+        control.option.source >= JopaOption::SDK1_5)
     {
         // Will implement lazy lookup here
     }
@@ -2639,7 +2639,7 @@ void Semantic::ProcessAmbiguousName(AstName* name)
         //
         // Java 5: Check for static imports before type lookup
         //
-        else if (control.option.source >= JikesOption::SDK1_5)
+        else if (control.option.source >= JopaOption::SDK1_5)
         {
             NameSymbol* name_symbol = lex_stream -> NameSymbol(name -> identifier_token);
             Symbol* static_member = NULL;
@@ -3162,7 +3162,7 @@ void Semantic::ProcessFloatLiteral(Ast* expr)
 
     if (! literal -> value)
         control.float_pool.FindOrInsertFloat(literal);
-    if (control.option.source < JikesOption::SDK1_5 &&
+    if (control.option.source < JopaOption::SDK1_5 &&
         (literal -> Name()[1] == U_x || literal -> Name()[1] == U_X))
     {
         ReportSemError(SemanticError::HEX_FLOATING_POINT_UNSUPPORTED,
@@ -3190,7 +3190,7 @@ void Semantic::ProcessDoubleLiteral(Ast* expr)
 
     if (! literal -> value)
         control.double_pool.FindOrInsertDouble(literal);
-    if (control.option.source < JikesOption::SDK1_5 &&
+    if (control.option.source < JopaOption::SDK1_5 &&
         (literal -> Name()[1] == U_x || literal -> Name()[1] == U_X))
     {
         ReportSemError(SemanticError::HEX_FLOATING_POINT_UNSUPPORTED,
@@ -3780,7 +3780,7 @@ void Semantic::ProcessClassLiteral(Ast* expr)
             class_lit -> symbol = control.Void_TYPE_Field();
         }
     }
-    else if (control.option.target < JikesOption::SDK1_5)
+    else if (control.option.target < JopaOption::SDK1_5)
     {
         //
         // We have already checked that the type is accessible. Older VMs
@@ -4338,7 +4338,7 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
         value.Length(); // +1 for $
     wchar_t* anonymous_name = new wchar_t[length + 1]; // +1 for '\0'
     wcscpy(anonymous_name, this_type -> ExternalName());
-    wcscat(anonymous_name, (control.option.target < JikesOption::SDK1_5
+    wcscat(anonymous_name, (control.option.target < JopaOption::SDK1_5
                             ? StringConstant::US_DS : StringConstant::US_MI));
     wcscat(anonymous_name, value.String());
 
@@ -5129,7 +5129,7 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
                 CanWideningPrimitiveConvert(target_type, source_type);
         }
         // Java 5: Boxing conversion (primitive → wrapper) for method invocation
-        if (control.option.source >= JikesOption::SDK1_5 &&
+        if (control.option.source >= JopaOption::SDK1_5 &&
             IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
             return true;
         return false;
@@ -5138,7 +5138,7 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
     if (target_type -> Primitive())
     {
         // Java 5: Unboxing conversion (wrapper → primitive) for method invocation
-        if (control.option.source >= JikesOption::SDK1_5 &&
+        if (control.option.source >= JopaOption::SDK1_5 &&
             IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
             return true;
         return false;
@@ -5163,12 +5163,12 @@ bool Semantic::CanAssignmentConvertReference(const TypeSymbol* target_type,
         return true;
 
     // Java 5: Boxing conversion (primitive → wrapper)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
         return true;
 
     // Java 5: Unboxing conversion (wrapper → primitive)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
         return true;
 
@@ -5196,12 +5196,12 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
         return true;
 
     // Java 5: Boxing conversion (primitive → wrapper)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
         return true;
 
     // Java 5: Unboxing conversion (wrapper → primitive)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
         return true;
 
@@ -5316,7 +5316,7 @@ LiteralValue* Semantic::CastValue(const TypeSymbol* target_type,
         return NULL; // A string cast to a supertype is not constant.
 
     // Java 5: Boxing/unboxing conversions are not constant expressions
-    if (control.option.source >= JikesOption::SDK1_5)
+    if (control.option.source >= JopaOption::SDK1_5)
     {
         if (IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type) ||
             IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
@@ -5605,7 +5605,7 @@ void Semantic::ProcessCastExpression(Ast* expr)
         {
             // Casting to a parameterized type - this is unchecked
             // Example: (List<String>) obj
-            if (control.option.source >= JikesOption::SDK1_5)
+            if (control.option.source >= JopaOption::SDK1_5)
             {
                 ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
                               cast_expression,
@@ -5619,7 +5619,7 @@ void Semantic::ProcessCastExpression(Ast* expr)
         {
             // Casting to raw generic type from non-generic source
             // Example: (List) obj where List is generic
-            if (control.option.source >= JikesOption::SDK1_5)
+            if (control.option.source >= JopaOption::SDK1_5)
             {
                 ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
                               cast_expression,
@@ -5682,7 +5682,7 @@ AstExpression* Semantic::PromoteUnaryNumericExpression(AstExpression* unary_expr
         return unary_expression;
 
     // Java 5: Unbox wrapper types to primitives before numeric promotion
-    if (control.option.source >= JikesOption::SDK1_5)
+    if (control.option.source >= JopaOption::SDK1_5)
     {
         TypeSymbol* unboxed_type = type -> UnboxedType(control);
         if (unboxed_type && unboxed_type != type)
@@ -5742,7 +5742,7 @@ TypeSymbol* Semantic::BinaryNumericPromotion(AstExpression*& left_expr,
     TypeSymbol* right_type = right_expr -> Type();
 
     // Java 5: Unbox wrapper types to primitives before numeric promotion
-    if (control.option.source >= JikesOption::SDK1_5)
+    if (control.option.source >= JopaOption::SDK1_5)
     {
         TypeSymbol* unboxed_left = left_type -> UnboxedType(control);
         if (unboxed_left && unboxed_left != left_type)
@@ -5964,7 +5964,7 @@ void Semantic::ProcessPLUS(AstBinaryExpression* expr)
             }
         }
 
-        AddDependence(ThisType(), control.option.target >= JikesOption::SDK1_5
+        AddDependence(ThisType(), control.option.target >= JopaOption::SDK1_5
                       ? control.StringBuilder() : control.StringBuffer());
 
         //
@@ -7344,7 +7344,7 @@ void Semantic::ProcessInstanceofExpression(Ast* expr)
     // Check for illegal instanceof with parameterized types
     // Due to type erasure, instanceof cannot check type arguments at runtime
     // Example: obj instanceof List<String> is illegal
-    else if (control.option.source >= JikesOption::SDK1_5)
+    else if (control.option.source >= JopaOption::SDK1_5)
     {
         AstTypeName* type_name = instanceof -> type -> TypeNameCast();
         if (type_name && type_name -> type_arguments_opt)
@@ -7845,5 +7845,5 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

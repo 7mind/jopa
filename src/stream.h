@@ -6,7 +6,7 @@
 #include "jikesapi.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 class Input_info;
 class Scanner;
@@ -16,7 +16,7 @@ class ZipFile;
 class LexStream;
 class ErrorString;
 
-class StreamError : public JikesError
+class StreamError : public JopaError
 {
     friend class LexStream;
 
@@ -27,7 +27,7 @@ public:
     virtual const wchar_t* getErrorMessage();
     virtual const wchar_t* getErrorReport();
 
-    virtual JikesErrorSeverity getSeverity();
+    virtual JopaErrorSeverity getSeverity();
     virtual const char* getFileName();
 
     virtual int getLeftLineNo() { return left_line_no; }
@@ -130,7 +130,7 @@ protected:
 
 #if defined(HAVE_LIBICU_UC)
     UConverter* _decoder;
-#elif defined(JIKES_ICONV_ENCODING)
+#elif defined(JOPA_ICONV_ENCODING)
     iconv_t _decoder;
 #endif
 
@@ -156,7 +156,7 @@ protected:
     {
 #if defined(HAVE_LIBICU_UC)
         return _decoder != NULL;
-#elif defined(JIKES_ICONV_ENCODING)
+#elif defined(JOPA_ICONV_ENCODING)
         return _decoder != (iconv_t) -1;
 #endif
     }
@@ -297,7 +297,7 @@ public:
     // Used for outputting sections of source code in error messages.
     //
     void OutputLine(unsigned, ErrorString&);
-    void OutputSource(JikesError*, ErrorString&);
+    void OutputSource(JopaError*, ErrorString&);
 
     CommentIndex FirstComment(TokenIndex);
 
@@ -334,7 +334,7 @@ public:
     {
         unsigned count = 0;
         for (unsigned i = 0; i < bad_tokens.Length(); i++)
-            if (bad_tokens[i].getSeverity() == JikesError::JIKES_ERROR)
+            if (bad_tokens[i].getSeverity() == JopaError::JOPA_ERROR)
                 count++;
         return count;
     }
@@ -343,7 +343,7 @@ public:
         return bad_tokens.Length() - NumBadTokens();
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     bool file_read;
 #endif
 
@@ -395,7 +395,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     void Dump(); // temporary function used to dump token stream.
 #endif
 
@@ -549,7 +549,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // stream_INCLUDED
 

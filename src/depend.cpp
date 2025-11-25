@@ -6,7 +6,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // Note that the types are ordered based on on the subtype relationship. We
 // reverse the order here because the desired order for processing is the
@@ -525,4 +525,4 @@ void Semantic::AddDependence(TypeSymbol* base_type, TypeSymbol* parent_type,
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

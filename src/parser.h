@@ -5,7 +5,7 @@
 #include "lpginput.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class StoragePool;
 class Ast;
 class AstListNode;
@@ -187,7 +187,7 @@ protected:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // parser_INCLUDED
 

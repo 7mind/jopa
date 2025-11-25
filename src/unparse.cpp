@@ -1,10 +1,10 @@
 #include "ast.h"
 #include "stream.h"
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 bool Ast::debug_unparse = false;
 
 // Special top-level form
@@ -1259,6 +1259,6 @@ void AstAssignmentExpression::Unparse(Ostream& os, LexStream* lex_stream)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG

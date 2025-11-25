@@ -1,19 +1,27 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(jikes VERSION 1.22 LANGUAGES CXX)
+# Read version from flake.nix
+file(READ "${CMAKE_SOURCE_DIR}/flake.nix" FLAKE_NIX_CONTENT)
+string(REGEX MATCH "version = \"([^\"]+)\"" _ "${FLAKE_NIX_CONTENT}")
+set(JOPA_VERSION "${CMAKE_MATCH_1}")
+if(NOT JOPA_VERSION)
+    message(FATAL_ERROR "Could not extract version from flake.nix")
+endif()
+
+project(jopa VERSION 1.22 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(JIKES_ENABLE_DEBUG "Enable internal compiler debugging traces" OFF)
-option(JIKES_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON)
-option(JIKES_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
+option(JOPA_ENABLE_DEBUG "Enable internal compiler debugging traces" OFF)
+option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON)
+option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 
-set(JIKES_VERSION_STRING "Version 1.22 - 3 October 2004")
-set(PACKAGE_NAME "jikes")
+set(JOPA_VERSION_STRING "${JOPA_VERSION}")
+set(PACKAGE_NAME "jopa")
 set(PACKAGE_TARNAME "${PACKAGE_NAME}")
-set(PACKAGE_STRING "${PACKAGE_NAME} ${PROJECT_VERSION}")
+set(PACKAGE_STRING "${PACKAGE_NAME} ${JOPA_VERSION}")
 
 include(GNUInstallDirs)
 include(CTest)

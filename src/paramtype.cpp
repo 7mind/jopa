@@ -5,7 +5,7 @@
 #include <cstring>
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // ParameterizedType implementation
 //
@@ -336,4 +336,4 @@ Type* Type::Clone()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

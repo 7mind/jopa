@@ -1,7 +1,7 @@
-#ifndef JIKES_API_H_FLAG_
-#define JIKES_API_H_FLAG_
+#ifndef JOPA_API_H_FLAG_
+#define JOPA_API_H_FLAG_
 
-class JikesOption
+class JopaOption
 {
 public:
     char* bootclasspath; // Location of the libraries
@@ -63,23 +63,23 @@ public:
 
     ToleranceLevel tolerance;
 
-    virtual ~JikesOption();
+    virtual ~JopaOption();
 
 protected:
-    JikesOption();
+    JopaOption();
 };
 
-class JikesError
+class JopaError
 {
 public:
-    enum JikesErrorSeverity
+    enum JopaErrorSeverity
     {
-        JIKES_ERROR,
-        JIKES_CAUTION,
-        JIKES_WARNING
+        JOPA_ERROR,
+        JOPA_CAUTION,
+        JOPA_WARNING
     };
 
-    virtual JikesErrorSeverity getSeverity() = 0;
+    virtual JopaErrorSeverity getSeverity() = 0;
 
     /**
      * The filename where the error occurred. The caller should not delete
@@ -109,20 +109,20 @@ protected:
 };
 
 /**
- * API to jikes compiler.
+ * API to Jopa compiler.
  */
-class JikesAPI
+class JopaAPI
 {
 public:
 
-    JikesAPI();
-    virtual ~JikesAPI();
+    JopaAPI();
+    virtual ~JopaAPI();
 
     /**
      * Returns instance of current compiler options.
      * Returned pointer can be used to modify current compiler options.
      */
-    virtual JikesOption* getOptions();
+    virtual JopaOption* getOptions();
 
     /**
      * Creates instance of compiler options,
@@ -141,19 +141,19 @@ public:
     virtual int compile(char** filenames);
 
     /**
-     * Jikes API implements singelton pattern.
+     * Jopa API implements singleton pattern.
      * This is a way to get instance of it.
      */
-    static JikesAPI* getInstance();
+    static JopaAPI* getInstance();
 
     /**
      * This method will be called for each error reported.
      */
-    virtual void reportError(JikesError* error);
+    virtual void reportError(JopaError* error);
 
     /**
      * Define the virtual base class for all Readers.
-     * A pointer to an object of this type is returned by JikesAPI::read()
+     * A pointer to an object of this type is returned by JopaAPI::read()
      */
     class FileReader
     {
@@ -169,7 +169,7 @@ public:
 
     /**
      * Define the virtual base class for all WriteObjects.
-     * A pointer to an object of this type is returned by JikesAPI::write()
+     * A pointer to an object of this type is returned by JopaAPI::write()
      */
     class FileWriter
     {
@@ -195,10 +195,10 @@ public:
 private:
     void cleanupOptions(); // Helper to delete option and parsedOptions
 
-    JikesOption* option;
+    JopaOption* option;
     char** parsedOptions;
 
-    static JikesAPI* instance;
+    static JopaAPI* instance;
 };
 
-#endif // JIKES_API_H_FLAG_
+#endif // JOPA_API_H_FLAG_
