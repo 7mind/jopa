@@ -28,15 +28,14 @@ echo ""
 echo "=== Running Primary Test Suite ==="
 cd "${BUILD_DIR}"
 
+# Get primary test count (format: "Total Tests: 82")
+PRIMARY_TOTAL=$(ctest -N -E "^parse_" 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' || echo "0")
+
 # Run primary tests (exclude parser tests) in parallel
 set +e
 ctest --output-on-failure -j"${NPROC}" -E "^parse_" 2>&1
 PRIMARY_EXIT=$?
 set -e
-
-# Get primary test counts
-PRIMARY_RESULTS=$(ctest -N -E "^parse_" | tail -1)
-PRIMARY_TOTAL=$(echo "$PRIMARY_RESULTS" | grep -oP '\d+(?= tests)' || echo "unknown")
 
 if [ $PRIMARY_EXIT -eq 0 ]; then
     echo ""
@@ -52,14 +51,17 @@ echo "=== Running JDK 7/8 Parser Tests (in parallel) ==="
 # Run JDK7 parser tests in parallel
 echo ""
 echo "--- JDK7 Parser Tests ---"
+
+# Get JDK7 test count
+JDK7_TOTAL=$(ctest -N -R "^parse_jdk7_" 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' || echo "0")
+
 set +e
 JDK7_OUTPUT=$(ctest -j"${NPROC}" -R "^parse_jdk7_" 2>&1)
 JDK7_EXIT=$?
 set -e
 
-# Parse JDK7 results
-JDK7_TOTAL=$(ctest -N -R "^parse_jdk7_" 2>/dev/null | grep -oP '\d+(?= tests)' | tail -1 || echo "0")
-JDK7_FAILED=$(echo "$JDK7_OUTPUT" | grep -oP '\d+(?= tests failed)' || echo "0")
+# Parse "X tests failed out of Y" - extract just the first number
+JDK7_FAILED=$(echo "$JDK7_OUTPUT" | grep -E '[0-9]+ tests failed' | sed 's/.*\b\([0-9]\+\) tests failed.*/\1/' || echo "0")
 JDK7_PASSED=$((JDK7_TOTAL - JDK7_FAILED))
 
 echo "  Total:   ${JDK7_TOTAL}"
@@ -69,14 +71,17 @@ echo "  Failed:  ${JDK7_FAILED}"
 # Run JDK8 parser tests in parallel
 echo ""
 echo "--- JDK8 Parser Tests ---"
+
+# Get JDK8 test count
+JDK8_TOTAL=$(ctest -N -R "^parse_jdk8_" 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' || echo "0")
+
 set +e
 JDK8_OUTPUT=$(ctest -j"${NPROC}" -R "^parse_jdk8_" 2>&1)
 JDK8_EXIT=$?
 set -e
 
-# Parse JDK8 results
-JDK8_TOTAL=$(ctest -N -R "^parse_jdk8_" 2>/dev/null | grep -oP '\d+(?= tests)' | tail -1 || echo "0")
-JDK8_FAILED=$(echo "$JDK8_OUTPUT" | grep -oP '\d+(?= tests failed)' || echo "0")
+# Parse "X tests failed out of Y" - extract just the first number
+JDK8_FAILED=$(echo "$JDK8_OUTPUT" | grep -E '[0-9]+ tests failed' | sed 's/.*\b\([0-9]\+\) tests failed.*/\1/' || echo "0")
 JDK8_PASSED=$((JDK8_TOTAL - JDK8_FAILED))
 
 echo "  Total:   ${JDK8_TOTAL}"
@@ -94,7 +99,7 @@ if [ $PRIMARY_EXIT -eq 0 ]; then
 else
     echo "  Status:  FAILED"
 fi
-echo "  Total:   ${PRIMARY_TOTAL:-unknown}"
+echo "  Total:   ${PRIMARY_TOTAL}"
 echo ""
 echo "JDK7 Parser Tests:"
 if [ $JDK7_EXIT -eq 0 ]; then
