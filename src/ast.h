@@ -4336,6 +4336,12 @@ public:
         block_symbols_to_delete.push_back(symbol);
     }
 
+    // Register a ParameterizedType for cleanup when this pool is destroyed.
+    void RegisterParameterizedType(ParameterizedType* ptype)
+    {
+        parameterized_types_to_delete.push_back(ptype);
+    }
+
 private:
     Cell** base;
     unsigned base_size; // number of segment slots in base
@@ -4348,6 +4354,9 @@ private:
     // BlockSymbol objects that need to be deleted when this pool is destroyed.
     // These are stored in AST nodes but AST destructors are never called.
     std::vector<BlockSymbol*> block_symbols_to_delete;
+
+    // ParameterizedType objects that need to be deleted when this pool is destroyed.
+    std::vector<ParameterizedType*> parameterized_types_to_delete;
 
     //
     // Allocate another block of storage for the storage pool. block_size
