@@ -39,7 +39,6 @@ private:
     // Process declarations using jast2 nodes
     void processJast2ClassBody(jast2::ClassBody* body);
     void processJast2EnumDeclaration(jast2::EnumDeclaration* decl);
-    void processJast2InterfaceBody(jast2::InterfaceBody* body);
 
     // Process members
     void processJast2Fields(jast2::ClassBody* body);
