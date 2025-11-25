@@ -5,7 +5,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Semantic::ProcessBlockStatements(AstBlock* block_body)
 {
     //
@@ -715,7 +715,7 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
     ProcessExpression(foreach -> expression);
     TypeSymbol* cond_type = foreach -> expression -> Type();
     TypeSymbol* component_type;
-    if (control.option.source < JikesOption::SDK1_5)
+    if (control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::FOREACH_UNSUPPORTED,
                        stmt -> RightToken(),
@@ -1950,7 +1950,7 @@ TypeSymbol* Semantic::GetLocalType(AstDeclaredType* class_declaration)
         name_symbol -> NameLength(); // +1 for $
     wchar_t* external_name = new wchar_t[length + 1]; // +1 for '\0';
     wcscpy(external_name, this_type -> ExternalName());
-    wcscat(external_name, (control.option.target < JikesOption::SDK1_5
+    wcscat(external_name, (control.option.target < JopaOption::SDK1_5
                            ? StringConstant::US_DS : StringConstant::US_MI));
     wcscat(external_name, value.String());
     wcscat(external_name, name_symbol -> Name());
@@ -2658,5 +2658,5 @@ void Semantic::ProcessExecutableBodies(AstClassBody* class_body)
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

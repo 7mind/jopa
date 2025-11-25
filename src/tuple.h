@@ -4,7 +4,7 @@
 #include "jikesapi.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class OutputBuffer;
 
 //
@@ -508,8 +508,8 @@ public:
 
     inline bool WriteToFile(const char* file_name)
     {
-        JikesAPI::FileWriter* file =
-            JikesAPI::getInstance() -> write(file_name, buffer.top);
+        JopaAPI::FileWriter* file =
+            JopaAPI::getInstance() -> write(file_name, buffer.top);
 
         // NB if file was invalid it would have been destroyed by write()
         if (file == NULL)
@@ -535,7 +535,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // tuple_INCLUDED
 

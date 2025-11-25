@@ -1,7 +1,7 @@
 #include "tab.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 int Tab::tab_size = Tab::DEFAULT_TAB_SIZE;
 
 //
@@ -29,5 +29,5 @@ int Tab::Wcslen(wchar_t *line, int start, int end)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

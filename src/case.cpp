@@ -1,7 +1,7 @@
 #include "case.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 char Case::lower[128] =
 {
       0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
@@ -37,5 +37,5 @@ char Case::upper[128] =
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

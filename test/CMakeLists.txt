@@ -1,13 +1,13 @@
-# Java 5 Feature Tests for Jikes Compiler
+# Java Feature Tests for Jopa Compiler
 # Tests both compilation and runtime execution with real JVM
 
 enable_testing()
 
 # Option to enable/disable JVM validation tests
-option(JIKES_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
+option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
 
 # Find Java for runtime tests (only if JVM tests are enabled)
-if(JIKES_ENABLE_JVM_TESTS)
+if(JOPA_ENABLE_JVM_TESTS)
     find_package(Java COMPONENTS Runtime Development REQUIRED)
 
     # Locate javap manually if not found
@@ -25,10 +25,10 @@ set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 # Helper function to add a compile-only test
 # Note: compile-only tests may generate multiple classes, so we don't validate
 # them with javap (which requires knowing the exact class name)
-function(add_jikes_compile_test test_name source_file)
+function(add_jopa_compile_test test_name source_file)
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jikes> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
@@ -40,11 +40,11 @@ function(add_jikes_compile_test test_name source_file)
 endfunction()
 
 # Helper function to add a compile+run test
-function(add_jikes_run_test test_name source_file main_class)
+function(add_jopa_run_test test_name source_file main_class)
     # Compilation test
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jikes> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
@@ -55,7 +55,7 @@ function(add_jikes_run_test test_name source_file main_class)
     )
 
     # Javap validation and runtime test (only if JVM tests are enabled)
-    if(JIKES_ENABLE_JVM_TESTS)
+    if(JOPA_ENABLE_JVM_TESTS)
         # Validate bytecode with javap
         add_test(
             NAME "validate_${test_name}"
@@ -79,11 +79,11 @@ function(add_jikes_run_test test_name source_file main_class)
 endfunction()
 
 # Enum Tests
-add_jikes_compile_test(Color "${TEST_DIR}/enums/Color.java")
-add_jikes_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest")
+add_jopa_compile_test(Color "${TEST_DIR}/enums/Color.java")
+add_jopa_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest")
 add_test(
     NAME "compile_EnumMethodsTest"
-    COMMAND $<TARGET_FILE:jikes> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -91,7 +91,7 @@ add_test(
             "${TEST_DIR}/enums/EnumMethodsTest.java"
 )
 set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
-if(JIKES_ENABLE_JVM_TESTS)
+if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_EnumMethodsTest"
         COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "EnumMethodsTest"
@@ -103,41 +103,41 @@ if(JIKES_ENABLE_JVM_TESTS)
 endif()
 
 # Varargs Tests
-add_jikes_run_test(VarargsTest "${TEST_DIR}/varargs/VarargsTest.java" "VarargsTest")
-add_jikes_compile_test(VarargsImplicitTest "${TEST_DIR}/varargs/VarargsImplicitTest.java")
+add_jopa_run_test(VarargsTest "${TEST_DIR}/varargs/VarargsTest.java" "VarargsTest")
+add_jopa_compile_test(VarargsImplicitTest "${TEST_DIR}/varargs/VarargsImplicitTest.java")
 
 # Enhanced For-Loop Tests
-add_jikes_run_test(ForEachTest "${TEST_DIR}/foreach/ForEachTest.java" "ForEachTest")
-add_jikes_compile_test(ForEachArrayTest "${TEST_DIR}/foreach/ForEachArrayTest.java")
-add_jikes_run_test(ForEachIterableTest "${TEST_DIR}/foreach/ForEachIterableTest.java" "ForEachIterableTest")
+add_jopa_run_test(ForEachTest "${TEST_DIR}/foreach/ForEachTest.java" "ForEachTest")
+add_jopa_compile_test(ForEachArrayTest "${TEST_DIR}/foreach/ForEachArrayTest.java")
+add_jopa_run_test(ForEachIterableTest "${TEST_DIR}/foreach/ForEachIterableTest.java" "ForEachIterableTest")
 
 # Generics Tests
-add_jikes_compile_test(GenericBox "${TEST_DIR}/generics/GenericBox.java")
-add_jikes_run_test(GenericTest "${TEST_DIR}/generics/GenericTest.java" "GenericTest")
-add_jikes_compile_test(SimpleGeneric "${TEST_DIR}/generics/SimpleGeneric.java")
-add_jikes_compile_test(TwoTypeParams "${TEST_DIR}/generics/TwoTypeParams.java")
-add_jikes_compile_test(BoundedGeneric "${TEST_DIR}/generics/BoundedGeneric.java")
-add_jikes_compile_test(Wildcards "${TEST_DIR}/generics/Wildcards.java")
-add_jikes_compile_test(GenericMethods "${TEST_DIR}/generics/GenericMethods.java")
-add_jikes_compile_test(CovariantReturnTest "${TEST_DIR}/generics/CovariantReturnTest.java")
-add_jikes_compile_test(BridgeTest "${TEST_DIR}/generics/BridgeTest.java")
-add_jikes_compile_test(SimpleSameFileTest "${TEST_DIR}/generics/SimpleSameFileTest.java")
-add_jikes_compile_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTest.java")
-add_jikes_compile_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java")
-add_jikes_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
-add_jikes_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
+add_jopa_compile_test(GenericBox "${TEST_DIR}/generics/GenericBox.java")
+add_jopa_run_test(GenericTest "${TEST_DIR}/generics/GenericTest.java" "GenericTest")
+add_jopa_compile_test(SimpleGeneric "${TEST_DIR}/generics/SimpleGeneric.java")
+add_jopa_compile_test(TwoTypeParams "${TEST_DIR}/generics/TwoTypeParams.java")
+add_jopa_compile_test(BoundedGeneric "${TEST_DIR}/generics/BoundedGeneric.java")
+add_jopa_compile_test(Wildcards "${TEST_DIR}/generics/Wildcards.java")
+add_jopa_compile_test(GenericMethods "${TEST_DIR}/generics/GenericMethods.java")
+add_jopa_compile_test(CovariantReturnTest "${TEST_DIR}/generics/CovariantReturnTest.java")
+add_jopa_compile_test(BridgeTest "${TEST_DIR}/generics/BridgeTest.java")
+add_jopa_compile_test(SimpleSameFileTest "${TEST_DIR}/generics/SimpleSameFileTest.java")
+add_jopa_compile_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTest.java")
+add_jopa_compile_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java")
+add_jopa_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
+add_jopa_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
 
 # Autoboxing/Unboxing Tests
-add_jikes_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
-add_jikes_run_test(AutoboxingTest "${TEST_DIR}/autoboxing/AutoboxingTest.java" "AutoboxingTest")
-add_jikes_run_test(MethodBoxingSimple "${TEST_DIR}/autoboxing/MethodBoxingSimple.java" "MethodBoxingSimple")
-add_jikes_run_test(ReturnBoxingSimple "${TEST_DIR}/autoboxing/ReturnBoxingSimple.java" "ReturnBoxingSimple")
-add_jikes_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple")
+add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
+add_jopa_run_test(AutoboxingTest "${TEST_DIR}/autoboxing/AutoboxingTest.java" "AutoboxingTest")
+add_jopa_run_test(MethodBoxingSimple "${TEST_DIR}/autoboxing/MethodBoxingSimple.java" "MethodBoxingSimple")
+add_jopa_run_test(ReturnBoxingSimple "${TEST_DIR}/autoboxing/ReturnBoxingSimple.java" "ReturnBoxingSimple")
+add_jopa_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple")
 
 # Static Import Tests
 add_test(
     NAME "compile_MathUtils"
-    COMMAND $<TARGET_FILE:jikes> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -145,27 +145,27 @@ add_test(
 )
 set_tests_properties("compile_MathUtils" PROPERTIES LABELS "compile")
 
-add_jikes_run_test(StaticFieldOnlyTest "${TEST_DIR}/static-imports/StaticFieldOnlyTest.java" "StaticFieldOnlyTest")
-add_jikes_run_test(StaticMethodImportTest "${TEST_DIR}/static-imports/StaticMethodImportTest.java" "StaticMethodImportTest")
-add_jikes_run_test(StaticWildcardImportTest "${TEST_DIR}/static-imports/StaticWildcardImportTest.java" "StaticWildcardImportTest")
+add_jopa_run_test(StaticFieldOnlyTest "${TEST_DIR}/static-imports/StaticFieldOnlyTest.java" "StaticFieldOnlyTest")
+add_jopa_run_test(StaticMethodImportTest "${TEST_DIR}/static-imports/StaticMethodImportTest.java" "StaticMethodImportTest")
+add_jopa_run_test(StaticWildcardImportTest "${TEST_DIR}/static-imports/StaticWildcardImportTest.java" "StaticWildcardImportTest")
 
 # Annotation Tests
-add_jikes_run_test(AnnotationTest "${TEST_DIR}/annotations/AnnotationTest.java" "AnnotationTest")
-add_jikes_run_test(MarkerAnnotationTest "${TEST_DIR}/annotations/MarkerAnnotationTest.java" "MarkerAnnotationTest")
-add_jikes_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotationTest.java" "CustomAnnotationTest")
-add_jikes_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")
+add_jopa_run_test(AnnotationTest "${TEST_DIR}/annotations/AnnotationTest.java" "AnnotationTest")
+add_jopa_run_test(MarkerAnnotationTest "${TEST_DIR}/annotations/MarkerAnnotationTest.java" "MarkerAnnotationTest")
+add_jopa_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotationTest.java" "CustomAnnotationTest")
+add_jopa_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")
 
 # Java 6 Tests (bytecode version 50.0 with parameter names)
 add_test(
     NAME "compile_SimpleJava6Test"
-    COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/java6/SimpleJava6Test.java"
 )
 set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
-if(JIKES_ENABLE_JVM_TESTS)
+if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_SimpleJava6Test"
         COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "SimpleJava6Test"
@@ -179,14 +179,14 @@ endif()
 # Reflection Tests (compile with our runtime, run with system JVM for real reflection)
 add_test(
     NAME "compile_ReflectionBasicTest"
-    COMMAND $<TARGET_FILE:jikes> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
             "${TEST_DIR}/java6/ReflectionBasicTest.java"
 )
 set_tests_properties("compile_ReflectionBasicTest" PROPERTIES LABELS "compile")
-if(JIKES_ENABLE_JVM_TESTS)
+if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_ReflectionBasicTest"
         COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}" "ReflectionBasicTest"

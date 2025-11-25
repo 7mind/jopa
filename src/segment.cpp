@@ -1,7 +1,7 @@
 #include "segment.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 u2& PairSegment::Image(int target)
 {
     if (array == NULL)
@@ -138,5 +138,5 @@ SegmentPool::~SegmentPool()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

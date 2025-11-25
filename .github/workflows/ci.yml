@@ -1,4 +1,4 @@
-name: Jikes Java 5 CI
+name: Jopa CI
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
   build-and-test:
-    name: Build and Test Jikes
+    name: Build and Test Jopa
     runs-on: ubuntu-latest
 
     steps:
@@ -31,10 +31,10 @@ jobs:
       - name: Configure with CMake
         run: |
           nix develop --command bash -c "
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJIKES_ENABLE_SOURCE_15=ON
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
           "
 
-      - name: Build Jikes
+      - name: Build Jopa
         run: |
           nix develop --command bash -c "
             cmake --build build -j$(nproc)
@@ -62,7 +62,7 @@ jobs:
             echo '' >> $GITHUB_STEP_SUMMARY
             echo '### Feature Coverage' >> $GITHUB_STEP_SUMMARY
             echo '' >> $GITHUB_STEP_SUMMARY
-            echo 'All Java 5 features are tested through CTest:' >> $GITHUB_STEP_SUMMARY
+            echo 'All Java 5+ features are tested through CTest:' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Generics (13 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Enums (3 compile + 2 runtime tests)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Varargs (2 compile + 1 runtime test)' >> $GITHUB_STEP_SUMMARY
@@ -71,7 +71,7 @@ jobs:
             echo '- ✅ Static Imports (1 compile + 3 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Annotations (4 compile + 4 runtime tests - all passing)' >> $GITHUB_STEP_SUMMARY
             echo '' >> $GITHUB_STEP_SUMMARY
-            echo '### Java 6 Support' >> $GITHUB_STEP_SUMMARY
+            echo '### Java 6+ Support' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Bytecode version 50.0 (Java 6)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Parameter names in LocalVariableTable (reflection support)' >> $GITHUB_STEP_SUMMARY
             echo '- ✅ Basic reflection (Class, Method, Field) verified with system JVM' >> $GITHUB_STEP_SUMMARY

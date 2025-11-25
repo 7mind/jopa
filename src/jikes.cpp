@@ -1,4 +1,4 @@
-// $Id: jikes.cpp,v 1.98 2004/03/20 04:48:17 jikesadmin Exp $
+// Jopa Compiler - based on Jikes
 //
 // This software is subject to the terms of the IBM Jikes Compiler
 // License Agreement available at the following URL:
@@ -12,12 +12,12 @@
 #include "error.h"
 
 
-using namespace Jikes;
+using namespace Jopa;
 
 int main(int argc, char *argv[])
 {
     // Here we are creating instance of default API
-    JikesAPI *compiler = new JikesAPI();
+    JopaAPI *compiler = new JopaAPI();
 
     int return_code;
     char **files;
@@ -71,7 +71,7 @@ int main(int argc, char *argv[])
                "+F                  do full dependence check except for Zip and Jar files\n"
                "+Kname=TypeKeyWord  map name to type keyword\n"
                "+M                  generate makefile dependencies\n"
-               "+OLDCSO             perform original Jikes classpath order for compatibility\n"
+               "+OLDCSO             perform original classpath order for compatibility\n"
                "+P                  pedantic compilation - issues lots of warnings\n"
                "                      some warnings can be turned on or off independently:\n");
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
                "+Z1                 treat cautions as errors\n"
                "+Z2                 treat both warnings and cautions as errors\n"
                "+Z                  equivalent to +Z1\n"
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                "\tDebugging options:\n"
                "+A                  dump AST to standard output\n"
                "+c                  do not discard comments from lexer output, use with +L\n"
@@ -103,10 +103,8 @@ int main(int argc, char *argv[])
     else if (compiler -> getOptions() -> version)
     {
         printf("%s", StringConstant::U8S_help_header);
-        printf("Originally written by Philippe Charles and Dave Shields of IBM Research\n"
-               "in 1996-1999, Jikes is once again maintained by Dave Shields at:\n"
-               "<http://github.com/daveshields/jikes>\n"
-               "Please consult this URL for more information and for reporting problems.\n");
+        printf("Originally written by Philippe Charles and Dave Shields of IBM Research.\n"
+               "Jopa fork maintained at: <https://github.com/pshirshov/jopa>\n");
 
         return_code = 0;
     }

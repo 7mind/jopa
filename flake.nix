@@ -1,5 +1,5 @@
 {
-  description = "Jikes Java compiler with Java 5 support";
+  description = "Jopa Java compiler (based on Jikes) with Java 7 support";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -40,7 +40,7 @@
 
           shellHook = ''
             echo "================================================"
-            echo "Jikes Java 5 Development Environment"
+            echo "Jopa Development Environment"
             echo "================================================"
             echo "C++ Compiler: $(gcc --version | head -1)"
             echo "CMake: $(${pkgs.cmake}/bin/cmake --version | head -1)"
@@ -53,10 +53,10 @@
           '';
         };
 
-        # Package definition for building Jikes with CMake
+        # Package definition for building Jopa with CMake
         packages.default = pkgs.stdenv.mkDerivation {
-          pname = "jikes";
-          version = "1.22-java5";
+          pname = "jopa";
+          version = "1.22-java7";
 
           src = ./.;
 
@@ -77,8 +77,8 @@
           # CMake will handle the build automatically
 
           meta = with pkgs.lib; {
-            description = "Jikes Java compiler with Java 5 (generics, foreach, varargs, enums) support";
-            homepage = "https://github.com/jikes/jikes";
+            description = "Jopa Java compiler (based on Jikes) with Java 7 support";
+            homepage = "https://github.com/pshirshov/jopa";
             license = licenses.ipl10;
             platforms = platforms.unix;
             maintainers = [];

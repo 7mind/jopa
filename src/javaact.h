@@ -1,7 +1,7 @@
 #ifndef HEADERS
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Parser::InitRuleAction()
 {
     rule_action[0] = &Parser::BadAction;
@@ -2492,6 +2492,6 @@ void Parser::InitRuleAction()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // ! HEADERS

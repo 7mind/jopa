@@ -6,7 +6,7 @@
 #include "case.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // Convert the null terminated Unicode string source into its Utf8
 // representation pointed to by target. The char string target is presumed
@@ -282,7 +282,7 @@ void Control::ProcessGlobals()
     // Some names are conditional on 1.5 VMs, which expanded the set of legal
     // VM names to include non-Java identifiers.
     access_name_symbol =
-        FindOrInsertSystemName(option.source < JikesOption::SDK1_5
+        FindOrInsertSystemName(option.source < JopaOption::SDK1_5
                                ? "access$" : "-");
     array_name_symbol = FindOrInsertSystemName("array");
     assert_name_symbol = FindOrInsertSystemName("assert");
@@ -308,7 +308,7 @@ void Control::ProcessGlobals()
     this_name_symbol = FindOrInsertSystemName("this");
     true_name_symbol = FindOrInsertSystemName("true");
     val_name_symbol =
-        FindOrInsertSystemName(option.source < JikesOption::SDK1_5
+        FindOrInsertSystemName(option.source < JopaOption::SDK1_5
                                ? "val$" : "-");
 
     ConstantValue_literal = Utf8_pool.FindOrInsert(U8S_ConstantValue,
@@ -397,7 +397,7 @@ void Control::ProcessPath()
     struct stat status;
     //FIXME: need to check for stat errors
     if (SystemStat(dot_name_symbol -> Utf8Name(), &status) == 0 &&
-        (status.st_mode & JIKES_STAT_S_IFDIR))
+        (status.st_mode & JOPA_STAT_S_IFDIR))
         system_table -> InsertDirectorySymbol(status.st_dev, status.st_ino,
                                               default_directory);
 
@@ -1724,5 +1724,5 @@ FileSymbol* Control::GetFileFirst(Control& control, PackageSymbol* package,
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

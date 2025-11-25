@@ -4,14 +4,14 @@
 #include "platform.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 typedef TokenIndex TokenObject;
 typedef TokenIndex Location;
 
 inline Location Loc(TokenObject i) { return i; }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #include "javasym.h" /* mapping of lexical symbols  */
 #include "javadef.h" /* definition of parsing names */

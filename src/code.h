@@ -1,7 +1,7 @@
 #include "platform.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 #ifndef code_INCLUDED
 #define code_INCLUDED
 
@@ -28,7 +28,7 @@ class Code
 
 
 public:
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     static inline void CodeCheck(u4 c)
     {
         assert((u2) (blocks[c >> SHIFT] + c) < 13558);
@@ -40,7 +40,7 @@ public:
             CodeCheck(c);
         return true;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 //
 // These methods test for Unicode surrogate pairs.
@@ -166,5 +166,5 @@ public:
 #endif // code_INCLUDED
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

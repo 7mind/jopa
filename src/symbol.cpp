@@ -12,7 +12,7 @@
 #include "typeparam.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 const char* FileSymbol::java_suffix = StringConstant::U8S_DO_java;
 unsigned FileSymbol::java_suffix_length = strlen(java_suffix);
 const char* FileSymbol::class_suffix = StringConstant::U8S_DO_class;
@@ -965,7 +965,7 @@ void DirectorySymbol::ReadDirectory()
                     sprintf(filename, "%s/%s", DirectoryName(),
                             entry -> d_name);
                     struct stat status;
-                    if(JikesAPI::getInstance() -> stat(filename, &status) == 0)
+                    if(JopaAPI::getInstance() -> stat(filename, &status) == 0)
                         entries -> InsertEntry(this, entry -> d_name, length);
                     delete [] filename;
                 }
@@ -2013,13 +2013,13 @@ VariableSymbol* TypeSymbol::FindOrInsertLocalShadow(VariableSymbol* local)
         local_shadow_map -> Map(local, variable);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     VariableSymbol* accessed;
     for (accessed = variable -> accessed_local;
          accessed && accessed != local;
          accessed = accessed -> accessed_local);
     assert(accessed);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     return variable;
 }
 
@@ -2931,5 +2931,5 @@ TypeSymbol* TypeSymbol::GetPlaceholderType()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

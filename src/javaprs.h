@@ -4,7 +4,7 @@
 #define javaprs_INCLUDED
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 #define SCOPE_REPAIR
 #define DEFERRED_RECOVERY
 #define FULL_DIAGNOSIS
@@ -61,6 +61,6 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif /* javaprs_INCLUDED */

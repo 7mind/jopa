@@ -9,7 +9,7 @@
 #include "set.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 class TypeShadowSymbol;
 class MethodShadowSymbol;
@@ -455,7 +455,7 @@ public:
           this_package(file_symbol_ -> package),
           processing_type(NULL)
     {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         int i;
         for (i = 0; i < Ast::_num_expr_or_stmt_kinds; i++)
         {
@@ -474,7 +474,7 @@ public:
             ProcessBinaryExpr[i] = NULL;
             DefiniteBinaryExpr[i] = NULL;
         }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
         // Semantic processing of expressions.
         ProcessExprOrStmt[Ast::NAME] = &Semantic::ProcessName;
         ProcessExprOrStmt[Ast::DOT] = &Semantic::ProcessFieldAccess;
@@ -718,7 +718,7 @@ public:
             &Semantic::ProcessPLUSPLUSOrMINUSMINUS;
         ProcessPreUnaryExpr[AstPreUnaryExpression::MINUSMINUS] =
             &Semantic::ProcessPLUSPLUSOrMINUSMINUS;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         for (i = 1; i < AstPreUnaryExpression::_num_kinds; i++)
         {
             assert(ProcessPreUnaryExpr[i]);
@@ -729,7 +729,7 @@ public:
             assert(ProcessBinaryExpr[i]);
             assert(DefiniteBinaryExpr[i]);
         }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     }
 
     ~Semantic()
@@ -1360,7 +1360,7 @@ private:
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // semantic_INCLUDED
 

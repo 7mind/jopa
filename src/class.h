@@ -8,7 +8,7 @@
 #include "double.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //
 // This header defines the .class file format, for both reading in and writing
 // out valid classfiles.
@@ -80,7 +80,7 @@ public:
     //
     virtual bool Check(const ConstantPool&) const { return true; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // Prints all information about the constant value, ending the line.
     //
@@ -96,7 +96,7 @@ public:
     {
         Coutput << "unknown tag: " << (unsigned) tag;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -117,7 +117,7 @@ class ConstantPool : private Tuple<CPInfo*>
         }
         virtual bool Check(const ConstantPool&) const { return false; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         virtual void Print(const ConstantPool&) const
         {
             Coutput << "invalid index" << endl;
@@ -126,7 +126,7 @@ class ConstantPool : private Tuple<CPInfo*>
         {
             Coutput << "(invalid)";
         }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     } invalid;
 
 public:
@@ -222,7 +222,7 @@ public:
 private:
     void Init(u2);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     //
     // When debugging, contents represents the String literal (less the
     // enclosing "") made of printing ASCII characters that will regenerate
@@ -243,7 +243,7 @@ public:
     {
         Coutput << contents.Array();
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -295,7 +295,7 @@ public:
     }
     TypeSymbol* Type() { return type; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool) const
     {
         Coutput << "Class: name: " << (unsigned) name_index;
@@ -315,7 +315,7 @@ public:
             constant_pool[name_index] -> Describe(constant_pool);
         else Coutput << "(invalid)";
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -352,7 +352,7 @@ public:
              CONSTANT_NameAndType);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool) const
     {
         switch (tag)
@@ -402,7 +402,7 @@ public:
         }
         else Coutput << "(invalid)";
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -444,7 +444,7 @@ public:
         return ((const CPUtf8Info*) constant_pool[string_index]) -> Length();
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool) const
     {
         Coutput << "String: string: " << (unsigned) string_index;
@@ -468,7 +468,7 @@ public:
         }
         else Coutput << "(invalid)";
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -496,7 +496,7 @@ public:
 
     i4 Value() const { return (i4) bytes; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool&) const
     {
         Coutput << "Integer: bytes: 0x"
@@ -508,7 +508,7 @@ public:
     {
         Coutput << (int) bytes;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -536,7 +536,7 @@ public:
 
     const IEEEfloat& Value() const { return value; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool&) const
     {
         Coutput << "Float: bytes: 0x"
@@ -548,7 +548,7 @@ public:
     {
         Coutput << FloatToString(value).String() << 'F';
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -577,7 +577,7 @@ public:
 
     const LongInt& Value() const { return value; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool&) const
     {
         Coutput << "Long: high: 0x"
@@ -590,7 +590,7 @@ public:
     {
         Coutput << LongToString(value).String() << 'L';
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -619,7 +619,7 @@ public:
 
     const IEEEdouble& Value() const { return value; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool&) const
     {
         Coutput << "Double: high: 0x"
@@ -632,7 +632,7 @@ public:
     {
         Coutput << DoubleToString(value).String();
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -682,7 +682,7 @@ public:
             constant_pool[descriptor_index] -> Tag() == CONSTANT_Utf8;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool) const
     {
         Coutput << "NameAndType: name: "
@@ -715,7 +715,7 @@ public:
             constant_pool[descriptor_index] -> Describe(constant_pool);
         else Coutput << "(invalid)";
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -795,7 +795,7 @@ public:
         out.PutU4(attribute_length);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     void PrintPrefix(const char* category, const ConstantPool& constant_pool,
                      int fill) const
     {
@@ -815,7 +815,7 @@ public:
 
     virtual void Print(const ConstantPool& constant_pool,
                        int fill = 0) const = 0;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -832,7 +832,7 @@ public:
     UnknownAttribute(ClassFile&);
     virtual ~UnknownAttribute() { delete [] info; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill) const
     {
         PrintPrefix("Unrecognized attribute", constant_pool, fill);
@@ -845,7 +845,7 @@ public:
             else Coutput << (char) info[i];
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -879,7 +879,7 @@ public:
         return constant_pool[constantvalue_index];
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -892,7 +892,7 @@ public:
         else Coutput << "invalid";
         Coutput << ')' << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -938,7 +938,7 @@ public:
             out.PutU2(exception_index_table[i]);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -959,7 +959,7 @@ public:
             Coutput << endl;
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1057,7 +1057,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -1104,7 +1104,7 @@ public:
                 Print(AccessFlags::ACCESS_TYPE);
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1124,14 +1124,14 @@ public:
     SyntheticAttribute(ClassFile&);
     virtual ~SyntheticAttribute() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
         PrintPrefix("Synthetic", constant_pool, 0);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1171,7 +1171,7 @@ public:
         out.PutU2(sourcefile_index);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -1186,7 +1186,7 @@ public:
         else Coutput << "(invalid)";
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1256,7 +1256,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 2) const
     {
         assert(fill == 2);
@@ -1271,7 +1271,7 @@ public:
                     << (unsigned) line_number_table[i].line_number << endl;
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1344,7 +1344,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 2) const
     {
         assert(fill == 2);
@@ -1380,7 +1380,7 @@ public:
                     << endl;
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1400,14 +1400,14 @@ public:
     DeprecatedAttribute(ClassFile&);
     virtual ~DeprecatedAttribute() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
         PrintPrefix("Deprecated", constant_pool, 0);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1442,7 +1442,7 @@ public:
         return (const CPUtf8Info*) constant_pool[signature_index];
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -1456,7 +1456,7 @@ public:
         else Coutput << "(invalid)";
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1476,14 +1476,14 @@ public:
     BridgeAttribute(ClassFile&);
     virtual ~BridgeAttribute() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
         PrintPrefix("Bridge", constant_pool, 0);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1535,7 +1535,7 @@ public:
                     out.PutU2(info);
             }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
             void Print(const ConstantPool& constant_pool,
                        unsigned& index) const
             {
@@ -1581,7 +1581,7 @@ public:
                     assert(false && "invalid VerificationTypeInfoTag");
                 }
             }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
         };
 
     private:
@@ -1630,7 +1630,7 @@ public:
                 stack[j].Put(out);
         }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         void Print(const ConstantPool& constant_pool) const
         {
             Coutput << "    pc: " << (unsigned) offset << ", locals_size: "
@@ -1661,7 +1661,7 @@ public:
                 Coutput << endl;
             }
         }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     };
 
 private:
@@ -1699,7 +1699,7 @@ public:
             frames[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 2) const
     {
         assert(fill == 2);
@@ -1709,7 +1709,7 @@ public:
         for (unsigned i = 0; i < frames.Length(); i++)
             frames[i] -> Print(constant_pool);
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1868,9 +1868,9 @@ public:
             attributes[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1930,13 +1930,13 @@ public:
         out.PutU1((u1) tag);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     // Subclasses must override.
     virtual void Print(const ConstantPool&) const
     {
         Coutput << "<invalid tag:" << (unsigned) tag << '>';
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -1971,7 +1971,7 @@ public:
         out.PutU2(index);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& pool) const
     {
         Coutput << (unsigned) index << '=';
@@ -2059,7 +2059,7 @@ public:
             assert(false && "invalid constant-valued attribute");
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2090,7 +2090,7 @@ public:
         out.PutU2(const_name_index);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& pool) const
     {
         Coutput << (unsigned) type_name_index << '.'
@@ -2103,7 +2103,7 @@ public:
         if (pool[type_name_index] -> Tag() != CPInfo::CONSTANT_Utf8)
             Coutput << "(invalid)";
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2127,9 +2127,9 @@ public:
 
     virtual void Put(OutputBuffer&) const;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool&) const;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2176,7 +2176,7 @@ public:
             values[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& pool) const
     {
         Coutput << '{';
@@ -2190,7 +2190,7 @@ public:
         }
         Coutput << '}';
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2254,7 +2254,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     void Print(const ConstantPool& pool) const
     {
         Coutput << (unsigned) type_index << "=@";
@@ -2278,7 +2278,7 @@ public:
         }
         Coutput << ')';
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2325,7 +2325,7 @@ public:
             annotations[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -2341,7 +2341,7 @@ public:
             Coutput << endl;
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2406,7 +2406,7 @@ public:
         }
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -2427,7 +2427,7 @@ public:
             }
         }
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2461,7 +2461,7 @@ public:
         default_value -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -2470,7 +2470,7 @@ public:
         default_value -> Print(constant_pool);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2507,7 +2507,7 @@ public:
         out.PutU2(name_and_type_index);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(const ConstantPool& constant_pool, int fill = 0) const
     {
         assert(! fill);
@@ -2529,7 +2529,7 @@ public:
         else Coutput << "(invalid)";
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2644,7 +2644,7 @@ public:
             attributes[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     void Print(const ConstantPool& constant_pool) const
     {
         Coutput << "field: ";
@@ -2668,7 +2668,7 @@ public:
             attributes[i] -> Print(constant_pool);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -2813,7 +2813,7 @@ public:
             attributes[i] -> Put(out);
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
      void Print(const ConstantPool& constant_pool) const
      {
         Coutput << "method: ";
@@ -2837,7 +2837,7 @@ public:
             attributes[i] -> Print(constant_pool);
         Coutput << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
@@ -3127,7 +3127,7 @@ public:
         else buffer += len;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 public:
     void Print()
     {
@@ -3198,11 +3198,11 @@ public:
         for (i = 0; i < attributes.Length(); i++)
             attributes[i] -> Print(constant_pool);
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // class_INCLUDED
 

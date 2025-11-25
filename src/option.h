@@ -6,7 +6,7 @@
 #include "jikesapi.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class OptionError;
 class Ostream;
 
@@ -77,7 +77,7 @@ private:
     char *name;
 };
 
-class Option: public JikesOption
+class Option: public JopaOption
 {
 
 #ifdef WIN32_FILE_SYSTEM
@@ -115,7 +115,7 @@ public:
 
     int first_file_index;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     int debug_trap_op;
 
     bool debug_dump_lex,
@@ -125,7 +125,7 @@ public:
          debug_comments,
          debug_dump_class,
          debug_trace_stack_change;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     bool nocleanup,
          incremental,
@@ -147,7 +147,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // option_INCLUDED
 

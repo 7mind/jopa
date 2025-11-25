@@ -7,7 +7,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 
 struct RepairCandidate
@@ -22,14 +22,14 @@ struct StateInfo
         next;
 };
 
-class ParseErrorInfo: public JikesError
+class ParseErrorInfo: public JopaError
 {
     friend class ParseError;
 public:
     virtual const wchar_t* getErrorMessage();
     virtual const wchar_t* getErrorReport();
 
-    virtual JikesErrorSeverity getSeverity();
+    virtual JopaErrorSeverity getSeverity();
     virtual const char* getFileName();
 
     virtual int getLeftLineNo();
@@ -171,7 +171,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // diagnose_INCLUDED
 

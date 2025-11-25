@@ -10,7 +10,7 @@
 #include "control.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class TypeSymbol;
 class Control;
 class Semantic;
@@ -87,7 +87,7 @@ public:
         if (top_index > 0)
         {
             top_index--;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
             unsigned level = nesting_level[top_index];
 
             nesting_level[top_index] = 0;
@@ -100,14 +100,14 @@ public:
             if (size)
                 memset(local_variables_start_pc[level], 0xFF,
                        size * sizeof(u2));
-#endif // ! JIKES_DEBUG
+#endif // ! JOPA_DEBUG
         }
         else assert(false);
     }
 
     unsigned Size() { return top_index; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     void AssertIndex(unsigned k)
     {
         for (unsigned i = 0; i < top_index; i++)
@@ -117,7 +117,7 @@ public:
     }
 #else
 # define AssertIndex(x) /* nop */
-#endif // ! JIKES_DEBUG
+#endif // ! JOPA_DEBUG
 
     unsigned TopNestingLevel()
     {
@@ -1030,7 +1030,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // bytecode_INCLUDED
 

@@ -2,8 +2,8 @@
 #include "class.h"
 
 
-namespace Jikes { // Open namespace Jikes block
-#ifdef JIKES_DEBUG
+namespace Jopa { // Open namespace Jopa block
+#ifdef JOPA_DEBUG
 int Operators::OpDesc(Opcode opc, const char** name, const char** desc)
 {
     struct OpEntry
@@ -606,7 +606,7 @@ void Operators::OpDmp(const ConstantPool& constant_pool, const Tuple<u1>& code)
                    argdesc, desc, info_kind, info_index);
     }
 }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
 //
@@ -820,5 +820,5 @@ int Operators::stack_effect[] =
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

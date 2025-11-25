@@ -7,7 +7,7 @@
 #include "double.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Cp_Info
 {
 public:
@@ -139,7 +139,7 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // getclass_INCLUDED
 

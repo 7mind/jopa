@@ -3,10 +3,10 @@
 #include "control.h"
 #include "stream.h"
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 static const char* token_type(unsigned char kind)
 {
     switch (kind)
@@ -252,7 +252,7 @@ const char* Dump(const wchar_t* wstr)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 

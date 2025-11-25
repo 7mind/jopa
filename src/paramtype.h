@@ -5,7 +5,7 @@
 #include "tuple.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class TypeSymbol;
 class TypeParameterSymbol;
 class Control;
@@ -436,6 +436,6 @@ public:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // paramtype_INCLUDED

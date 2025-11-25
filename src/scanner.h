@@ -5,7 +5,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 class FileSymbol;
 
@@ -112,7 +112,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // scanner_INCLUDED
 

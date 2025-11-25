@@ -4,20 +4,20 @@
 #include "option.h"
 
 
-using namespace Jikes;
+using namespace Jopa;
 
-// Note: JikesAPI classes only use the Jikes namespace, they
-// are never defined in the Jikes namespace. The use of the Jikes
+// Note: JopaAPI classes only use the Jopa namespace, they
+// are never defined in the Jopa namespace. The use of the Jopa
 // namespace is a compile time option and jikesapi.h can not
 // include build files like platform.h or config.h. Only
-// the Default* classes in this file can live in the Jikes namespace.
+// the Default* classes in this file can live in the Jopa namespace.
 
 
-namespace Jikes {
+namespace Jopa {
 //
 // A default implementation of ReadObject that read from the file sysytem.
 //
-class DefaultFileReader: public JikesAPI::FileReader
+class DefaultFileReader: public JopaAPI::FileReader
 {
 public:
 
@@ -42,7 +42,7 @@ private:
 //
 // A default implementation of WriteObject that writes to the file system.
 //
-class DefaultFileWriter: public JikesAPI::FileWriter
+class DefaultFileWriter: public JopaAPI::FileWriter
 {
 public:
     DefaultFileWriter(const char *fileName, size_t maxSize);
@@ -72,9 +72,9 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
-JikesOption::~JikesOption()
+JopaOption::~JopaOption()
 {
     delete [] bootclasspath;
     delete [] classpath;
@@ -84,7 +84,7 @@ JikesOption::~JikesOption()
     delete [] sourcepath;
 }
 
-JikesOption::JikesOption()
+JopaOption::JopaOption()
     : bootclasspath(NULL),
       extdirs(NULL),
       classpath(NULL),
@@ -106,9 +106,9 @@ JikesOption::JikesOption()
 {
 }
 
-JikesAPI* JikesAPI::instance = NULL;
+JopaAPI* JopaAPI::instance = NULL;
 
-JikesAPI::JikesAPI() : option(NULL),
+JopaAPI::JopaAPI() : option(NULL),
                        parsedOptions(NULL)
 {
     SetNewHandler();
@@ -116,18 +116,18 @@ JikesAPI::JikesAPI() : option(NULL),
     instance = this;
 }
 
-JikesAPI* JikesAPI::getInstance()
+JopaAPI* JopaAPI::getInstance()
 {
     return instance;
 }
 
 
-JikesAPI::~JikesAPI()
+JopaAPI::~JopaAPI()
 {
     cleanupOptions();
 }
 
-void JikesAPI::cleanupOptions()
+void JopaAPI::cleanupOptions()
 {
     delete option;
 
@@ -142,7 +142,7 @@ void JikesAPI::cleanupOptions()
     }
 }
 
-char** JikesAPI::parseOptions(int argc, char** argv)
+char** JopaAPI::parseOptions(int argc, char** argv)
 {
     cleanupOptions();
 
@@ -178,7 +178,7 @@ char** JikesAPI::parseOptions(int argc, char** argv)
     return parsedOptions;
 }
 
-JikesOption* JikesAPI::getOptions()
+JopaOption* JopaAPI::getOptions()
 {
     return option;
 }
@@ -186,12 +186,12 @@ JikesOption* JikesAPI::getOptions()
 /**
  * Compile given list of files.
  */
-int JikesAPI::compile(char** filenames)
+int JopaAPI::compile(char** filenames)
 {
-    // Cast the JikesOption to an Option instance.
+    // Cast the JopaOption to an Option instance.
     // Note that the reason we don't use an Option
-    // member type in the declaration of JikesAPI
-    // is so that the jikespai.h header does not
+    // member type in the declaration of JopaAPI
+    // is so that the jikesapi.h header does not
     // need to include option.h.
 
     Control *control = new Control(filenames, *((Option *) option));
@@ -203,18 +203,18 @@ int JikesAPI::compile(char** filenames)
 /**
  * This method will be called for each error reported.
  */
-void JikesAPI::reportError(JikesError *error)
+void JopaAPI::reportError(JopaError *error)
 {
     Coutput << error -> getErrorReport() << endl;
 }
 
-const char *JikesError::getSeverityString()
+const char *JopaError::getSeverityString()
 {
     switch (getSeverity())
     {
-    case JIKES_ERROR  : return "Error";
-    case JIKES_WARNING: return "Warning";
-    case JIKES_CAUTION: return "Caution";
+    case JOPA_ERROR  : return "Error";
+    case JOPA_WARNING: return "Warning";
+    case JOPA_CAUTION: return "Caution";
     default: return "Unknown";
     }
 }
@@ -230,7 +230,7 @@ const char *JikesError::getSeverityString()
 /**
  *  By default just ask the system for stat information.
  */
-int JikesAPI::stat(const char *fileName, struct stat *status)
+int JopaAPI::stat(const char *fileName, struct stat *status)
 {
     return SystemStat(fileName, status);
 }
@@ -238,7 +238,7 @@ int JikesAPI::stat(const char *fileName, struct stat *status)
 /**
  * By default return an object that reads from the file system.
  */
-JikesAPI::FileReader *JikesAPI::read(const char *fileName)
+JopaAPI::FileReader *JopaAPI::read(const char *fileName)
 {
     FileReader  *result  =  new DefaultFileReader(fileName);
 
@@ -256,7 +256,7 @@ JikesAPI::FileReader *JikesAPI::read(const char *fileName)
 //
 // By Default return an object that reads from the file system.
 //
-JikesAPI::FileWriter *JikesAPI::write(const char *fileName, size_t bytes)
+JopaAPI::FileWriter *JopaAPI::write(const char *fileName, size_t bytes)
 {
     FileWriter *result  = new DefaultFileWriter(fileName, bytes);
 
@@ -272,7 +272,7 @@ JikesAPI::FileWriter *JikesAPI::write(const char *fileName, size_t bytes)
  * The Write() method on all WriteObject(s) makes sure that we do not
  * send too much data to the virtual function.
  */
-size_t JikesAPI::FileWriter::write(const unsigned char *data, size_t size)
+size_t JopaAPI::FileWriter::write(const unsigned char *data, size_t size)
 {
     size_t result   = 0;
 
@@ -287,7 +287,7 @@ size_t JikesAPI::FileWriter::write(const unsigned char *data, size_t size)
 
 
 
-namespace Jikes {
+namespace Jopa {
 #ifdef UNIX_FILE_SYSTEM
 // The following methods define UNIX specific methods for
 // reading files from the file system. WINDOWS method follow in
@@ -304,7 +304,7 @@ DefaultFileReader::DefaultFileReader(const char *fileName)
     buffer = NULL;
 
     struct stat status;
-    JikesAPI::getInstance() -> stat(fileName, &status);
+    JopaAPI::getInstance() -> stat(fileName, &status);
     size = status.st_size;
 
     FILE *srcfile = SystemFopen(fileName, "rb");
@@ -337,7 +337,7 @@ DefaultFileReader::~DefaultFileReader()
  * Open a standard FILE pointer and get ready to write.
  */
 DefaultFileWriter::DefaultFileWriter(const char *fileName, size_t maxSize)
-  : JikesAPI::FileWriter(maxSize)
+  : JopaAPI::FileWriter(maxSize)
 {
     valid = false;
     file = SystemFopen(fileName, "wb");
@@ -460,5 +460,5 @@ size_t DefaultFileWriter::doWrite(const unsigned char* data, size_t size)
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

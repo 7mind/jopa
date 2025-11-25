@@ -5,7 +5,7 @@
 #include "depend.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Parser;
 class SemanticEnvironment;
 class LexStream;
@@ -142,7 +142,7 @@ public:
 //    or Gen* defined in StoragePool. Likewise, AST tree nodes never need
 //    destruction - simply delete the pool to reclaim the entire tree.
 //
-//    When the preprocessor variable JIKES_DEBUG is defined the user may print
+//    When the preprocessor variable JOPA_DEBUG is defined the user may print
 //    out an AST tree to standard output by calling the virtual function
 //    "Print" for the root node of the tree.
 //
@@ -404,11 +404,11 @@ protected:
 public:
     bool generated;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     const unsigned id;
     static unsigned count;
     static bool debug_unparse;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     //
     // Note that ALL fields of an Ast are initialized to 0 unless modified
@@ -419,9 +419,9 @@ public:
     inline Ast(AstKind k, AstTag t = NO_TAG)
         : kind(k)
         , class_tag(t)
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         , id(++count)
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     {}
 
     //
@@ -442,10 +442,10 @@ public:
     //
     virtual ~Ast() { assert(false && "Use the associated StoragePool"); }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&) = 0;
     virtual void Unparse(Ostream&, LexStream*) = 0;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     //
     // General queries.
@@ -696,9 +696,9 @@ public:
     inline AstListNode()
         : Ast(LIST_NODE)
     {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         --count; // don't count these nodes
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     }
 
     ~AstListNode() {}
@@ -708,10 +708,10 @@ public:
     // only exist long enough to create the AST tree and then are reclaimed.
     //
     virtual Ast* Clone(StoragePool*) { assert(false); return NULL; }
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&) { assert(false); }
     virtual void Unparse(Ostream&, LexStream*) { assert(false); }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual TokenIndex LeftToken() { return element -> LeftToken(); }
     virtual TokenIndex RightToken() { return element -> RightToken(); }
@@ -896,10 +896,10 @@ public:
     inline void AllocateLocallyDefinedVariables(unsigned estimate = 1);
     inline void AddLocallyDefinedVariable(VariableSymbol*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -932,10 +932,10 @@ public:
     {}
     ~AstName() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -971,10 +971,10 @@ public:
     {}
     ~AstPrimitiveType() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1003,10 +1003,10 @@ public:
     {}
     ~AstBrackets() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1042,10 +1042,10 @@ public:
 
     inline unsigned NumBrackets() { return brackets -> dims; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1075,10 +1075,10 @@ public:
     {}
     ~AstWildcard() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1124,10 +1124,10 @@ public:
     inline void AllocateTypeArguments(unsigned estimate = 1);
     inline void AddTypeArgument(AstType*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1166,10 +1166,10 @@ public:
             ? type_arguments_opt -> NumTypeArguments() : 0;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1206,10 +1206,10 @@ public:
     {}
     ~AstMemberValuePair() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1253,10 +1253,10 @@ public:
     inline void AllocateMemberValuePairs(unsigned estimate = 1);
     inline void AddMemberValuePair(AstMemberValuePair*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1284,10 +1284,10 @@ public:
     {}
     ~AstModifierKeyword() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1328,10 +1328,10 @@ public:
     inline void AddModifier(AstAnnotation*);
     inline void AddModifier(AstModifierKeyword*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1360,10 +1360,10 @@ public:
     {}
     ~AstPackageDeclaration() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1392,10 +1392,10 @@ public:
     {}
     ~AstImportDeclaration() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1457,13 +1457,13 @@ public:
     inline void AllocateTypeDeclarations(unsigned estimate = 1);
     inline void AddTypeDeclaration(AstDeclaredType*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
 
     // special forms
     virtual void Unparse(LexStream*, const char* const directory);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1505,10 +1505,10 @@ public:
     {}
     ~AstEmptyDeclaration() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1707,11 +1707,11 @@ public:
     inline void AllocateEmptyDeclarations(unsigned estimate = 1);
     inline void AddEmptyDeclaration(AstEmptyDeclaration*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream& o, LexStream* l) { Unparse(o, l, false); }
     void Unparse(Ostream&, LexStream*, bool);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1747,10 +1747,10 @@ public:
     inline void AllocateBounds(unsigned estimate = 1);
     inline void AddBound(AstTypeName*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1793,10 +1793,10 @@ public:
     inline void AllocateTypeParameters(unsigned estimate = 1);
     inline void AddTypeParameter(AstTypeParameter*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1832,10 +1832,10 @@ public:
     inline void AllocateInterfaces(unsigned estimate = 1);
     inline void AddInterface(AstTypeName*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1876,10 +1876,10 @@ public:
     inline void AllocateVariableInitializers(unsigned estimate = 1);
     inline void AddVariableInitializer(AstMemberValue*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1908,10 +1908,10 @@ public:
         return brackets_opt ? brackets_opt -> dims : 0;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -1949,10 +1949,10 @@ public:
     {}
     ~AstVariableDeclarator() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2010,10 +2010,10 @@ public:
     inline void AllocateVariableDeclarators(unsigned estimate = 1);
     inline void AddVariableDeclarator(AstVariableDeclarator*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2042,10 +2042,10 @@ public:
     {}
     ~AstFormalParameter() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2098,10 +2098,10 @@ public:
         return brackets_opt ? brackets_opt -> dims : 0;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2132,10 +2132,10 @@ public:
     }
     ~AstMethodBody() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
     // Inherited LeftToken(), RightToken() are adequate.
@@ -2176,10 +2176,10 @@ public:
     inline void AllocateThrows(unsigned estimate = 1);
     inline void AddThrow(AstTypeName*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2219,10 +2219,10 @@ public:
 
     inline void MarkStatic() { other_tag = STATIC; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2281,10 +2281,10 @@ public:
     inline void AddNullArgument() { other_tag = true; }
     inline bool NeedsExtraNullArgument() { return (bool) other_tag; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2311,10 +2311,10 @@ public:
     {}
     ~AstThisCall() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2346,10 +2346,10 @@ public:
     {}
     ~AstSuperCall() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2408,10 +2408,10 @@ public:
     inline void AllocateThrows(unsigned estimate = 1);
     inline void AddThrow(AstTypeName*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2468,10 +2468,10 @@ public:
     inline void AllocateEnumConstants(unsigned estimate = 1);
     inline void AddEnumConstant(AstEnumConstant*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2503,10 +2503,10 @@ public:
     {}
     ~AstEnumConstant() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2552,10 +2552,10 @@ public:
     inline void AllocateInterfaces(unsigned estimate = 1);
     inline void AddInterface(AstTypeName*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2581,10 +2581,10 @@ public:
     {}
     ~AstAnnotationDeclaration() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2627,10 +2627,10 @@ public:
     inline void AllocateVariableDeclarators(unsigned estimate = 1);
     inline void AddVariableDeclarator(AstVariableDeclarator*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2666,10 +2666,10 @@ public:
     {}
     ~AstLocalClassStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2698,10 +2698,10 @@ public:
     {}
     ~AstIfStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2728,10 +2728,10 @@ public:
     {}
     ~AstEmptyStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2755,10 +2755,10 @@ public:
     {}
     ~AstExpressionStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2792,10 +2792,10 @@ public:
     {}
     ~AstSwitchLabel() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2830,10 +2830,10 @@ public:
     inline void AllocateSwitchLabels(unsigned estimate = 1);
     inline void AddSwitchLabel(AstSwitchLabel*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
     virtual TokenIndex LeftToken() { return SwitchLabel(0) -> case_token; }
@@ -2878,9 +2878,9 @@ class AstSwitchStatement : public AstStatement
     //
     CaseElement** cases;
     unsigned num_cases;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     unsigned max_cases; // bounds check only when debugging
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 public:
     TokenIndex switch_token;
@@ -2912,10 +2912,10 @@ public:
     void SortCases();
     CaseElement* CaseForValue(i4 value);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2942,10 +2942,10 @@ public:
     {}
     ~AstWhileStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -2971,10 +2971,10 @@ public:
     {}
     ~AstDoStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3027,10 +3027,10 @@ public:
     inline void AllocateForUpdateStatements(unsigned estimate = 1);
     inline void AddForUpdateStatement(AstExpressionStatement*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3058,10 +3058,10 @@ public:
     {}
     ~AstForeachStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3087,10 +3087,10 @@ public:
     {}
     ~AstBreakStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3116,10 +3116,10 @@ public:
     {}
     ~AstContinueStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3144,10 +3144,10 @@ public:
     {}
     ~AstReturnStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3171,10 +3171,10 @@ public:
     {}
     ~AstThrowStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3199,10 +3199,10 @@ public:
     {}
     ~AstSynchronizedStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3231,10 +3231,10 @@ public:
     {}
     ~AstAssertStatement() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3260,10 +3260,10 @@ public:
     {}
     ~AstCatchClause() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3286,10 +3286,10 @@ public:
     {}
     ~AstFinallyClause() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3330,10 +3330,10 @@ public:
     inline void AllocateCatchClauses(unsigned estimate = 1);
     inline void AddCatchClause(AstCatchClause*);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3360,10 +3360,10 @@ public:
     {}
     ~AstIntegerLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3386,10 +3386,10 @@ public:
     {}
     ~AstLongLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3412,10 +3412,10 @@ public:
     {}
     ~AstFloatLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3438,10 +3438,10 @@ public:
     {}
     ~AstDoubleLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3464,10 +3464,10 @@ public:
     {}
     ~AstTrueLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3490,10 +3490,10 @@ public:
     {}
     ~AstFalseLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3516,10 +3516,10 @@ public:
     {}
     ~AstStringLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3542,10 +3542,10 @@ public:
     {}
     ~AstCharacterLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3568,10 +3568,10 @@ public:
     {}
     ~AstNullLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3601,10 +3601,10 @@ public:
     {}
     ~AstClassLiteral() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3634,10 +3634,10 @@ public:
     {}
     ~AstThisExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3670,10 +3670,10 @@ public:
     {}
     ~AstSuperExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3701,10 +3701,10 @@ public:
     {}
     ~AstParenthesizedExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3742,10 +3742,10 @@ public:
     {}
     ~AstClassCreationExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3776,10 +3776,10 @@ public:
     {}
     ~AstDimExpr() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3822,10 +3822,10 @@ public:
         return brackets_opt ? brackets_opt -> dims : 0;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3862,10 +3862,10 @@ public:
     {}
     ~AstFieldAccess() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3900,10 +3900,10 @@ public:
     {}
     ~AstMethodInvocation() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3936,10 +3936,10 @@ public:
     {}
     ~AstArrayAccess() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -3993,10 +3993,10 @@ public:
         return (PostUnaryExpressionTag) other_tag;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4050,10 +4050,10 @@ public:
         return (PreUnaryExpressionTag) other_tag;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4081,10 +4081,10 @@ public:
     {}
     ~AstCastExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4153,10 +4153,10 @@ public:
         return (BinaryExpressionTag) other_tag;
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4183,10 +4183,10 @@ public:
     {}
     ~AstInstanceofExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4213,10 +4213,10 @@ public:
     {}
     ~AstConditionalExpression() {}
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -4296,10 +4296,10 @@ public:
     }
     inline bool SimpleAssignment() { return other_tag == SIMPLE_EQUAL; }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
     virtual void Unparse(Ostream&, LexStream*);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     virtual Ast* Clone(StoragePool*);
 
@@ -6546,18 +6546,18 @@ inline void AstSwitchStatement::AllocateCases(unsigned estimate)
     assert(! cases);
     cases = new (pool -> Alloc((estimate + 1) * sizeof(CaseElement*)))
         CaseElement*[estimate + 1];
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     max_cases = estimate + 1;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 inline void AstSwitchStatement::AddCase(CaseElement* case_element)
 {
     assert(cases);
     cases[++num_cases] = case_element;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     assert(num_cases < max_cases);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 inline void AstForStatement::AllocateForInitStatements(unsigned estimate)
@@ -6637,15 +6637,15 @@ AstArray<T>::AstArray(StoragePool* pool, unsigned estimate)
     // This bit of code is a compile-time assertion that only Ast* are stuck
     // in an AstArray.
     //
-#if defined JIKES_DEBUG && defined HAVE_STATIC_CAST
+#if defined JOPA_DEBUG && defined HAVE_STATIC_CAST
     assert(true || static_cast<Ast*> (T()));
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     if(estimate)
         array = new (pool -> Alloc(size * sizeof(T))) T[size];
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // ast_INCLUDED

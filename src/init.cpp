@@ -4,7 +4,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void Semantic::ProcessVariableInitializer(AstVariableDeclarator* variable_declarator)
 {
     VariableSymbol* symbol = variable_declarator -> symbol;
@@ -218,5 +218,5 @@ void Semantic::ComputeFinalValue(VariableSymbol* variable)
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

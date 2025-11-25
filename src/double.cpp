@@ -54,7 +54,7 @@
 #include "code.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 #ifndef HAVE_MEMBER_CONSTANTS
 // VC++ can't cope with constant class members
 IEEEfloat IEEEfloat::tens[] = {
@@ -3200,5 +3200,5 @@ IEEEdouble BigInt::DoubleValue() const
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

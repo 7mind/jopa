@@ -5,7 +5,7 @@
 #include <cstdio>
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 //************************************************************
 //
 // The ZipFile methods follow
@@ -271,4 +271,4 @@ void Zip::ReadDirectory()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

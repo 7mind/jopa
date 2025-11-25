@@ -4,7 +4,7 @@
 #define javasym_INCLUDED
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 enum {
       TK_abstract = 22,
       TK_assert = 74,
@@ -120,6 +120,6 @@ enum {
      };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif /* javasym_INCLUDED */

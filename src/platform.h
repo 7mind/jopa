@@ -232,7 +232,7 @@ enum { false = 0, true = 1 };
 #endif
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 template <typename TO, typename FROM>
 inline TO DYNAMIC_CAST(FROM f)
 {
@@ -996,7 +996,7 @@ extern Ostream Coutput;
 #define cerr Please_Do_Not_Use_cerr_Directly_But_use_an_instance_of_Ostream_with_cerr_as_argument
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // platform_INCLUDED
 

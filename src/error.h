@@ -6,7 +6,7 @@
 #include "jikesapi.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 class Control;
 class LexStream;
 class FileSymbol;
@@ -59,7 +59,7 @@ private:
 };
 
 
-class ErrorInfo : public JikesError
+class ErrorInfo : public JopaError
 {
     friend class SemanticError;
 
@@ -67,7 +67,7 @@ public:
     virtual const wchar_t* getErrorMessage();
     virtual const wchar_t* getErrorReport();
 
-    virtual JikesErrorSeverity getSeverity();
+    virtual JopaErrorSeverity getSeverity();
     virtual const char* getFileName();
 
     virtual int getLeftLineNo();
@@ -94,7 +94,7 @@ private:
     const wchar_t* msg;
     unsigned num;
     short msg_code;
-    JikesErrorSeverity severity;
+    JopaErrorSeverity severity;
 
     static bool emacs_style_report;
     LexStream* lex_stream;
@@ -108,14 +108,14 @@ private:
 class SemanticError
 {
     friend class ErrorInfo;
-    friend class JikesAPI;
+    friend class JopaAPI;
 
 public:
     enum WarningLevel
     {
-        MANDATORY_ERROR = ErrorInfo::JIKES_ERROR,
-        STRONG_WARNING = ErrorInfo::JIKES_CAUTION,
-        WEAK_WARNING = ErrorInfo::JIKES_WARNING,
+        MANDATORY_ERROR = ErrorInfo::JOPA_ERROR,
+        STRONG_WARNING = ErrorInfo::JOPA_CAUTION,
+        WEAK_WARNING = ErrorInfo::JOPA_WARNING,
         DISABLED,
         NAMED_STRONG_ON,
         NAMED_STRONG_OFF,
@@ -511,7 +511,7 @@ private:
 };
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
 #endif // error_INCLUDED
 

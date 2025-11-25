@@ -30,7 +30,7 @@
 #include "double.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 // Define the PathSeparator() function with the proper
 // impl for each platform.
 
@@ -216,7 +216,7 @@ int SystemIsDirectory(char* name)
 {
     struct stat status;
     return ((SystemStat(name, &status) == 0 &&
-             (status.st_mode & JIKES_STAT_S_IFDIR)) ? 1 : 0);
+             (status.st_mode & JOPA_STAT_S_IFDIR)) ? 1 : 0);
 }
 
 int SystemMkdirhier(char* dirname)
@@ -1375,11 +1375,12 @@ const wchar_t StringConstant::US_while[] = {
 // Miscellaneous strings.
 //
 const char StringConstant::U8S_help_header[] =
-    "Jikes Compiler - " JIKES_VERSION_STRING
+    "Jopa Compiler (based on Jikes) - Version " JOPA_VERSION_STRING
     "\nCopyright (C) IBM Corporation 1997-2003, 2004.\n"
-    "- Licensed Materials - Program Property of IBM - All Rights Reserved.\n";
+    "Licensed Materials. Program Property of IBM. All Rights Reserved.\n"
+    "Dragons. Cluster lizards. Hippity Hoppity of 7mind. Sanity not preserved.\n";
 const char StringConstant::U8S_command_format[] =
-    "use: jikes [options] [@files] file.java...\n";
+    "use: jopa [options] [@files] file.java...\n";
 
 //
 // Constant pool entries.
@@ -1469,4 +1470,4 @@ const char StringConstant::U8S_neg_Zero[] = {
 Ostream Coutput;
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

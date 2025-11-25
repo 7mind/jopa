@@ -7,7 +7,7 @@
 #include "code.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 int (*Scanner::scan_keyword[13]) (const wchar_t* p1) =
 {
     ScanKeyword0,
@@ -42,9 +42,9 @@ Scanner::Scanner(Control& control_)
     //
     // If this assertion fails, then gencode.java is at fault.
     //
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     assert(Code::CodeCheck());
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     //
     // CLASSIFY_TOKEN is a mapping from each character into a
@@ -126,7 +126,7 @@ void Scanner::Initialize(FileSymbol* file_symbol)
     current_token = &(lex -> token_stream[current_token_index]);
     current_token -> SetKind(0);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_comments)
     {
         // Add 0th comment.
@@ -136,7 +136,7 @@ void Scanner::Initialize(FileSymbol* file_symbol)
         current_comment -> previous_token = BAD_TOKEN;
         current_comment -> location = 0;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     lex -> line_location.Next() = 0; // Mark starting location of line # 0
 }
@@ -172,7 +172,7 @@ void Scanner::Scan(FileSymbol* file_symbol)
         {
             lex -> SortMessages();
             for (unsigned i = 0; i < lex -> bad_tokens.Length(); i++)
-                JikesAPI::getInstance() ->
+                JopaAPI::getInstance() ->
                     reportError(&(lex -> bad_tokens[i]));
         }
         lex -> DestroyInput(); // get rid of input buffer
@@ -252,7 +252,7 @@ void Scanner::ScanStarComment()
 {
     const wchar_t* start = cursor - 1;
     current_token -> SetKind(0);
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     LexStream::Comment* current_comment = NULL;
     if (control.option.debug_comments)
     {
@@ -261,7 +261,7 @@ void Scanner::ScanStarComment()
         current_comment -> previous_token = current_token_index - 1;
         current_comment -> location = start - lex -> InputBuffer();
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     //
     // If this comment starts with the prefix "/**" then it is a document
@@ -308,10 +308,10 @@ void Scanner::ScanStarComment()
             case U_SLASH:
                 if (state == STAR)
                 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                     if (control.option.debug_comments)
                         current_comment -> length = cursor - start;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
                     return;
                 }
                 // fallthrough
@@ -354,10 +354,10 @@ void Scanner::ScanStarComment()
                 if (*cursor == U_SLASH)
                 {
                     cursor++;
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
                     if (control.option.debug_comments)
                         current_comment -> length = cursor - start;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
                     return;
                 }
                 if (*cursor == U_CARRIAGE_RETURN)
@@ -378,10 +378,10 @@ void Scanner::ScanStarComment()
                          start - lex -> InputBuffer(),
                          cursor - lex -> InputBuffer() - 1);
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_comments)
         current_comment -> length = cursor - 1 - start;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
@@ -399,7 +399,7 @@ void Scanner::ScanSlashComment()
         deprecated = true;
     current_token -> SetKind(0);
     while (! Code::IsNewline(*++cursor));  // Skip all until \n or EOF
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_comments)
     {
         LexStream::Comment* current_comment = &(lex -> comment_stream.Next());
@@ -409,7 +409,7 @@ void Scanner::ScanSlashComment()
         current_comment -> length = (cursor - lex -> InputBuffer()) -
             current_comment -> location;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
@@ -947,7 +947,7 @@ void Scanner::ClassifyIdOrKeyword()
                              : TK_Identifier);
 
     if (current_token -> Kind() == TK_assert &&
-        control.option.source < JikesOption::SDK1_4)
+        control.option.source < JopaOption::SDK1_4)
     {
         lex -> ReportMessage(StreamError::DEPRECATED_IDENTIFIER_ASSERT,
                              current_token -> Location(),
@@ -955,7 +955,7 @@ void Scanner::ClassifyIdOrKeyword()
         current_token -> SetKind(TK_Identifier);
     }
     if (current_token -> Kind() == TK_enum &&
-        control.option.source < JikesOption::SDK1_5)
+        control.option.source < JopaOption::SDK1_5)
     {
         lex -> ReportMessage(StreamError::DEPRECATED_IDENTIFIER_ENUM,
                              current_token -> Location(),
@@ -1663,4 +1663,4 @@ void Scanner::ClassifyBadToken()
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block

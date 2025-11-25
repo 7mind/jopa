@@ -1,4 +1,4 @@
-set(JIKES_SOURCES
+set(JOPA_SOURCES
     ast.cpp
     body.cpp
     bytecode.cpp
@@ -132,14 +132,14 @@ endif()
 
 # Always enable Java 5 support and namespaces
 set(ENABLE_SOURCE_15 1)
-set(HAVE_JIKES_NAMESPACE 1)
+set(HAVE_JOPA_NAMESPACE 1)
 
-if(JIKES_ENABLE_NATIVE_FP)
+if(JOPA_ENABLE_NATIVE_FP)
     set(HAVE_IEEE754 1)
 endif()
 
-if(JIKES_ENABLE_DEBUG)
-    set(JIKES_DEBUG 1)
+if(JOPA_ENABLE_DEBUG)
+    set(JOPA_DEBUG 1)
 endif()
 
 set(HAVE_STD 1)
@@ -153,37 +153,37 @@ set(HAVE_RTTI 1)
 set(HAVE_BOOL 1)
 set(HAVE_OSTREAM_CONST_UNSIGNED_CHAR_PTR 1)
 
-set(JIKES_STAT_S_IFDIR S_IFDIR)
+set(JOPA_STAT_S_IFDIR S_IFDIR)
 
 unset(HAVE_ENCODING)
-unset(JIKES_ICONV_ENCODING)
-set(JIKES_LIBS)
+unset(JOPA_ICONV_ENCODING)
+set(JOPA_LIBS)
 
 # Find libzip
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBZIP REQUIRED IMPORTED_TARGET libzip)
 
-list(APPEND JIKES_LIBS PkgConfig::LIBZIP)
+list(APPEND JOPA_LIBS PkgConfig::LIBZIP)
 
-if(JIKES_ENABLE_ENCODING)
+if(JOPA_ENABLE_ENCODING)
     find_package(ICU COMPONENTS uc QUIET)
     if(ICU_UC_FOUND)
         set(HAVE_LIBICU_UC 1)
         set(HAVE_ENCODING 1)
-        list(APPEND JIKES_LIBS ICU::uc)
+        list(APPEND JOPA_LIBS ICU::uc)
     endif()
 
     find_package(Iconv QUIET)
     if(Iconv_FOUND)
         set(HAVE_ICONV_H 1)
         set(HAVE_ENCODING 1)
-        set(JIKES_ICONV_ENCODING "wchar_t")
+        set(JOPA_ICONV_ENCODING "wchar_t")
         set(HAVE_ERROR_CALL_ICONV_CONST 1)
-        list(APPEND JIKES_LIBS Iconv::Iconv)
+        list(APPEND JOPA_LIBS Iconv::Iconv)
     endif()
 
     if(NOT HAVE_ENCODING)
-        message(FATAL_ERROR "JIKES_ENABLE_ENCODING is ON but neither iconv nor ICU (uc) were found.")
+        message(FATAL_ERROR "JOPA_ENABLE_ENCODING is ON but neither iconv nor ICU (uc) were found.")
     endif()
 endif()
 
@@ -193,11 +193,11 @@ configure_file(
     @ONLY
 )
 
-add_executable(jikes ${JIKES_SOURCES})
-target_include_directories(jikes PRIVATE
+add_executable(jopa ${JOPA_SOURCES})
+target_include_directories(jopa PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_BINARY_DIR}/generated"
 )
-target_link_libraries(jikes PRIVATE ${JIKES_LIBS})
+target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
 
-install(TARGETS jikes RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(TARGETS jopa RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

@@ -8,7 +8,7 @@
 #include "code.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 inline u1 Semantic::GetU1(const char *buffer)
 {
     return *buffer;
@@ -366,7 +366,7 @@ inline TypeSymbol *Semantic::GetClassPool(TypeSymbol *base_type,
 
 void Semantic::ReadClassFile(TypeSymbol *type, LexStream::TokenIndex tok)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     control.class_files_read++;
 #endif
 
@@ -408,8 +408,8 @@ void Semantic::ReadClassFile(TypeSymbol *type, LexStream::TokenIndex tok)
     else
     {
         // Get a ReadObject from the API that contains the filew data.
-        JikesAPI::FileReader *classFile =
-            JikesAPI::getInstance()->read(file_symbol->FileName());
+        JopaAPI::FileReader *classFile =
+            JopaAPI::getInstance()->read(file_symbol->FileName());
         if (classFile == NULL)
         {
             // this symbol table will only contain a default constructor
@@ -1221,5 +1221,5 @@ bool Semantic::ProcessClassFile(TypeSymbol *type, const char *buffer,
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

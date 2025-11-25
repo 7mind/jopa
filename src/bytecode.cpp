@@ -9,7 +9,7 @@
 #include "option.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void ByteCode::GenerateCode()
 {
     AstClassBody* class_body = unit_type -> declaration;
@@ -85,7 +85,7 @@ void ByteCode::GenerateCode()
     {
         assert(! control.option.noassert);
         DeclareField(assert_variable);
-        if (control.option.target < JikesOption::SDK1_4)
+        if (control.option.target < JopaOption::SDK1_4)
         {
             semantic.ReportSemError(SemanticError::ASSERT_UNSUPPORTED_IN_TARGET,
                                     unit_type -> declaration,
@@ -307,10 +307,10 @@ void ByteCode::GenerateCode()
 
     if (semantic.NumErrors() == 0)
         Write(unit_type);
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_dump_class)
         Print();
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
@@ -339,7 +339,7 @@ void ByteCode::CompileConstructor(AstConstructorDeclaration* constructor,
                 GetTypeWords(method_symbol -> FormalParameter(j) -> Type());
     }
 
-    if (control.option.target < JikesOption::SDK1_4)
+    if (control.option.target < JopaOption::SDK1_4)
     {
         //
         // Prior to JDK 1.4, VMs incorrectly complained if shadow
@@ -389,7 +389,7 @@ void ByteCode::CompileConstructor(AstConstructorDeclaration* constructor,
             EmitStatement(constants[j]);
     }
 
-    if (control.option.target >= JikesOption::SDK1_4)
+    if (control.option.target >= JopaOption::SDK1_4)
     {
         //
         // Since JDK 1.4, VMs correctly allow shadow initialization before
@@ -466,7 +466,7 @@ void ByteCode::DeclareField(VariableSymbol* symbol)
     }
 
     if (symbol -> ACC_SYNTHETIC() &&
-        control.option.target < JikesOption::SDK1_5)
+        control.option.target < JopaOption::SDK1_5)
     {
         fields[field_index] -> AddAttribute(CreateSyntheticAttribute());
     }
@@ -487,13 +487,13 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
                 << unit_type -> ContainingPackageName() << "/"
                 << unit_type -> ExternalName() << endl;
 #endif // DUMP
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_trace_stack_change)
         Coutput << endl << "Generating method "
                 << unit_type -> ContainingPackageName() << '.'
                 << unit_type -> ExternalName() << '.' << msym -> Name()
                 << msym -> signature -> value << endl;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
     MethodInitialization();
 
     methods[method_index] = new MethodInfo();
@@ -504,7 +504,7 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     methods[method_index] -> SetFlags(msym -> Flags());
 
     if (msym -> ACC_SYNTHETIC() &&
-        control.option.target < JikesOption::SDK1_5)
+        control.option.target < JopaOption::SDK1_5)
     {
         methods[method_index] -> AddAttribute(CreateSyntheticAttribute());
     }
@@ -941,7 +941,7 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
         line_number_table_attribute = new LineNumberTableAttribute
             (RegisterUtf8(control.LineNumberTable_literal));
 
-        local_variable_table_attribute = (control.option.g & JikesOption::VARS)
+        local_variable_table_attribute = (control.option.g & JopaOption::VARS)
             ? (new LocalVariableTableAttribute
                (RegisterUtf8(control.LocalVariableTable_literal)))
             : (LocalVariableTableAttribute*) NULL;
@@ -1045,7 +1045,7 @@ void ByteCode::EndMethod(int method_index, MethodSymbol* msym)
         // Only write line number attribute if there are line numbers to
         // write, and -g:lines is enabled.
         //
-        if ((control.option.g & JikesOption::LINES) &&
+        if ((control.option.g & JopaOption::LINES) &&
             line_number_table_attribute -> LineNumberTableLength())
         {
              code_attribute -> AddAttribute(line_number_table_attribute);
@@ -1059,7 +1059,7 @@ void ByteCode::EndMethod(int method_index, MethodSymbol* msym)
         //
         // Debug level -g:vars & not dealing with generated accessed method
         //
-        if ((control.option.g & JikesOption::VARS)
+        if ((control.option.g & JopaOption::VARS)
             && (! msym -> accessed_member)
             && (msym -> Identity() != control.class_name_symbol))
         {
@@ -1198,12 +1198,12 @@ void ByteCode::InitializeArray(const TypeSymbol* type,
 //
 void ByteCode::DeclareLocalVariable(AstVariableDeclarator* declarator)
 {
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
     {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
         // Must be uninitialized.
         assert(method_stack -> StartPc(declarator -> symbol) == 0xFFFF);
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 #ifdef DUMP
         Coutput << "(53) Variable \"" << declarator -> symbol -> Name()
                 << "\" numbered "
@@ -1224,7 +1224,7 @@ void ByteCode::DeclareLocalVariable(AstVariableDeclarator* declarator)
         // Optimization: If we are not tracking local variable names, we do
         // not need to waste space on a constant as it is always inlined.
         //
-        if (! (control.option.g & JikesOption::VARS))
+        if (! (control.option.g & JopaOption::VARS))
             return;
         LoadLiteral(declarator -> symbol -> initial_value,
                     declarator -> symbol -> Type());
@@ -1260,7 +1260,7 @@ void ByteCode::DeclareLocalVariable(AstVariableDeclarator* declarator)
             // assigned to a multi-dimensional local variable or directly
             // used as an array access base.
             //
-            if (control.option.target < JikesOption::SDK1_5 &&
+            if (control.option.target < JopaOption::SDK1_5 &&
                 IsMultiDimensionalArray(type) &&
                 (StripNops(expr) -> Type() == control.null_type))
             {
@@ -1702,7 +1702,7 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
         abrupt = false;
     }
 
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
     {
         for (unsigned i = 0; i < block -> NumLocallyDefinedVariables(); i++)
         {
@@ -1921,7 +1921,7 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
         // Force the generation of a LOOKUPSWITCH in these circumstances.
         //
         if (high < 0x7ffffff0L ||
-            control.option.target >= JikesOption::SDK1_4)
+            control.option.target >= JopaOption::SDK1_4)
         {
             // We want to compute (1 + (high - low + 1)) < (ncases * 2 + 8).
             // However, we must beware of integer overflow.
@@ -2076,7 +2076,7 @@ bool ByteCode::EmitSwitchBlockStatement(AstSwitchBlockStatement* block,
             {
                 AstVariableDeclarator* declarator =
                     lvs -> VariableDeclarator(j);
-                if (control.option.g & JikesOption::VARS)
+                if (control.option.g & JopaOption::VARS)
                 {
                     method_stack -> StartPc(declarator -> symbol) =
                         code_attribute -> CodeLength();
@@ -2096,7 +2096,7 @@ bool ByteCode::EmitSwitchBlockStatement(AstSwitchBlockStatement* block,
 void ByteCode::CloseSwitchLocalVariables(AstBlock* switch_block,
                                          u2 op_start)
 {
-    if (control.option.g & JikesOption::VARS)
+    if (control.option.g & JopaOption::VARS)
     {
         for (unsigned i = 0;
              i < switch_block -> NumLocallyDefinedVariables(); i++)
@@ -2218,7 +2218,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             // Unless debugging, we don't need to waste a variable on an
             // empty catch.
             //
-            if ((control.option.g & JikesOption::VARS) ||
+            if ((control.option.g & JopaOption::VARS) ||
                 ! IsNop(catch_clause -> block))
             {
                 StoreLocal(parameter_symbol -> LocalVariableIndex(),
@@ -2253,7 +2253,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             }
             abrupt = EmitBlockStatement(catch_clause -> block);
 
-            if (control.option.g & JikesOption::VARS)
+            if (control.option.g & JopaOption::VARS)
             {
                 local_variable_table_attribute ->
                     AddLocalVariable(handler_pc,
@@ -3405,7 +3405,7 @@ void ByteCode::EmitAssertStatement(AstAssertStatement* assertion)
     //
     if (semantic.IsConstantTrue(assertion -> condition) ||
         control.option.noassert ||
-        control.option.target < JikesOption::SDK1_4)
+        control.option.target < JopaOption::SDK1_4)
     {
         return;
     }
@@ -3549,7 +3549,7 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         u2 var_pc = code_attribute -> CodeLength();        
         StoreLocal(var -> LocalVariableIndex(), component_type);
         abrupt = EmitStatement(foreach -> statement);
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
             local_variable_table_attribute ->
                 AddLocalVariable(var_pc, code_attribute -> CodeLength(),
@@ -3630,7 +3630,7 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         u2 var_pc = code_attribute -> CodeLength();        
         StoreLocal(var -> LocalVariableIndex(), component_type);
         abrupt = EmitStatement(foreach -> statement);
-        if (control.option.g & JikesOption::VARS)
+        if (control.option.g & JopaOption::VARS)
         {
             local_variable_table_attribute ->
                 AddLocalVariable(var_pc, code_attribute -> CodeLength(),
@@ -3826,7 +3826,7 @@ TypeSymbol* ByteCode::VariableTypeResolution(AstExpression* expression,
     TypeSymbol* candidate = field ? field -> base -> Type()
         : name -> base_opt ? name -> base_opt -> Type() : unit_type;
     return (sym -> ContainingType() -> ACC_INTERFACE() &&
-            control.option.target < JikesOption::SDK1_4)
+            control.option.target < JopaOption::SDK1_4)
         ? sym -> ContainingType() : candidate;
 }
 
@@ -3889,7 +3889,7 @@ void ByteCode::EmitFieldAccessLhs(AstExpression* expression)
 //
 void ByteCode::GenerateClassAccessMethod()
 {
-    assert(control.option.target < JikesOption::SDK1_5);
+    assert(control.option.target < JopaOption::SDK1_5);
     //
     // Here, we add a line-number attribute entry for this method.
     // Even though this is a generated method, JPDA debuggers will
@@ -3973,7 +3973,7 @@ void ByteCode::GenerateClassAccessMethod()
       AddException(0, 12, 12, RegisterClass(control.ClassNotFoundException()));
 
     ChangeStack(1); // account for the exception on the stack
-    if (control.option.target < JikesOption::SDK1_4)
+    if (control.option.target < JopaOption::SDK1_4)
     {
         PutOp(OP_INVOKEVIRTUAL);
         PutU2(RegisterLibraryMethodref(control.Throwable_getMessageMethod()));
@@ -4304,7 +4304,7 @@ void ByteCode::EmitUnboxingConversion(TypeSymbol* source_type, TypeSymbol* targe
 int ByteCode::GenerateClassAccess(AstClassLiteral* class_lit,
                                   bool need_value)
 {
-    assert(control.option.target < JikesOption::SDK1_5);
+    assert(control.option.target < JopaOption::SDK1_5);
     //
     // Evaluate X.class literal. If X is a primitive type, this is a
     // predefined field, and we emitted it directly rather than relying on
@@ -4398,7 +4398,7 @@ void ByteCode::GenerateAssertVariableInitializer(TypeSymbol* tsym,
     //  putstatic        <thisClass>.$noassert
     //
     assert(! control.option.noassert &&
-           control.option.target >= JikesOption::SDK1_4);
+           control.option.target >= JopaOption::SDK1_4);
     tsym = tsym -> GetArrayType(control.system_semantic, 1);
     LoadLiteral(tsym -> FindOrInsertClassLiteralName(control),
                 control.String());
@@ -4641,20 +4641,20 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
             left_type == control.String())
         {
             PutOp(OP_NEW);
-            PutU2(RegisterClass(control.option.target >= JikesOption::SDK1_5
+            PutU2(RegisterClass(control.option.target >= JopaOption::SDK1_5
                                 ? control.StringBuilder()
                                 : control.StringBuffer()));
             PutOp(OP_DUP_X1);
             PutOp(OP_INVOKESPECIAL);
             PutU2(RegisterLibraryMethodref
-                  (control.option.target >= JikesOption::SDK1_5
+                  (control.option.target >= JopaOption::SDK1_5
                    ? control.StringBuilder_InitMethod()
                    : control.StringBuffer_InitMethod()));
             EmitStringAppendMethod(control.String());
             AppendString(assignment_expression -> expression, true);
             PutOp(OP_INVOKEVIRTUAL);
             PutU2(RegisterLibraryMethodref
-                  (control.option.target >= JikesOption::SDK1_5
+                  (control.option.target >= JopaOption::SDK1_5
                    ? control.StringBuilder_toStringMethod()
                    : control.StringBuffer_toStringMethod()));
             ChangeStack(1); // account for return value
@@ -4861,7 +4861,7 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
         // time null might be assigned to a multi-dimensional local variable
         // or directly used as an array access base.
         //
-        if (control.option.target < JikesOption::SDK1_5 &&
+        if (control.option.target < JopaOption::SDK1_5 &&
             IsMultiDimensionalArray(left_type) &&
             (StripNops(assignment_expression -> expression) -> Type() ==
              control.null_type))
@@ -4908,7 +4908,7 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
         }
         PutOp(OP_INVOKEVIRTUAL);
         PutU2(RegisterLibraryMethodref
-              (control.option.target >= JikesOption::SDK1_5
+              (control.option.target >= JopaOption::SDK1_5
                ? control.StringBuilder_toStringMethod()
                : control.StringBuffer_toStringMethod()));
         ChangeStack(1); // account for return value
@@ -5486,7 +5486,7 @@ void ByteCode::EmitCast(TypeSymbol* dest_type, TypeSymbol* source_type)
     }
 
     // Java 5: Handle boxing conversion (primitive → wrapper)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         semantic.IsBoxingConversion(source_type, dest_type))
     {
         EmitBoxingConversion(source_type, dest_type);
@@ -5494,7 +5494,7 @@ void ByteCode::EmitCast(TypeSymbol* dest_type, TypeSymbol* source_type)
     }
 
     // Java 5: Handle unboxing conversion (wrapper → primitive)
-    if (control.option.source >= JikesOption::SDK1_5 &&
+    if (control.option.source >= JopaOption::SDK1_5 &&
         semantic.IsUnboxingConversion(source_type, dest_type))
     {
         EmitUnboxingConversion(source_type, dest_type);
@@ -6087,7 +6087,7 @@ void ByteCode::EmitArrayAccessLhs(AstArrayAccess* expression)
     TypeSymbol* base_type = expression -> base -> Type();
     AstExpression* base = StripNops(expression -> base);
     EmitExpression(base);
-    if (control.option.target < JikesOption::SDK1_5 &&
+    if (control.option.target < JopaOption::SDK1_5 &&
         IsMultiDimensionalArray(base_type) &&
         base -> Type() == control.null_type)
     {
@@ -6788,7 +6788,7 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
     else
     {
         PutOp(OP_NEW);
-        PutU2(RegisterClass(control.option.target >= JikesOption::SDK1_5
+        PutU2(RegisterClass(control.option.target >= JopaOption::SDK1_5
                             ? control.StringBuilder()
                             : control.StringBuffer()));
         PutOp(OP_DUP);
@@ -6808,7 +6808,7 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
             {
                 PutOp(OP_INVOKESPECIAL);
                 PutU2(RegisterLibraryMethodref
-                      (control.option.target >= JikesOption::SDK1_5
+                      (control.option.target >= JopaOption::SDK1_5
                        ? control.StringBuilder_InitMethod()
                        : control.StringBuffer_InitMethod()));
             }
@@ -6817,7 +6817,7 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
                 LoadConstantAtIndex(RegisterString(value));
                 PutOp(OP_INVOKESPECIAL);
                 PutU2(RegisterLibraryMethodref
-                      (control.option.target >= JikesOption::SDK1_5
+                      (control.option.target >= JopaOption::SDK1_5
                        ? control.StringBuilder_InitWithStringMethod()
                        : control.StringBuffer_InitWithStringMethod()));
                 ChangeStack(-1); // account for the argument
@@ -6827,7 +6827,7 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
         {
             PutOp(OP_INVOKESPECIAL);
             PutU2(RegisterLibraryMethodref
-                  (control.option.target >= JikesOption::SDK1_5
+                  (control.option.target >= JopaOption::SDK1_5
                    ? control.StringBuilder_InitMethod()
                    : control.StringBuffer_InitMethod()));
             //
@@ -6918,7 +6918,7 @@ void ByteCode::EmitStringAppendMethod(TypeSymbol* type)
     // efficient than as an Object.
     //
     MethodSymbol* append_method;
-    if (control.option.target >= JikesOption::SDK1_5)
+    if (control.option.target >= JopaOption::SDK1_5)
     {
         append_method =
             (type == control.char_type
@@ -6971,13 +6971,13 @@ void ByteCode::EmitStringAppendMethod(TypeSymbol* type)
 }
 
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
 static void op_trap()
 {
     int i = 0; // used for debugger trap
     i++;       // avoid compiler warnings about unused variable
 }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
 
 ByteCode::ByteCode(TypeSymbol* type)
@@ -7006,10 +7006,10 @@ ByteCode::ByteCode(TypeSymbol* type)
     , fieldref_constant_pool_index(NULL)
     , methodref_constant_pool_index(NULL)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (! control.option.nowrite)
         control.class_files_written++;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     //
     // For compatibility reasons, protected classes are marked public, and
@@ -7035,32 +7035,32 @@ ByteCode::ByteCode(TypeSymbol* type)
 
     switch (control.option.target)
     {
-    case JikesOption::SDK1_1:
+    case JopaOption::SDK1_1:
         major_version = 45;
         minor_version = 3;
         break;
-    case JikesOption::SDK1_2:
+    case JopaOption::SDK1_2:
         major_version = 46;
         minor_version = 0;
         break;
-    case JikesOption::SDK1_3:
+    case JopaOption::SDK1_3:
         major_version = 47;
         minor_version = 0;
         break;
-    case JikesOption::SDK1_4:
-    case JikesOption::SDK1_4_2:
+    case JopaOption::SDK1_4:
+    case JopaOption::SDK1_4_2:
         major_version = 48;
         minor_version = 0;
         break;
-    case JikesOption::SDK1_5:
+    case JopaOption::SDK1_5:
         major_version = 49;
         minor_version = 0;
         break;
-    case JikesOption::SDK1_6:
+    case JopaOption::SDK1_6:
         major_version = 50;
         minor_version = 0;
         break;
-    case JikesOption::SDK1_7:
+    case JopaOption::SDK1_7:
         major_version = 51;
         minor_version = 0;
         break;
@@ -7068,12 +7068,12 @@ ByteCode::ByteCode(TypeSymbol* type)
         assert(false && "unknown version for target");
     }
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.verbose)
 	Coutput << "[generating code for class "
 		<< unit_type -> fully_qualified_name -> value << " as version "
 		<< major_version << '.' << minor_version << ']' << endl;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     this_class = RegisterClass(unit_type);
     super_class = (unit_type -> super ? RegisterClass(unit_type -> super) : 0);
@@ -7107,14 +7107,14 @@ void ByteCode::DefineLabel(Label& lab)
     // implement the -O option as more than a no-op.
     //
     int index = lab.uses.Length() - 1;
-    if (last_op_goto && index >= 0 && ! (control.option.g & JikesOption::VARS))
+    if (last_op_goto && index >= 0 && ! (control.option.g & JopaOption::VARS))
     {
         unsigned int luse = lab.uses[index].use_offset;
         int start = luse - lab.uses[index].op_offset;
         if (start == last_op_pc &&
             code_attribute -> CodeLength() != last_label_pc)
         {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
             if (control.option.debug_trace_stack_change)
                 Coutput << "removing dead jump: pc " << start << endl;
 #endif
@@ -7656,7 +7656,7 @@ void ByteCode::FinishCode()
     //
     // Only output SourceFile attribute if -g:source is enabled.
     //
-    if (control.option.g & JikesOption::SOURCE)
+    if (control.option.g & JopaOption::SOURCE)
         AddAttribute(new SourceFileAttribute
                      (RegisterUtf8(control.SourceFile_literal),
                       RegisterUtf8(unit_type -> file_symbol ->
@@ -7664,7 +7664,7 @@ void ByteCode::FinishCode()
     if (unit_type -> IsDeprecated())
         AddAttribute(CreateDeprecatedAttribute());
     if (unit_type -> ACC_SYNTHETIC() &&
-        control.option.target < JikesOption::SDK1_5)
+        control.option.target < JopaOption::SDK1_5)
     {
         AddAttribute(CreateSyntheticAttribute());
     }
@@ -8101,7 +8101,7 @@ void ByteCode::FinishCode()
 
 void ByteCode::PutOp(Opcode opc)
 {
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_trap_op &&
         code_attribute -> CodeLength() == (u2) control.option.debug_trap_op)
     {
@@ -8114,7 +8114,7 @@ void ByteCode::PutOp(Opcode opc)
         OpDesc(opc, &opname, NULL);
         Coutput << "opcode: " << opname << endl;
     }
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 
     // save pc at start of operation
     last_op_pc = code_attribute -> CodeLength();
@@ -8163,15 +8163,15 @@ void ByteCode::ChangeStack(int i)
     if (i > 0 && stack_depth > max_stack)
         max_stack = stack_depth;
 
-#ifdef JIKES_DEBUG
+#ifdef JOPA_DEBUG
     if (control.option.debug_trace_stack_change)
         Coutput << "stack change: pc " << last_op_pc << " change " << i
                 << "  stack_depth " << stack_depth << "  max_stack: "
                 << max_stack << endl;
-#endif // JIKES_DEBUG
+#endif // JOPA_DEBUG
 }
 
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

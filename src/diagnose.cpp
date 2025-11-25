@@ -7,7 +7,7 @@
 #include "stream.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 void DiagnoseParser::ReallocateStacks()
 {
     int old_stack_length = stack_length;
@@ -2021,9 +2021,9 @@ int ParseErrorInfo::getLeftColumnNo() { return left_column_no; }
 int ParseErrorInfo::getRightLineNo() { return right_line_no; }
 int ParseErrorInfo::getRightColumnNo() { return right_column_no; }
 
-JikesError::JikesErrorSeverity ParseErrorInfo::getSeverity()
+JopaError::JopaErrorSeverity ParseErrorInfo::getSeverity()
 {
-    return JikesError::JIKES_ERROR;
+    return JopaError::JOPA_ERROR;
 }
 
 const char* ParseErrorInfo::getFileName()
@@ -2302,9 +2302,9 @@ void ParseError::PrintMessages()
 void ParseError::PrintMessage(int k)
 {
     errors[k].Initialize(lex_stream);
-    JikesAPI::getInstance() -> reportError(&errors[k]);
+    JopaAPI::getInstance() -> reportError(&errors[k]);
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 

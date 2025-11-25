@@ -2,7 +2,7 @@
 #include "double.h"
 
 
-namespace Jikes { // Open namespace Jikes block
+namespace Jopa { // Open namespace Jopa block
 BaseLong::operator LongInt() const
 {
     return LongInt(HighWord(), LowWord());
@@ -568,5 +568,5 @@ bool LongInt::operator>= (const LongInt op) const
 }
 
 
-} // Close namespace Jikes block
+} // Close namespace Jopa block
 
