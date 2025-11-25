@@ -151,6 +151,7 @@ set(HAVE_DYNAMIC_CAST 1)
 set(HAVE_REINTERPRET_CAST 1)
 set(HAVE_RTTI 1)
 set(HAVE_BOOL 1)
+set(HAVE_EXPLICIT 1)
 set(HAVE_OSTREAM_CONST_UNSIGNED_CHAR_PTR 1)
 
 set(JOPA_STAT_S_IFDIR S_IFDIR)
@@ -199,5 +200,13 @@ target_include_directories(jopa PRIVATE
     "${CMAKE_BINARY_DIR}/generated"
 )
 target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
+
+# Enable strict warnings
+target_compile_options(jopa PRIVATE
+    -Wall
+    -Wextra
+    -Wpedantic
+    -Werror
+)
 
 install(TARGETS jopa RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")

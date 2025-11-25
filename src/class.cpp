@@ -1724,7 +1724,7 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                        unicode_problem);
         type -> MarkBad();
         delete class_data;
-        delete unicode_problem;
+        delete[] unicode_problem;
         return;
     }
 

@@ -995,6 +995,7 @@ void LexStream::ProcessInputUnicode(const char* buffer, long filesize)
             // The encoding should have been validated by now
             bool encoding_set = SetEncoding(control.option.encoding);
             assert(encoding_set);
+            (void)encoding_set;
         }
 
         // init data after setting the encoding

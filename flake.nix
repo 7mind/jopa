@@ -15,7 +15,8 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Build tools
-            gcc
+            clang
+            llvm
             cmake
             gnumake
             pkg-config
@@ -24,7 +25,7 @@
             libzip
 
             # Development tools
-            gdb
+            lldb
             valgrind
 
             # Java for testing
@@ -40,9 +41,9 @@
 
           shellHook = ''
             echo "================================================"
-            echo "Jopa Development Environment"
+            echo "Jopa Development Environment (Clang)"
             echo "================================================"
-            echo "C++ Compiler: $(gcc --version | head -1)"
+            echo "C++ Compiler: $(clang++ --version | head -1)"
             echo "CMake: $(${pkgs.cmake}/bin/cmake --version | head -1)"
             echo "Java: $(java -version 2>&1 | head -1)"
             echo ""
@@ -66,7 +67,7 @@
           ];
 
           buildInputs = with pkgs; [
-            gcc
+            clang
             libzip
           ];
 

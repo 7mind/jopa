@@ -831,7 +831,6 @@ DirectorySymbol::DirectorySymbol(const NameSymbol* name_symbol_,
                                  Symbol* owner_, bool source_dir_only_)
     : owner(owner_)
     , name_symbol(name_symbol_)
-    , mtime(0)
     , table(NULL)
     , entries(NULL)
     , directory_name(NULL)
@@ -1440,6 +1439,7 @@ void MethodSymbol::ProcessMethodSignature(Semantic* sem,
                                                             signature,
                                                             token_location);
             assert(enclosing == containing_type -> EnclosingType());
+            (void)enclosing;
         }
 
         while (*signature && *signature != U_RIGHT_PARENTHESIS)
@@ -2099,6 +2099,7 @@ MethodSymbol* TypeSymbol::GetReadAccessMethod(MethodSymbol* member,
            (member -> ACC_PROTECTED() &&
             ! semantic_environment -> sem -> ProtectedAccessCheck(containing_type)) ||
            (base_type == super && ! member -> ACC_STATIC()));
+    (void)containing_type;
 
     MethodSymbol* read_method = ReadMethod(member, base_type);
 
@@ -2525,6 +2526,7 @@ MethodSymbol* TypeSymbol::GetReadAccessMethod(VariableSymbol* member,
            (member -> ACC_PROTECTED() &&
             (! semantic_environment -> sem -> ProtectedAccessCheck(containing_type) ||
              (base_type == super && ! member -> ACC_STATIC()))));
+    (void)containing_type;
 
     MethodSymbol* read_method = ReadMethod(member, base_type);
 
@@ -2691,6 +2693,7 @@ MethodSymbol* TypeSymbol::GetWriteAccessMethod(VariableSymbol* member,
            (member -> ACC_PROTECTED() &&
             (! semantic_environment -> sem -> ProtectedAccessCheck(containing_type) ||
              (base_type == super && ! member -> ACC_STATIC()))));
+    (void)containing_type;
 
     MethodSymbol* write_method = WriteMethod(member, base_type);
 

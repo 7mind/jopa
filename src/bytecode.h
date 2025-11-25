@@ -249,8 +249,7 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
         last_label_pc,        // pc for last (closest to end) label
         last_op_pc,           // pc of last operation emitted
         stack_depth,          // current stack depth;
-        max_stack,
-        max_block_depth;
+        max_stack;
     MethodStack* method_stack;
 
     bool string_overflow,

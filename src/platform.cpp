@@ -623,13 +623,13 @@ FloatToString::FloatToString(const IEEEfloat& f)
             *s++ = dig;
             break;
         }
-        if ((j < 0 || j == 0 && ! (f.value.word & 1)) && s != str)
+        if ((j < 0 || (j == 0 && ! (f.value.word & 1))) && s != str)
         {
             if (! b.IsZero() && j1 > 0)
             {
                 b <<= 1;
                 j1 = b.compareTo(S);
-                if ((j1 > 0 || j1 == 0 && dig & 1) && dig++ == U_9)
+                if ((j1 > 0 || (j1 == 0 && (dig & 1))) && dig++ == U_9)
                 {
                     *s++ = U_9;
                     round = true;
@@ -991,13 +991,13 @@ DoubleToString::DoubleToString(const IEEEdouble& d)
             *s++ = dig;
             break;
         }
-        if ((j < 0 || j == 0 && ! (d.LowWord() & 1)) && s != str)
+        if ((j < 0 || (j == 0 && ! (d.LowWord() & 1))) && s != str)
         {
             if (! b.IsZero() && j1 > 0)
             {
                 b <<= 1;
                 j1 = b.compareTo(S);
-                if ((j1 > 0 || j1 == 0 && dig & 1) && dig++ == U_9)
+                if ((j1 > 0 || (j1 == 0 && (dig & 1))) && dig++ == U_9)
                 {
                     *s++ = U_9;
                     round = true;

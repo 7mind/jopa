@@ -319,6 +319,7 @@ DefaultFileReader::DefaultFileReader(const char *fileName)
 #endif
             , sizeof(char), size, srcfile);
         assert(numread <= size); // FIXME: change to == when SystemFread uses "b"
+        (void)numread;
         fclose(srcfile);
     }
 }

@@ -47,7 +47,7 @@ AccessFlags Semantic::ProcessModifiers(AstModifiers* modifiers,
         }
         assert(keyword);
         seen_keyword = true;
-        u2 flag;
+        u2 flag = 0;
         switch (lex_stream -> Kind(keyword -> modifier_token))
         {
         case TK_abstract: flag = AccessFlags::ACCESS_ABSTRACT; break;
@@ -163,6 +163,7 @@ AccessFlags Semantic::ProcessTopLevelTypeModifiers(AstDeclaredType* decl)
         decl -> InterfaceDeclarationCast();
     AstAnnotationDeclaration* annotation_decl =
         decl -> AnnotationDeclarationCast();
+    (void)annotation_decl;
     u2 valid_flags;
     u2 implicit_flags = 0;
     const wchar_t* context;
@@ -259,6 +260,7 @@ AccessFlags Semantic::ProcessNestedTypeModifiers(TypeSymbol* containing_type,
         decl -> InterfaceDeclarationCast();
     AstAnnotationDeclaration* annotation_decl =
         decl -> AnnotationDeclarationCast();
+    (void)annotation_decl;
     u2 valid_flags;
     u2 implicit_flags = 0;
     const wchar_t* context;

@@ -15,13 +15,13 @@ class Int
 {
 public:
     // Max value of i4
-    static inline const i4 MAX_INT()
+    static inline i4 MAX_INT()
     {
         return 0x7FFFFFFF;
     }
 
     // Min value of i4
-    static inline const i4 MIN_INT()
+    static inline i4 MIN_INT()
     {
         return 0x80000000;
     }
