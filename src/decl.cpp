@@ -3167,6 +3167,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
             compilation_unit -> ast_pool -> GenMethodBody();
         // This symbol table will be empty.
         constructor_block -> block_symbol = new BlockSymbol(0);
+        compilation_unit -> ast_pool -> RegisterBlockSymbol(constructor_block -> block_symbol);
         constructor_block -> left_brace_token  = left_loc;
         constructor_block -> right_brace_token = right_loc;
         constructor_block -> AllocateStatements(1);

@@ -1624,7 +1624,11 @@ public:
         Symbol::_kind = VARIABLE;
     }
 
-    virtual ~VariableSymbol() { delete [] signature_string; }
+    virtual ~VariableSymbol()
+    {
+        delete [] signature_string;
+        delete file_location;
+    }
 
     void SetOwner(Symbol* owner_)
     {

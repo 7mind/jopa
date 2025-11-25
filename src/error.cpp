@@ -672,6 +672,17 @@ void SemanticError::InitializeMessageGroups()
 }
 
 //
+// Cleans up static message groups to avoid memory leaks.
+// Should be called at program shutdown.
+//
+void SemanticError::CleanupMessageGroups()
+{
+    for (unsigned i = 0; i < message_groups.Length(); i++)
+        delete message_groups[i];
+    message_groups.Resize(0);
+}
+
+//
 // Outputs information about the warnings that can be disabled on the
 // command-line. Called by the code that handles the -help option.
 //

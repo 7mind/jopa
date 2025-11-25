@@ -10,6 +10,20 @@ namespace Jopa { // Open namespace Jopa block
 unsigned Ast::count = 0;
 #endif
 
+
+StoragePool::~StoragePool()
+{
+    // Delete BlockSymbol objects that were registered for cleanup
+    for (BlockSymbol* symbol : block_symbols_to_delete)
+        delete symbol;
+
+    if (base)
+        for (unsigned i = 0; i <= base_index; i++)
+            delete [] base[i];
+    delete [] base;
+}
+
+
 //
 // Allocate another block of storage for the VariableSymbol array.
 //

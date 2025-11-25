@@ -183,10 +183,11 @@ jobs:
             # Run tests in parallel, capture results
             ctest -R '^parse_jdk7_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
 
-            # Extract statistics
-            TOTAL=\$(grep -oP '\\d+(?= tests)' parser_results.txt | head -1 || echo 0)
-            PASSED=\$(grep -oP '\\d+(?=% tests passed)' parser_results.txt | head -1 || echo 0)
-            FAILED=\$(grep -oP '\\d+(?= tests failed)' parser_results.txt | head -1 || echo 0)
+            # Extract statistics using ctest -N for total count
+            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 0)
+            # Extract failed count from 'X tests failed out of Y' format
+            FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
+            PASSED=\$((\$TOTAL - \$FAILED))
 
             echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
             echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
@@ -201,21 +202,19 @@ jobs:
             echo '## JDK7 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
             echo '' >> \$GITHUB_STEP_SUMMARY
 
-            # Count tests
-            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep -oP '\\d+(?= tests)' | tail -1 || echo 'N/A')
+            # Count tests using 'Total Tests: N' format
+            TOTAL=\$(ctest -R '^parse_jdk7_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 'N/A')
 
             # Get pass/fail from last run
             if [ -f parser_results.txt ]; then
-              RESULT_LINE=\$(grep -E '^[0-9]+% tests passed' parser_results.txt || echo '')
-              if [ -n \"\$RESULT_LINE\" ]; then
-                echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
-                echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
-                echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
-                PASSED=\$(echo \"\$RESULT_LINE\" | grep -oP '\\d+(?= tests failed)' | head -1)
-                FAILED=\$(echo \"\$RESULT_LINE\" | grep -oP ', \\K\\d+(?= tests failed)')
-                echo \"| Passed | \$((\$TOTAL - \${FAILED:-0})) |\" >> \$GITHUB_STEP_SUMMARY
-                echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
-              fi
+              echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
+              echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
+              echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
+              # Extract failed count from 'X tests failed out of Y' format
+              FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
+              PASSED=\$((\$TOTAL - \${FAILED:-0}))
+              echo \"| Passed | \$PASSED |\" >> \$GITHUB_STEP_SUMMARY
+              echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
             fi
 
             echo '' >> \$GITHUB_STEP_SUMMARY
@@ -271,10 +270,11 @@ jobs:
             # Run tests in parallel, capture results
             ctest -R '^parse_jdk8_' -j\$(nproc) --output-on-failure 2>&1 | tee parser_results.txt || true
 
-            # Extract statistics
-            TOTAL=\$(grep -oP '\\d+(?= tests)' parser_results.txt | head -1 || echo 0)
-            PASSED=\$(grep -oP '\\d+(?=% tests passed)' parser_results.txt | head -1 || echo 0)
-            FAILED=\$(grep -oP '\\d+(?= tests failed)' parser_results.txt | head -1 || echo 0)
+            # Extract statistics using ctest -N for total count
+            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 0)
+            # Extract failed count from 'X tests failed out of Y' format
+            FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
+            PASSED=\$((\$TOTAL - \$FAILED))
 
             echo \"total=\$TOTAL\" >> \$GITHUB_OUTPUT
             echo \"passed=\$PASSED\" >> \$GITHUB_OUTPUT
@@ -289,21 +289,19 @@ jobs:
             echo '## JDK8 Parser Test Results' >> \$GITHUB_STEP_SUMMARY
             echo '' >> \$GITHUB_STEP_SUMMARY
 
-            # Count tests
-            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep -oP '\\d+(?= tests)' | tail -1 || echo 'N/A')
+            # Count tests using 'Total Tests: N' format
+            TOTAL=\$(ctest -R '^parse_jdk8_' -N 2>/dev/null | grep 'Total Tests:' | sed 's/Total Tests: //' || echo 'N/A')
 
             # Get pass/fail from last run
             if [ -f parser_results.txt ]; then
-              RESULT_LINE=\$(grep -E '^[0-9]+% tests passed' parser_results.txt || echo '')
-              if [ -n \"\$RESULT_LINE\" ]; then
-                echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
-                echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
-                echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
-                PASSED=\$(echo \"\$RESULT_LINE\" | grep -oP '\\d+(?= tests failed)' | head -1)
-                FAILED=\$(echo \"\$RESULT_LINE\" | grep -oP ', \\K\\d+(?= tests failed)')
-                echo \"| Passed | \$((\$TOTAL - \${FAILED:-0})) |\" >> \$GITHUB_STEP_SUMMARY
-                echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
-              fi
+              echo \"| Metric | Count |\" >> \$GITHUB_STEP_SUMMARY
+              echo \"|--------|-------|\" >> \$GITHUB_STEP_SUMMARY
+              echo \"| Total Tests | \$TOTAL |\" >> \$GITHUB_STEP_SUMMARY
+              # Extract failed count from 'X tests failed out of Y' format
+              FAILED=\$(grep -E '[0-9]+ tests failed' parser_results.txt | sed 's/.*\\b\\([0-9]\\+\\) tests failed.*/\\1/' | head -1 || echo 0)
+              PASSED=\$((\$TOTAL - \${FAILED:-0}))
+              echo \"| Passed | \$PASSED |\" >> \$GITHUB_STEP_SUMMARY
+              echo \"| Failed | \${FAILED:-0} |\" >> \$GITHUB_STEP_SUMMARY
             fi
 
             echo '' >> \$GITHUB_STEP_SUMMARY
