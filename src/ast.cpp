@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "symbol.h"
+#include "paramtype.h"
 #ifdef JOPA_DEBUG
 # include "stream.h"
 #endif // JOPA_DEBUG
@@ -16,6 +17,10 @@ StoragePool::~StoragePool()
     // Delete BlockSymbol objects that were registered for cleanup
     for (BlockSymbol* symbol : block_symbols_to_delete)
         delete symbol;
+
+    // Delete ParameterizedType objects that were registered for cleanup
+    for (ParameterizedType* ptype : parameterized_types_to_delete)
+        delete ptype;
 
     if (base)
         for (unsigned i = 0; i <= base_index; i++)

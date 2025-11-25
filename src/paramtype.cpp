@@ -10,6 +10,19 @@ namespace Jopa { // Open namespace Jopa block
 // ParameterizedType implementation
 //
 
+ParameterizedType::~ParameterizedType()
+{
+    // Delete the Type* objects in the tuple (they were allocated with 'new Type()')
+    if (type_arguments)
+    {
+        for (unsigned i = 0; i < type_arguments -> Length(); i++)
+            delete (*type_arguments)[i];
+        delete type_arguments;
+    }
+    delete enclosing_type;
+}
+
+
 void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
 {
     // Format: L<classname><TypeArguments>;

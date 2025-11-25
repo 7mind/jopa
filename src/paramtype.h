@@ -70,16 +70,9 @@ public:
     }
 
     //
-    // Destructor
+    // Destructor - implemented in paramtype.cpp
     //
-    // Note: We don't delete Type objects as they're managed by the symbol table.
-    // We only delete the Tuple container, not its contents.
-    //
-    ~ParameterizedType()
-    {
-        delete type_arguments;
-        delete enclosing_type;
-    }
+    ~ParameterizedType();
 
     //
     // Get the erased type (just the raw generic type)
