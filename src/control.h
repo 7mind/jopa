@@ -12,6 +12,7 @@ class StoragePool;
 class Option;
 class Scanner;
 class Parser;
+class IParser;
 class Semantic;
 class LexStream;
 class AstPackageDeclaration;
@@ -56,6 +57,7 @@ public:
     SymbolSet recompilation_file_set;
 
     Parser* parser;
+    IParser* parser_interface;
     Scanner* scanner;
 
     //

@@ -1,11 +1,14 @@
 #include "control.h"
 #include "scanner.h"
 #include "parser.h"
+#include "parser_interface.h"
+#include "legacy_parser_adapter.h"
 #include "semantic.h"
 #include "error.h"
 #include "bytecode.h"
 #include "case.h"
 #include "option.h"
+#include "ast.h"
 #include "ast_json.h"
 
 
@@ -150,6 +153,7 @@ Control::Control(char** arguments, Option& option_)
     //
     scanner = new Scanner(*this);
     parser = new Parser();
+    parser_interface = new LegacyParserAdapter();
     SemanticError::StaticInitializer();
 
     //
@@ -178,8 +182,8 @@ Control::Control(char** arguments, Option& option_)
         if (file_symbol -> lex_stream) // did we have a successful scan!
         {
             AstPackageDeclaration* package_declaration =
-                parser -> PackageHeaderParse(file_symbol -> lex_stream,
-                                             ast_pool);
+                parser_interface -> ParsePackageHeader(file_symbol -> lex_stream,
+                                                       ast_pool);
             ProcessPackageDeclaration(file_symbol, package_declaration);
             ast_pool -> Reset();
         }
@@ -194,32 +198,36 @@ Control::Control(char** arguments, Option& option_)
     }
 
     //
-    // Handle parse-only mode
+    // Handle parse-only mode using the parser interface abstraction.
+    // This decouples --parse-only from the legacy parser implementation.
     //
     if (option.parse_only)
     {
         bool parse_success = true;
         int total_errors = 0;
+        std::vector<ParseResult> parse_results;
 
-        // Parse each file fully
+        // Parse each file using the parser interface (fully decoupled)
         for (int j = 0; j < num_files; j++)
         {
             FileSymbol* file_symbol = input_files[j];
             if (file_symbol -> lex_stream)
             {
-                file_symbol -> lex_stream -> Reset();
-                file_symbol -> compilation_unit =
-                    parser -> HeaderParse(file_symbol -> lex_stream, ast_pool);
-                if (! file_symbol -> compilation_unit ||
-                    file_symbol -> compilation_unit -> BadCompilationUnitCast())
+                ParseResult result = parser_interface->ParseFile(file_symbol -> lex_stream);
+                total_errors += result.error_count;
+                if (!result.success)
                 {
                     parse_success = false;
                 }
-                total_errors += file_symbol -> lex_stream -> NumBadTokens();
+                parse_results.push_back(std::move(result));
             }
             else
             {
                 parse_success = false;
+                ParseResult empty_result;
+                empty_result.filename = file_symbol->FileName();
+                empty_result.success = false;
+                parse_results.push_back(std::move(empty_result));
             }
         }
 
@@ -238,35 +246,27 @@ Control::Control(char** arguments, Option& option_)
             output["total_errors"] = total_errors;
             output["files"] = json::array();
 
-            // Serialize each compilation unit to JSON
-            for (int j = 0; j < num_files; j++)
+            // Use JSON from ParseResult (already serialized by parser interface)
+            for (size_t j = 0; j < parse_results.size(); j++)
             {
-                FileSymbol* file_symbol = input_files[j];
+                const ParseResult& result = parse_results[j];
                 json file_entry;
-                file_entry["filename"] = file_symbol->FileName();
+                file_entry["filename"] = result.filename;
+                file_entry["lexErrors"] = result.lex_errors;
 
-                if (file_symbol->lex_stream)
+                if (result.success)
                 {
-                    // Always include lexical errors
-                    file_entry["lexErrors"] = AstJsonSerializer::SerializeLexErrors(file_symbol->lex_stream);
-
-                    if (file_symbol->compilation_unit &&
-                        !file_symbol->compilation_unit->BadCompilationUnitCast())
-                    {
-                        AstJsonSerializer serializer(file_symbol->lex_stream);
-                        file_entry["ast"] = serializer.Serialize(file_symbol->compilation_unit);
-                    }
-                    else
-                    {
-                        file_entry["ast"] = nullptr;
-                        file_entry["parseError"] = "Parse failed";
-                    }
+                    file_entry["ast"] = result.ast_json;
+                }
+                else if (!result.ast_json.is_null())
+                {
+                    file_entry["ast"] = result.ast_json;
+                    file_entry["parseError"] = "Parse had errors";
                 }
                 else
                 {
                     file_entry["ast"] = nullptr;
-                    file_entry["lexErrors"] = json::array();
-                    file_entry["error"] = "Failed to read file";
+                    file_entry["error"] = "Failed to parse file";
                 }
 
                 output["files"].push_back(file_entry);
@@ -294,14 +294,12 @@ Control::Control(char** arguments, Option& option_)
             return_code = 1;
         }
 
-        // Clean up compilation units and their ast_pools
-        for (int j = 0; j < num_files; j++)
+        // Clean up legacy AST pools from parse results
+        for (size_t j = 0; j < parse_results.size(); j++)
         {
-            FileSymbol* file_symbol = input_files[j];
-            if (file_symbol -> compilation_unit)
+            if (parse_results[j].legacy_ast_pool)
             {
-                delete file_symbol -> compilation_unit -> ast_pool;
-                file_symbol -> compilation_unit = NULL;
+                delete parse_results[j].legacy_ast_pool;
             }
         }
         delete ast_pool;
@@ -534,8 +532,8 @@ Control::Control(char** arguments, Option& option_)
                     LexStream* lex_stream = file_symbol -> lex_stream;
                     if (lex_stream)
                     {
-                        AstPackageDeclaration* package_declaration = parser ->
-                            PackageHeaderParse(lex_stream, ast_pool);
+                        AstPackageDeclaration* package_declaration =
+                            parser_interface -> ParsePackageHeader(lex_stream, ast_pool);
                         ProcessPackageDeclaration(file_symbol,
                                                   package_declaration);
                         ast_pool -> Reset();
@@ -725,6 +723,7 @@ Control::~Control()
 
     delete scanner;
     delete parser;
+    delete parser_interface;
     delete system_semantic;
     delete system_table;
 
@@ -1318,7 +1317,7 @@ void Control::ProcessHeaders(FileSymbol* file_symbol)
     {
         if (! file_symbol -> compilation_unit)
             file_symbol -> compilation_unit =
-                parser -> HeaderParse(file_symbol -> lex_stream);
+                parser_interface -> ParseHeaders(file_symbol -> lex_stream);
         //
         // If we have a compilation unit, analyze it, process its types.
         //
@@ -1468,8 +1467,8 @@ void Control::ProcessBodies(TypeSymbol* type)
 
         if (type -> declaration -> UnparsedClassBodyCast())
         {
-            if (! parser -> InitializerParse(sem -> lex_stream,
-                                             type -> declaration))
+            if (! parser_interface -> ParseInitializers(sem -> lex_stream,
+                                                        type -> declaration))
             {
                 // Mark that syntax errors were detected.
                 sem -> compilation_unit -> MarkBad();
@@ -1477,7 +1476,7 @@ void Control::ProcessBodies(TypeSymbol* type)
             else
             {
                 type -> CompleteSymbolTable();
-                if (! parser -> BodyParse(sem -> lex_stream, type -> declaration))
+                if (! parser_interface -> ParseBodies(sem -> lex_stream, type -> declaration))
                 {
                     // Mark that syntax errors were detected.
                     sem -> compilation_unit -> MarkBad();

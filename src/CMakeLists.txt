@@ -20,6 +20,7 @@ set(JOPA_SOURCES
     grammar/javaact.cpp
     jikes.cpp
     jikesapi.cpp
+    legacy_parser_adapter.cpp
     long.cpp
     lookup.cpp
     lpginput.cpp

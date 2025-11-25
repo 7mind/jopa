@@ -90,6 +90,10 @@ public:
     bool InitializerParse(LexStream*, AstClassBody*);
     bool BodyParse(LexStream*, AstClassBody*);
 
+    // Parse all method bodies without requiring semantic analysis.
+    // Used by --parse-only mode to fully parse the source file.
+    bool FullBodyParse(LexStream*, AstClassBody*);
+
 protected:
     TokenObject buffer[BUFF_SIZE];
     TokenObject end_token;
@@ -97,6 +101,7 @@ protected:
     Ast* HeaderParse();
     bool Initializer(AstClassBody*);
     bool Body(AstClassBody*);
+    bool FullBody(AstClassBody*);
     AstMethodBody* ParseSegment(TokenObject);
 
 #define HEADERS

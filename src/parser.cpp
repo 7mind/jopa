@@ -286,6 +286,77 @@ bool Parser::Body(AstClassBody* class_body)
 }
 
 
+bool Parser::FullBodyParse(LexStream* lex_stream_, AstClassBody* class_body)
+{
+    assert(class_body -> UnparsedClassBodyCast());
+
+    lex_stream = lex_stream_;
+    ast_pool = class_body -> pool;
+    body_pool = class_body -> pool;
+    list_node_pool = new StoragePool(lex_stream_ -> NumTokens());
+    free_list_nodes = NULL;
+
+    bool success = Initializer(class_body);
+    if (success)
+        success = FullBody(class_body);
+
+    delete list_node_pool;
+
+    class_body -> MarkParsed();
+
+    return success;
+}
+
+
+bool Parser::FullBody(AstClassBody* class_body)
+{
+    bool errors_detected = false;
+    unsigned i;
+
+    for (i = 0; i < class_body -> NumConstructors(); i++)
+    {
+        AstConstructorDeclaration* constructor_decl =
+            class_body -> Constructor(i);
+
+        AstMethodBody* block = constructor_decl -> constructor_body;
+        if (block)
+        {
+            end_token = block -> right_brace_token;
+
+            AstMethodBody* new_body = ParseSegment(block -> left_brace_token);
+
+            if (! new_body)
+                errors_detected = true;
+            else
+                constructor_decl -> constructor_body = new_body;
+        }
+    }
+
+    for (i = 0; i < class_body -> NumMethods(); i++)
+    {
+        AstMethodDeclaration* method_decl = class_body -> Method(i);
+        if (method_decl -> method_body_opt)
+        {
+            AstMethodBody* block = method_decl -> method_body_opt;
+            end_token = block -> right_brace_token;
+            AstMethodBody* new_block = ParseSegment(block -> left_brace_token);
+            if (! new_block)
+                errors_detected = true;
+            else
+                method_decl -> method_body_opt = new_block;
+        }
+    }
+
+    for (i = 0; i < class_body -> NumNestedClasses(); i++)
+        errors_detected = errors_detected ||
+            ! FullBody(class_body -> NestedClass(i) -> class_body);
+    for (i = 0; i < class_body -> NumNestedInterfaces(); i++)
+        errors_detected = errors_detected ||
+            ! FullBody(class_body -> NestedInterface(i) -> class_body);
+    return ! errors_detected;
+}
+
+
 bool Parser::InitializerParse(LexStream* stream, AstClassBody* class_body)
 {
     lex_stream = stream;
