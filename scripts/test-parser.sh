@@ -30,13 +30,19 @@ DISPLAY_NAME=$(echo "$JDK_VERSION" | tr '[:lower:]' '[:upper:]')
 # Build if requested
 if [[ "$BUILD_FLAG" == "--build" ]]; then
     echo "=== Configuring Build ==="
-    cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DJOPA_ENABLE_SANITIZERS=OFF \
-        -DJOPA_ENABLE_CPPTRACE=OFF \
+    CMAKE_OUTPUT=$(cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
+        -DCMAKE_BUILD_TYPE=Debug \
+        -DJOPA_ENABLE_SANITIZERS=ON \
+        -DJOPA_ENABLE_CPPTRACE=ON \
         -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
         -DJOPA_PARSER_TESTS_JDK7=$([[ "$JDK_VERSION" == "jdk7" ]] && echo "ON" || echo "OFF") \
-        -DJOPA_PARSER_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF")
+        -DJOPA_PARSER_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF") 2>&1)
+    echo "$CMAKE_OUTPUT"
+
+    # Extract skipped count from cmake output and save it
+    JDK_NUM="${JDK_VERSION#jdk}"
+    SKIPPED=$(echo "$CMAKE_OUTPUT" | grep -oP "Added \d+ JDK${JDK_NUM} parser tests \(skipped \K\d+" || echo "0")
+    echo "$SKIPPED" > "${BUILD_DIR}/parser_${JDK_VERSION}_skipped.txt"
 
     echo ""
     echo "=== Building ==="
@@ -67,6 +73,15 @@ echo "$TEST_OUTPUT" > parser_results.txt
 TOTAL=$(ctest -R "^${PREFIX}" -N 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' | tr -d ' ')
 TOTAL=${TOTAL:-0}
 
+# Get skipped count from saved file (if exists)
+SKIPPED_FILE="${BUILD_DIR}/parser_${JDK_VERSION}_skipped.txt"
+if [[ -f "$SKIPPED_FILE" ]]; then
+    SKIPPED=$(cat "$SKIPPED_FILE" | tr -d ' \n')
+else
+    SKIPPED=0
+fi
+SKIPPED=${SKIPPED:-0}
+
 # Count different failure types from the "The following tests FAILED:" section
 # Format: "123 - test_name (Failed)" or "(Subprocess aborted)" or "(Timeout)"
 FAILED=$(echo "$TEST_OUTPUT" | grep -cE '^\s+[0-9]+.*\(Failed\)') || true
@@ -88,6 +103,7 @@ PASSED=$((TOTAL - TOTAL_FAILURES))
 echo ""
 echo "${DISPLAY_NAME} Parser Tests:"
 echo "  Total:   ${TOTAL}"
+echo "  Skipped: ${SKIPPED} (negative tests)"
 echo "  Passed:  ${PASSED}"
 echo "  Failed:  ${FAILED}"
 echo "  Timeout: ${TIMEOUT}"
@@ -100,6 +116,7 @@ echo "  Crashed: ${CRASHED}"
     echo "| Metric | Count |"
     echo "|--------|-------|"
     echo "| Total Tests | ${TOTAL} |"
+    echo "| Skipped (negative) | ${SKIPPED} |"
     echo "| Passed | ${PASSED} |"
     echo "| Failed | ${FAILED} |"
     echo "| Timeout | ${TIMEOUT} |"
@@ -115,6 +132,7 @@ echo "  Crashed: ${CRASHED}"
 RESULTS_FILE="${BUILD_DIR}/parser_${JDK_VERSION}_results.env"
 {
     echo "PARSER_TOTAL=$TOTAL"
+    echo "PARSER_SKIPPED=$SKIPPED"
     echo "PARSER_PASSED=$PASSED"
     echo "PARSER_FAILED=$FAILED"
     echo "PARSER_TIMEOUT=$TIMEOUT"
