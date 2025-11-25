@@ -1,3 +1,3 @@
 #include "lpginput.h"
-#include "javadcl.h"
+#include "grammar/javadcl.h"
 

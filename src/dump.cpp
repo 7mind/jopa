@@ -1,5 +1,5 @@
 #include "platform.h"
-#include "javasym.h"
+#include "grammar/javasym.h"
 #include "control.h"
 #include "stream.h"
 

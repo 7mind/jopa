@@ -4,7 +4,7 @@
 #include "symbol.h"
 #include "control.h"
 #include "semantic.h"
-#include "javasym.h"
+#include "grammar/javasym.h"
 #include "option.h"
 #include "tab.h"
 
