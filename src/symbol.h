@@ -673,6 +673,16 @@ public:
         return type_parameters && type_parameters -> Length() > 0;
     }
 
+    // Detach type parameters without deleting them (for transfer to another method)
+    void DetachTypeParameters()
+    {
+        if (type_parameters)
+        {
+            delete type_parameters;  // Delete the tuple, not the contents
+            type_parameters = NULL;
+        }
+    }
+
     // Check if this is a bridge method
     bool IsBridge() const { return bridge_target != NULL; }
 

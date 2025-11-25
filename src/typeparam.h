@@ -78,6 +78,7 @@ public:
     ~TypeParameterSymbol()
     {
         delete bounds;
+        delete [] signature_string;
     }
 
     //
