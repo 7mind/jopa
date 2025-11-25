@@ -28,17 +28,19 @@ set(RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
 set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Helper function to add a compile-only test
-# Note: compile-only tests may generate multiple classes, so we don't validate
-# them with javap (which requires knowing the exact class name)
+# Usage: add_jopa_compile_test(test_name source_file [extra_sources...])
+# Each test gets its own output directory to avoid class file collisions
 function(add_jopa_compile_test test_name source_file)
+    set(TEST_OUTPUT_DIR "${OUTPUT_DIR}/${test_name}")
+    file(MAKE_DIRECTORY "${TEST_OUTPUT_DIR}")
     add_test(
         NAME "compile_${test_name}"
         COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
                 $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
-                -d "${OUTPUT_DIR}"
-                "${source_file}"
+                -d "${TEST_OUTPUT_DIR}"
+                "${source_file}" ${ARGN}
     )
     set_tests_properties("compile_${test_name}" PROPERTIES
         LABELS "compile"
@@ -46,16 +48,20 @@ function(add_jopa_compile_test test_name source_file)
 endfunction()
 
 # Helper function to add a compile+run test
+# Usage: add_jopa_run_test(test_name source_file main_class [extra_sources...])
+# Each test gets its own output directory to avoid class file collisions
 function(add_jopa_run_test test_name source_file main_class)
-    # Compilation test
+    set(TEST_OUTPUT_DIR "${OUTPUT_DIR}/${test_name}")
+    file(MAKE_DIRECTORY "${TEST_OUTPUT_DIR}")
+    # Compilation test - compiles main source plus any extra sources
     add_test(
         NAME "compile_${test_name}"
         COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
                 $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
-                -d "${OUTPUT_DIR}"
-                "${source_file}"
+                -d "${TEST_OUTPUT_DIR}"
+                "${source_file}" ${ARGN}
     )
     set_tests_properties("compile_${test_name}" PROPERTIES
         LABELS "compile"
@@ -66,7 +72,7 @@ function(add_jopa_run_test test_name source_file main_class)
         # Validate bytecode with javap
         add_test(
             NAME "validate_${test_name}"
-            COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${OUTPUT_DIR}/${main_class}.class"
+            COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${TEST_OUTPUT_DIR}/${main_class}.class"
         )
         set_tests_properties("validate_${test_name}" PROPERTIES
             LABELS "validate"
@@ -76,7 +82,7 @@ function(add_jopa_run_test test_name source_file main_class)
         # Runtime test
         add_test(
             NAME "run_${test_name}"
-            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
+            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${TEST_OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
         )
         set_tests_properties("run_${test_name}" PROPERTIES
             LABELS "run"
@@ -87,14 +93,16 @@ endfunction()
 
 # Enum Tests
 add_jopa_compile_test(Color "${TEST_DIR}/enums/Color.java")
-add_jopa_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest")
+add_jopa_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest" "${TEST_DIR}/enums/Color.java")
+set(EnumMethodsTest_OUTPUT "${OUTPUT_DIR}/EnumMethodsTest")
+file(MAKE_DIRECTORY "${EnumMethodsTest_OUTPUT}")
 add_test(
     NAME "compile_EnumMethodsTest"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${EnumMethodsTest_OUTPUT}"
             "${TEST_DIR}/enums/Color.java"
             "${TEST_DIR}/enums/EnumMethodsTest.java"
 )
@@ -102,7 +110,7 @@ set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_EnumMethodsTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "EnumMethodsTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${EnumMethodsTest_OUTPUT}:${RUNTIME_JAR}" "EnumMethodsTest"
     )
     set_tests_properties("run_EnumMethodsTest" PROPERTIES
         LABELS "run"
@@ -121,7 +129,7 @@ add_jopa_run_test(ForEachIterableTest "${TEST_DIR}/foreach/ForEachIterableTest.j
 
 # Generics Tests
 add_jopa_compile_test(GenericBox "${TEST_DIR}/generics/GenericBox.java")
-add_jopa_run_test(GenericTest "${TEST_DIR}/generics/GenericTest.java" "GenericTest")
+add_jopa_run_test(GenericTest "${TEST_DIR}/generics/GenericTest.java" "GenericTest" "${TEST_DIR}/generics/GenericBox.java")
 add_jopa_compile_test(SimpleGeneric "${TEST_DIR}/generics/SimpleGeneric.java")
 add_jopa_compile_test(TwoTypeParams "${TEST_DIR}/generics/TwoTypeParams.java")
 add_jopa_compile_test(BoundedGeneric "${TEST_DIR}/generics/BoundedGeneric.java")
@@ -143,13 +151,15 @@ add_jopa_run_test(ReturnBoxingSimple "${TEST_DIR}/autoboxing/ReturnBoxingSimple.
 add_jopa_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple")
 
 # Static Import Tests
+set(MathUtils_OUTPUT "${OUTPUT_DIR}/MathUtils")
+file(MAKE_DIRECTORY "${MathUtils_OUTPUT}")
 add_test(
     NAME "compile_MathUtils"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${MathUtils_OUTPUT}"
             "${TEST_DIR}/util/MathUtils.java"
 )
 set_tests_properties("compile_MathUtils" PROPERTIES LABELS "compile")
@@ -165,20 +175,22 @@ add_jopa_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotation
 add_jopa_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")
 
 # Java 6 Tests (bytecode version 50.0 with parameter names)
+set(SimpleJava6Test_OUTPUT "${OUTPUT_DIR}/SimpleJava6Test")
+file(MAKE_DIRECTORY "${SimpleJava6Test_OUTPUT}")
 add_test(
     NAME "compile_SimpleJava6Test"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${SimpleJava6Test_OUTPUT}"
             "${TEST_DIR}/java6/SimpleJava6Test.java"
 )
 set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_SimpleJava6Test"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "SimpleJava6Test"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${SimpleJava6Test_OUTPUT}:${RUNTIME_JAR}" "SimpleJava6Test"
     )
     set_tests_properties("run_SimpleJava6Test" PROPERTIES
         LABELS "run"
@@ -187,20 +199,22 @@ if(JOPA_ENABLE_JVM_TESTS)
 endif()
 
 # Reflection Tests (compile with our runtime, run with system JVM for real reflection)
+set(ReflectionBasicTest_OUTPUT "${OUTPUT_DIR}/ReflectionBasicTest")
+file(MAKE_DIRECTORY "${ReflectionBasicTest_OUTPUT}")
 add_test(
     NAME "compile_ReflectionBasicTest"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${ReflectionBasicTest_OUTPUT}"
             "${TEST_DIR}/java6/ReflectionBasicTest.java"
 )
 set_tests_properties("compile_ReflectionBasicTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_ReflectionBasicTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${OUTPUT_DIR}" "ReflectionBasicTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${ReflectionBasicTest_OUTPUT}" "ReflectionBasicTest"
     )
     set_tests_properties("run_ReflectionBasicTest" PROPERTIES
         LABELS "run"
@@ -209,13 +223,15 @@ if(JOPA_ENABLE_JVM_TESTS)
 endif()
 
 # Java 7 Tests (bytecode version 51.0 with diamond operator)
+set(DiamondTest_OUTPUT "${OUTPUT_DIR}/DiamondTest")
+file(MAKE_DIRECTORY "${DiamondTest_OUTPUT}")
 add_test(
     NAME "compile_DiamondTest"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.7 -target 1.7
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${DiamondTest_OUTPUT}"
             "${TEST_DIR}/java7/DiamondTest.java"
 )
 set_tests_properties("compile_DiamondTest" PROPERTIES LABELS "compile;java7")
@@ -223,7 +239,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     # Use -noverify because StackMapTable is not yet implemented for Java 7+ bytecode
     add_test(
         NAME "run_DiamondTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "DiamondTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${DiamondTest_OUTPUT}:${RUNTIME_JAR}" "DiamondTest"
     )
     set_tests_properties("run_DiamondTest" PROPERTIES
         LABELS "run;java7"
@@ -232,13 +248,15 @@ if(JOPA_ENABLE_JVM_TESTS)
 endif()
 
 # Java 8 Tests (bytecode version 52.0 with default methods)
+set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
+file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
     COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
             $<TARGET_FILE:jopa> -source 1.8 -target 1.8
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
-            -d "${OUTPUT_DIR}"
+            -d "${DefaultMethodTest_OUTPUT}"
             "${TEST_DIR}/java8/DefaultMethodTest.java"
 )
 set_tests_properties("compile_DefaultMethodTest" PROPERTIES LABELS "compile;java8")
@@ -246,7 +264,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     # Use -noverify because StackMapTable is not yet implemented for Java 8 bytecode
     add_test(
         NAME "run_DefaultMethodTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${OUTPUT_DIR}:${RUNTIME_JAR}" "DefaultMethodTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${DefaultMethodTest_OUTPUT}:${RUNTIME_JAR}" "DefaultMethodTest"
     )
     set_tests_properties("run_DefaultMethodTest" PROPERTIES
         LABELS "run;java8"
