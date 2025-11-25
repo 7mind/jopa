@@ -15,13 +15,10 @@ class SegmentPool;
 class PairSegment
 {
 public:
-    enum
-    {
-        LIST_LIMIT = 5,
-        LOG_BLKSIZE = 8,
-        BLKSIZE = 1 << LOG_BLKSIZE,
-        MASK = ~ (BLKSIZE - 1)
-    };
+    static constexpr int LIST_LIMIT = 5;
+    static constexpr int LOG_BLKSIZE = 8;
+    static constexpr unsigned BLKSIZE = 1U << LOG_BLKSIZE;
+    static constexpr unsigned MASK = ~(BLKSIZE - 1U);
 
 private:
     struct TargetValuePair
@@ -91,13 +88,10 @@ private:
 class TripletSegment
 {
 public:
-    enum
-    {
-        LIST_LIMIT = 5,
-        LOG_BLKSIZE = 8,
-        BLKSIZE = 1 << LOG_BLKSIZE,
-        MASK = ~ (BLKSIZE - 1)
-    };
+    static constexpr int LIST_LIMIT = 5;
+    static constexpr int LOG_BLKSIZE = 8;
+    static constexpr unsigned BLKSIZE = 1U << LOG_BLKSIZE;
+    static constexpr unsigned MASK = ~(BLKSIZE - 1U);
 
 private:
     struct TargetValuePair

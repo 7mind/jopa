@@ -403,7 +403,8 @@ public:
         // optimized for no branching, idea from fdlibm.c
         u4 high = HighWord();
         u4 low = LowWord();
-        return ((high & ABS_BITS) | ((low | -(i4) low) >> 31)) > EXP_BITS;
+        // Cast negation result to u4 to avoid implicit signed-to-unsigned conversion
+        return ((high & ABS_BITS) | ((low | static_cast<u4>(-(i4) low)) >> 31)) > EXP_BITS;
     }
 
     inline bool IsNegative() const

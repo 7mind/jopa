@@ -6023,7 +6023,7 @@ AstExpression* ByteCode::StripNops(AstExpression* expr)
 
 bool ByteCode::IsNop(AstBlock* block)
 {
-    for (int i = block -> NumStatements() - 1; i >= 0; i--)
+    for (int i = static_cast<int>(block -> NumStatements()) - 1; i >= 0; i--)
     {
         Ast* statement = block -> Statement(i);
         if (statement -> EmptyStatementCast() ||
@@ -6081,7 +6081,7 @@ void ByteCode::EmitNewArray(unsigned num_dims, const TypeSymbol* type)
         PutOp(OP_MULTIANEWARRAY);
         PutU2(RegisterClass(type));
         PutU1(num_dims); // load dims count
-        ChangeStack(1 - num_dims);
+        ChangeStack(1 - static_cast<int>(num_dims));
     }
 }
 
@@ -7117,7 +7117,7 @@ void ByteCode::DefineLabel(Label& lab)
     // try-finally, or in private methods); and might allow us to finally
     // implement the -O option as more than a no-op.
     //
-    int index = lab.uses.Length() - 1;
+    int index = static_cast<int>(lab.uses.Length()) - 1;
     if (last_op_goto && index >= 0 && ! (control.option.g & JopaOption::VARS))
     {
         unsigned int luse = lab.uses[index].use_offset;

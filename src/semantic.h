@@ -41,7 +41,7 @@ public:
     //
     VariableSymbol* FindVariableSymbol(NameSymbol* name_symbol)
     {
-        for (int i = table.Length() - 1; i >= 0; i--)
+        for (int i = static_cast<int>(table.Length()) - 1; i >= 0; i--)
         {
             VariableSymbol* symbol =
                 table[i] -> FindVariableSymbol(name_symbol);
@@ -58,7 +58,7 @@ public:
     //
     TypeSymbol* FindTypeSymbol(NameSymbol* name_symbol)
     {
-        for (int i = table.Length() - 1; i >= 0; i--)
+        for (int i = static_cast<int>(table.Length()) - 1; i >= 0; i--)
         {
             TypeSymbol* symbol = table[i] -> FindTypeSymbol(name_symbol);
             if (symbol)
@@ -74,7 +74,7 @@ public:
     //
     LabelSymbol* FindLabelSymbol(NameSymbol* name_symbol)
     {
-        for (int i = table.Length() - 1; i >= 0; i--)
+        for (int i = static_cast<int>(table.Length()) - 1; i >= 0; i--)
         {
             LabelSymbol* label = table[i] -> FindLabelSymbol(name_symbol);
             if (label)

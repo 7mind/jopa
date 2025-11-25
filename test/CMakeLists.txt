@@ -33,7 +33,8 @@ set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 function(add_jopa_compile_test test_name source_file)
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.5
+        COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+                $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
@@ -49,7 +50,8 @@ function(add_jopa_run_test test_name source_file main_class)
     # Compilation test
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.5
+        COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+                $<TARGET_FILE:jopa> -source 1.5
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${OUTPUT_DIR}"
@@ -88,7 +90,8 @@ add_jopa_compile_test(Color "${TEST_DIR}/enums/Color.java")
 add_jopa_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest")
 add_test(
     NAME "compile_EnumMethodsTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -142,7 +145,8 @@ add_jopa_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxin
 # Static Import Tests
 add_test(
     NAME "compile_MathUtils"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.5
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -163,7 +167,8 @@ add_jopa_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarnings
 # Java 6 Tests (bytecode version 50.0 with parameter names)
 add_test(
     NAME "compile_SimpleJava6Test"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -184,7 +189,8 @@ endif()
 # Reflection Tests (compile with our runtime, run with system JVM for real reflection)
 add_test(
     NAME "compile_ReflectionBasicTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -205,7 +211,8 @@ endif()
 # Java 7 Tests (bytecode version 51.0 with diamond operator)
 add_test(
     NAME "compile_DiamondTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.7
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.7 -target 1.7
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -227,7 +234,8 @@ endif()
 # Java 8 Tests (bytecode version 52.0 with default methods)
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
+    COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+            $<TARGET_FILE:jopa> -source 1.8 -target 1.8
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${OUTPUT_DIR}"
@@ -334,7 +342,8 @@ if(JOPA_ENABLE_JDK_PARSER_TESTS)
             # Add the parse test with appropriate source level
             add_test(
                 NAME "parse_jdk${jdk_version}_${test_name}"
-                COMMAND $<TARGET_FILE:jopa> -source "1.${jdk_version}" --parse-only "${output_file}" "${java_file}"
+                COMMAND ${CMAKE_COMMAND} -E env "ASAN_OPTIONS=detect_leaks=0"
+                        $<TARGET_FILE:jopa> -source "1.${jdk_version}" --parse-only "${output_file}" "${java_file}"
             )
             set_tests_properties("parse_jdk${jdk_version}_${test_name}" PROPERTIES
                 LABELS "parser;jdk${jdk_version}"

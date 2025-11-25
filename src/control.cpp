@@ -1414,21 +1414,30 @@ void Control::ProcessBodies(TypeSymbol* type)
         }
 #endif // WIN32_FILE_SYSTEM
 
-        if (! parser -> InitializerParse(sem -> lex_stream,
-                                         type -> declaration))
+        if (type -> declaration -> UnparsedClassBodyCast())
         {
-            // Mark that syntax errors were detected.
-            sem -> compilation_unit -> MarkBad();
-        }
-        else
-        {
-            type -> CompleteSymbolTable();
-            if (! parser -> BodyParse(sem -> lex_stream, type -> declaration))
+            if (! parser -> InitializerParse(sem -> lex_stream,
+                                             type -> declaration))
             {
                 // Mark that syntax errors were detected.
                 sem -> compilation_unit -> MarkBad();
             }
-            else type -> ProcessExecutableBodies();
+            else
+            {
+                type -> CompleteSymbolTable();
+                if (! parser -> BodyParse(sem -> lex_stream, type -> declaration))
+                {
+                    // Mark that syntax errors were detected.
+                    sem -> compilation_unit -> MarkBad();
+                }
+                else type -> ProcessExecutableBodies();
+            }
+        }
+        else
+        {
+            // Already parsed (e.g., anonymous class)
+            type -> CompleteSymbolTable();
+            type -> ProcessExecutableBodies();
         }
 
         if (sem -> NumErrors() == 0 &&

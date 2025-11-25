@@ -443,7 +443,7 @@ public:
                 method -> NumFormalParameters())
             {
                 int i;
-                for (i = method -> NumFormalParameters() - 1; i >= 0; i--)
+                for (i = static_cast<int>(method -> NumFormalParameters()) - 1; i >= 0; i--)
                 {
                     if (method -> FormalParameter(i) -> Type() !=
                         overload_method -> FormalParameter(i) -> Type())
