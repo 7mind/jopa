@@ -23,11 +23,18 @@ echo ""
 
 # Configure and build (Debug with sanitizers for primary tests)
 echo "=== Configuring Build ==="
-cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
+CMAKE_OUTPUT=$(cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
     -DJOPA_ENABLE_SANITIZERS=ON \
     -DJOPA_ENABLE_CPPTRACE=ON \
     -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
-    -DCMAKE_BUILD_TYPE=Debug
+    -DCMAKE_BUILD_TYPE=Debug 2>&1)
+echo "$CMAKE_OUTPUT"
+
+# Extract and save skipped counts for parser tests
+JDK7_SKIPPED_COUNT=$(echo "$CMAKE_OUTPUT" | grep -oP "Added \d+ JDK7 parser tests \(skipped \K\d+" || echo "0")
+JDK8_SKIPPED_COUNT=$(echo "$CMAKE_OUTPUT" | grep -oP "Added \d+ JDK8 parser tests \(skipped \K\d+" || echo "0")
+echo "$JDK7_SKIPPED_COUNT" > "${BUILD_DIR}/parser_jdk7_skipped.txt"
+echo "$JDK8_SKIPPED_COUNT" > "${BUILD_DIR}/parser_jdk8_skipped.txt"
 
 echo ""
 echo "=== Building Compiler and Runtime ==="
@@ -77,6 +84,7 @@ echo "--- JDK7 Parser Tests ---"
 # shellcheck source=/dev/null
 source "${BUILD_DIR}/parser_jdk7_results.env"
 JDK7_TOTAL=${PARSER_TOTAL:-0}
+JDK7_SKIPPED=${PARSER_SKIPPED:-0}
 JDK7_PASSED=${PARSER_PASSED:-0}
 JDK7_FAILED=${PARSER_FAILED:-0}
 JDK7_TIMEOUT=${PARSER_TIMEOUT:-0}
@@ -89,6 +97,7 @@ echo "--- JDK8 Parser Tests ---"
 # shellcheck source=/dev/null
 source "${BUILD_DIR}/parser_jdk8_results.env"
 JDK8_TOTAL=${PARSER_TOTAL:-0}
+JDK8_SKIPPED=${PARSER_SKIPPED:-0}
 JDK8_PASSED=${PARSER_PASSED:-0}
 JDK8_FAILED=${PARSER_FAILED:-0}
 JDK8_TIMEOUT=${PARSER_TIMEOUT:-0}
@@ -109,6 +118,7 @@ echo "  Total:   ${PRIMARY_TOTAL}"
 echo ""
 echo "JDK7 Parser Tests:"
 echo "  Total:   ${JDK7_TOTAL}"
+echo "  Skipped: ${JDK7_SKIPPED} (negative tests)"
 echo "  Passed:  ${JDK7_PASSED}"
 echo "  Failed:  ${JDK7_FAILED}"
 echo "  Timeout: ${JDK7_TIMEOUT}"
@@ -116,6 +126,7 @@ echo "  Crashed: ${JDK7_CRASHED}"
 echo ""
 echo "JDK8 Parser Tests:"
 echo "  Total:   ${JDK8_TOTAL}"
+echo "  Skipped: ${JDK8_SKIPPED} (negative tests)"
 echo "  Passed:  ${JDK8_PASSED}"
 echo "  Failed:  ${JDK8_FAILED}"
 echo "  Timeout: ${JDK8_TIMEOUT}"
