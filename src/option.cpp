@@ -318,6 +318,7 @@ Option::Option(ArgumentExpander& arguments,
       errors(true),
       pedantic(false),
       noassert(false),
+      jast2(true),  // jast2 pipeline is now the default
       dependence_report_name(NULL)
 {
 #ifdef WIN32_FILE_SYSTEM
@@ -733,6 +734,10 @@ Option::Option(ArgumentExpander& arguments,
                      strcmp(arguments.argv[i], "--noassert") == 0)
             {
                 noassert = true;
+            }
+            else if (strcmp(arguments.argv[i], "--jast2") == 0)
+            {
+                jast2 = true;
             }
             else if (strcmp(arguments.argv[i], "+B") == 0 ||
                      strcmp(arguments.argv[i], "--nobytecode") == 0)

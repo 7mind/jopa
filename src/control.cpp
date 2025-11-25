@@ -8,7 +8,11 @@
 #include "option.h"
 #include "parser_facade.h"
 #include "ast_serializer.h"
+#include "jast2.h"
+#include "jast_semantic.h"
+#include "jast_bytecode.h"
 #include <fstream>
+#include <functional>
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -456,8 +460,12 @@ Control::Control(char** arguments, Option& option_)
         for (int j = 0; j < num_files; j++)
         {
             FileSymbol* file_symbol = input_files[j];
-            if (! input_java_file_set.IsElement(file_symbol))
-                ProcessFile(file_symbol);
+            if (! input_java_file_set.IsElement(file_symbol)) {
+                if (option.jast2)
+                    ProcessFileJast2(file_symbol);
+                else
+                    ProcessFile(file_symbol);
+            }
         }
 
         //
@@ -567,8 +575,12 @@ Control::Control(char** arguments, Option& option_)
                 for (int j = 0; j < num_files; j++)
                 {
                     FileSymbol* file_symbol = input_files[j];
-                    if (! input_java_file_set.IsElement(file_symbol))
-                        ProcessFile(file_symbol);
+                    if (! input_java_file_set.IsElement(file_symbol)) {
+                        if (option.jast2)
+                            ProcessFileJast2(file_symbol);
+                        else
+                            ProcessFile(file_symbol);
+                    }
                 }
 
                 //
@@ -1293,6 +1305,67 @@ void Control::ProcessFile(FileSymbol* file_symbol)
         ProcessBodies(needs_body_work[i]);
     }
     needs_body_work.Reset();
+}
+
+
+void Control::ProcessFileJast2(FileSymbol* file_symbol)
+{
+    // jast2 pipeline: parse to JSON -> convert to jast2 -> delegate to legacy for rest
+    //
+    // This validates the jast2 parsing infrastructure works. The jast2 AST is stored
+    // in file_symbol->jast2_compilation_unit for future use when JastSemantic and
+    // JastByteCode are fully implemented.
+
+    if (option.verbose) {
+        Coutput << "[jast2: parsing "
+                << file_symbol->FileName()
+                << "]" << endl;
+    }
+
+    // Step 1: Scan the file
+    if (!file_symbol->lex_stream) {
+        scanner->Scan(file_symbol);
+    } else {
+        file_symbol->lex_stream->Reset();
+    }
+
+    if (!file_symbol->lex_stream) {
+        return; // Scan failed
+    }
+
+    // Step 2: Parse to JSON using parser_facade
+    // This also creates the legacy AST in file_symbol->compilation_unit
+    ParseResult result = parser_facade->parseCompilationUnit(file_symbol);
+    if (!result.success || result.ast.is_null()) {
+        // Report parse errors
+        for (const auto& err : result.errors) {
+            Coutput << file_symbol->FileName() << ":"
+                    << err.line << ":" << err.column << ": "
+                    << err.severity.c_str() << ": " << err.message.c_str() << endl;
+        }
+        return_code = 1;
+        return;
+    }
+
+    // Step 3: Convert JSON to jast2 AST
+    auto compilation_unit = jast2::CompilationUnit::fromJson(result.ast);
+    if (!compilation_unit) {
+        Coutput << file_symbol->FileName() << ": failed to convert JSON to jast2 AST" << endl;
+        return_code = 1;
+        return;
+    }
+
+    // Store the jast2 compilation unit in the file symbol
+    file_symbol->jast2_compilation_unit = compilation_unit.release();
+
+    if (option.verbose) {
+        Coutput << "[jast2: created jast2 AST for "
+                << file_symbol->FileName() << "]" << endl;
+    }
+
+    // Step 4: Delegate to the legacy ProcessFile for semantic analysis and bytecode
+    // This ensures the compiler still works while we develop the jast2 pipeline
+    ProcessFile(file_symbol);
 }
 
 

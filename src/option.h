@@ -137,7 +137,8 @@ public:
          dump_errors,
          errors,
          pedantic,
-         noassert;
+         noassert,
+         jast2;  // Use jast2 AST pipeline instead of legacy
 
     char *dependence_report_name;
 

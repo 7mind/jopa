@@ -518,6 +518,7 @@ private:
     VariableSymbol* ProcessSystemField(TypeSymbol*, const char*, const char*);
 
     void ProcessFile(FileSymbol*);
+    void ProcessFileJast2(FileSymbol*);  // jast2 pipeline: parse->semantic->bytecode
     void ProcessMembers();
     void CollectTypes(TypeSymbol*, Tuple<TypeSymbol*>&);
     void ProcessBodies(TypeSymbol*);
