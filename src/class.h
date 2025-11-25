@@ -1470,7 +1470,7 @@ class BridgeAttribute : public AttributeInfo
     // u4 attribute_length; // inherited from AttributeInfo
 
 public:
-    BridgeAttribute(u2 name_index, u2 index)
+    BridgeAttribute(u2 name_index, u2 /*index*/)
         : AttributeInfo(ATTRIBUTE_Bridge, name_index)
     {}
     BridgeAttribute(ClassFile&);

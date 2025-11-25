@@ -14,7 +14,6 @@ class LexStream;
 
 class javaprs_table
 {
-    int dummy; /* Prevents empty class from causing compile error. */
 public:
     static int original_state(int state) { return -base_check[state]; }
     static int asi(int state) { return asb[original_state(state)]; }

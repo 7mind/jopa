@@ -151,9 +151,6 @@ public:
     void ReadDirectory();
 
 private:
-
-    time_t mtime;
-
     SymbolTable* table;
     inline SymbolTable* Table();
 

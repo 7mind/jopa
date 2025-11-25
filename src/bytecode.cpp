@@ -61,10 +61,11 @@ void ByteCode::GenerateCode()
             DeclareField(vsym);
             if (vd -> variable_initializer_opt && vsym -> initial_value)
             {
-                AstExpression* init;
-                assert(init = vd -> variable_initializer_opt ->
-                       ExpressionCast());
+                AstExpression* init = vd -> variable_initializer_opt ->
+                       ExpressionCast();
+                assert(init);
                 assert(init -> IsConstant() && vd -> symbol -> ACC_FINAL());
+                (void)init;
                 constant_instance_fields.Next() = vd;
             }
         }
@@ -664,7 +665,7 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
                             {
                                 if (long_text[k] >= U_0 && long_text[k] <= U_9)
                                 {
-                                    long_val = long_val * 10 + (long_text[k] - U_0);
+                                    long_val = LongInt(long_val * 10 + (long_text[k] - U_0));
                                 }
                             }
 
@@ -2155,13 +2156,17 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     // in the range of protected code.
     //
     if (statement -> finally_clause_opt)
+    {
         if (! emit_finally_clause)
+        {
             statement -> block -> SetTag(AstBlock::NONE);
+        }
         else if (! statement -> finally_clause_opt -> block ->
                  can_complete_normally)
         {
             statement -> block -> SetTag(AstBlock::ABRUPT_TRY_FINALLY);
         }
+    }
     if (statement -> block -> Tag() == AstBlock::NONE &&
         statement -> NumCatchClauses())
     {
@@ -4665,7 +4670,7 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
         //
         else
         {
-            Opcode opc;
+            Opcode opc = OP_NOP;
 
             TypeSymbol* op_type = (casted_left_hand_side
                                    ? casted_left_hand_side -> Type()
@@ -7826,7 +7831,7 @@ void ByteCode::FinishCode()
                             {
                                 if (long_text[k] >= U_0 && long_text[k] <= U_9)
                                 {
-                                    long_val = long_val * 10 + (long_text[k] - U_0);
+                                    long_val = LongInt(long_val * 10 + (long_text[k] - U_0));
                                 }
                             }
 

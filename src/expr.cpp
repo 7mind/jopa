@@ -56,10 +56,10 @@ inline void CheckIntegerAddition(Semantic* semantic, AstExpression* expr,
     ExtremaForType(min, max);
     bool safe = x == zero ||
                 y == zero ||
-                x < zero && y < zero && x >= (min - y) ||
-                x < zero && y > zero ||
-                x > zero && y < zero ||
-                x > zero && y > zero && x <= (max - y);
+                (x < zero && y < zero && x >= (min - y)) ||
+                (x < zero && y > zero) ||
+                (x > zero && y < zero) ||
+                (x > zero && y > zero && x <= (max - y));
     ReportOverflow(semantic, expr, safe);
 }
 
@@ -81,12 +81,12 @@ static void CheckIntegerMultiplication(Semantic* semantic, AstExpression* expr,
     const T minus_one = T(-1);
     T min, max;
     ExtremaForType(min, max);
-    bool safe = x > minus_one && x <= one ||
-                y > minus_one && y <= one ||
-                x < zero && y < zero && T(-x) <= max/-y ||
-                x < zero && y > zero && x >= min/y ||
-                x > zero && y < zero && y >= min/x ||
-                x > zero && y > zero && x <= max/y;
+    bool safe = (x > minus_one && x <= one) ||
+                (y > minus_one && y <= one) ||
+                (x < zero && y < zero && T(-x) <= max/-y) ||
+                (x < zero && y > zero && x >= min/y) ||
+                (x > zero && y < zero && y >= min/x) ||
+                (x > zero && y > zero && x <= max/y);
     ReportOverflow(semantic, expr, safe);
 }
 

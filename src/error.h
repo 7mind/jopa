@@ -33,6 +33,7 @@ public:
     ErrorString& operator<<(int n);
     ErrorString& operator<<(ostream&(*f)(ostream&))
     {
+        (void)f;
         assert(f == (ostream&(*)(ostream&)) endl);
         return *this << '\n';
     }

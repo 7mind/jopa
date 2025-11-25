@@ -620,7 +620,6 @@ public:
             &Semantic::DefiniteDefaultExpression;
         DefiniteExpr[Ast::SUPER_EXPRESSION] =
             &Semantic::DefiniteDefaultExpression;
-        DefiniteExpr[Ast::TYPE] = &Semantic::DefiniteDefaultExpression;
 
         DefiniteBinaryExpr[AstBinaryExpression::PLUS] =
             &Semantic::DefiniteDefaultBinaryExpression;

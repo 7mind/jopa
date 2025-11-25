@@ -167,9 +167,9 @@ void Zip::ProcessDirectoryEntry(zip_int64_t index)
                                    file_name_length - 1);
     else
     {
-        bool java_file = (file_name_length >= FileSymbol::java_suffix_length &&
+        bool java_file = (static_cast<unsigned>(file_name_length) >= FileSymbol::java_suffix_length &&
                           FileSymbol::IsJavaSuffix(const_cast<char*>(&name[file_name_length - FileSymbol::java_suffix_length]))),
-             class_file = (file_name_length >= FileSymbol::class_suffix_length &&
+             class_file = (static_cast<unsigned>(file_name_length) >= FileSymbol::class_suffix_length &&
                            FileSymbol::IsClassSuffix(const_cast<char*>(&name[file_name_length - FileSymbol::class_suffix_length])));
 
         if (java_file || class_file)

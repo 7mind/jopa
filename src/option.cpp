@@ -81,10 +81,8 @@ void ArgumentExpander::ExpandAtFileArgument(Tuple<char *>& arguments,
             // Ignore single/double quotes at start and end of line.
 
             if (start < end &&
-                (*start == U_DOUBLE_QUOTE &&
-                *end == U_DOUBLE_QUOTE) ||
-                (*start == U_SINGLE_QUOTE &&
-                *end == U_SINGLE_QUOTE)) {
+                ((*start == U_DOUBLE_QUOTE && *end == U_DOUBLE_QUOTE) ||
+                 (*start == U_SINGLE_QUOTE && *end == U_SINGLE_QUOTE))) {
                 start++;
                 end--;
             }
@@ -678,6 +676,7 @@ Option::Option(ArgumentExpander& arguments,
                 const char* image = arguments.argv[i] + 2;
                 bool success = SemanticError::ProcessWarningSwitch(image);
                 assert(success);
+                (void)success;
             }
             else if (arguments.argv[i][1] == 'X')
             {

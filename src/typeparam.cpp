@@ -107,7 +107,7 @@ MethodSymbol* TypeParameterSymbol::ContainingMethod() const
 //   T extends Number -> T:Ljava/lang/Number;
 //   T extends Number & Comparable<T> -> T:Ljava/lang/Number;:Ljava/lang/Comparable<TT;>;
 //
-void TypeParameterSymbol::GenerateSignature(Control& control)
+void TypeParameterSymbol::GenerateSignature(Control& /*control*/)
 {
     // Estimate size needed
     unsigned estimated_size = NameLength() + 100;  // Buffer for bounds
