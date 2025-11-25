@@ -161,12 +161,13 @@ const wchar_t* OptionError::GetErrorMessage()
         break;
     case INVALID_SOURCE_ARGUMENT:
         s << "\"-source\" only recognizes Java releases 1.3 (JLS 2 "
-          << "features), 1.4 (assert statement), 1.5 (partial "
-          << "support beta, see NEWS for supported features), 1.6, and 1.7.";
+          << "features), 1.4 (assert statement), 1.5 (generics, "
+          << "annotations, enums), 1.6, 1.7 (diamond, try-with-resources), and 1.8 "
+          << "(lambdas, default methods).";
         break;
     case INVALID_TARGET_ARGUMENT:
         s << "\"-target\" only recognizes Java releases 1.1, 1.2, 1.3, 1.4, "
-          << "1.4.2, 1.5, 1.6, and 1.7.";
+          << "1.4.2, 1.5, 1.6, 1.7, and 1.8.";
         break;
     case INVALID_K_OPTION:
         s << "No argument specified for +K option. The proper form is "
@@ -568,6 +569,25 @@ Option::Option(ArgumentExpander& arguments,
             {
                 nowrite = true;
             }
+            else if (strcmp(arguments.argv[i], "--parse-only") == 0)
+            {
+                if (i + 1 == arguments.argc)
+                {
+                    bad_options.Next() =
+                        new OptionError(OptionError::MISSING_OPTION_ARGUMENT,
+                                        arguments.argv[i]);
+                    continue;
+                }
+                parse_only = true;
+                nowrite = true;
+                // Default to Java 7 source level for parser tests
+                if (source == UNKNOWN)
+                    source = SDK1_7;
+                i++;
+                delete [] parse_only_output;
+                parse_only_output = new char[strlen(arguments.argv[i]) + 1];
+                strcpy(parse_only_output, arguments.argv[i]);
+            }
             else if (strcmp(arguments.argv[i], "-O") == 0 ||
                      strcmp(arguments.argv[i], "--optimize") == 0)
             {
@@ -595,6 +615,8 @@ Option::Option(ArgumentExpander& arguments,
                     source = SDK1_6;
                 else if (! strcmp(arguments.argv[i], "1.7"))
                     source = SDK1_7;
+                else if (! strcmp(arguments.argv[i], "1.8"))
+                    source = SDK1_8;
                 else
                 {
                     bad_options.Next() =
@@ -645,6 +667,8 @@ Option::Option(ArgumentExpander& arguments,
                     target = SDK1_6;
                 else if (! strcmp(arguments.argv[i], "1.7"))
                     target = SDK1_7;
+                else if (! strcmp(arguments.argv[i], "1.8"))
+                    target = SDK1_8;
                 else
                 {
                     bad_options.Next() =
@@ -962,6 +986,9 @@ Option::Option(ArgumentExpander& arguments,
             break;
         case SDK1_7:
             source = SDK1_7;
+            break;
+        case SDK1_8:
+            source = SDK1_8;
             break;
         default:
             assert(false && "Unexpected target level");

@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
                "-J...               no effect (ignored for compatibility)\n"
                "-nowarn             javac-compatible equivalent of +Z0\n"
                "-nowrite            do not write any class files, useful with -verbose\n"
+               "--parse-only file   parse only, write result to file (for testing)\n"
                "-O                  optimize bytecode (presently does nothing)\n"
                "-source release     interpret source by Java SDK release rules\n"
                "                      [default to max(target, 1.4)]\n"

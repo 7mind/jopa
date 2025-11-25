@@ -82,6 +82,7 @@ JopaOption::~JopaOption()
     delete [] encoding;
     delete [] extdirs;
     delete [] sourcepath;
+    delete [] parse_only_output;
 }
 
 JopaOption::JopaOption()
@@ -92,6 +93,8 @@ JopaOption::JopaOption()
       directory(NULL),
       encoding(NULL),
       nowrite(false),
+      parse_only(false),
+      parse_only_output(NULL),
       deprecation(false),
       optimize(false),
       verbose(false),

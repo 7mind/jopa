@@ -193,6 +193,71 @@ Control::Control(char** arguments, Option& option_)
     }
 
     //
+    // Handle parse-only mode
+    //
+    if (option.parse_only)
+    {
+        bool parse_success = true;
+        int total_errors = 0;
+
+        // Parse each file fully
+        for (int j = 0; j < num_files; j++)
+        {
+            FileSymbol* file_symbol = input_files[j];
+            if (file_symbol -> lex_stream)
+            {
+                file_symbol -> lex_stream -> Reset();
+                file_symbol -> compilation_unit =
+                    parser -> HeaderParse(file_symbol -> lex_stream, ast_pool);
+                if (! file_symbol -> compilation_unit ||
+                    file_symbol -> compilation_unit -> BadCompilationUnitCast())
+                {
+                    parse_success = false;
+                }
+                total_errors += file_symbol -> lex_stream -> NumBadTokens();
+            }
+            else
+            {
+                parse_success = false;
+            }
+        }
+
+        // Also check for IO errors
+        if (general_io_errors.Length() > 0)
+        {
+            parse_success = false;
+        }
+
+        // Write the result to the output file
+        FILE* outfile = SystemFopen(option.parse_only_output, "w");
+        if (outfile)
+        {
+            if (parse_success && total_errors == 0)
+            {
+                fprintf(outfile, "OK\n");
+                return_code = 0;
+            }
+            else
+            {
+                fprintf(outfile, "FAIL\n");
+                fprintf(outfile, "Errors: %d\n", total_errors);
+                return_code = 1;
+            }
+            fclose(outfile);
+        }
+        else
+        {
+            Coutput << "*** Cannot open parse-only output file "
+                    << option.parse_only_output << endl;
+            return_code = 1;
+        }
+
+        delete ast_pool;
+        delete [] input_files;
+        return;
+    }
+
+    //
     //
     //
     FileSymbol* main_file_clone;

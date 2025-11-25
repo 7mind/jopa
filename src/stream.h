@@ -415,6 +415,30 @@ public:
         return comment_stream.Length() * sizeof(Comment);
     }
 
+    // Check if a token is a synthetic diamond '?' token
+    // Used by semantic analysis to detect diamond operator <>
+    inline bool IsDiamondToken(TokenIndex i)
+    {
+        for (unsigned j = 0; j < diamond_tokens.Length(); j++)
+        {
+            if (diamond_tokens[j] == i)
+                return true;
+        }
+        return false;
+    }
+
+    // Check if a token is a transformed 'default' modifier token
+    // Used by semantic analysis to detect Java 8 default methods
+    inline bool IsDefaultMethodToken(TokenIndex i)
+    {
+        for (unsigned j = 0; j < default_method_tokens.Length(); j++)
+        {
+            if (default_method_tokens[j] == i)
+                return true;
+        }
+        return false;
+    }
+
 private:
 
     int hexvalue(wchar_t ch);
@@ -521,6 +545,17 @@ private:
     TokenIndex* types;
     ConvertibleArray<TokenIndex> type_index;
     TokenIndex package;
+
+    // Track synthetic '?' tokens that represent diamond operator <>
+    // These are injected by the scanner when it sees <> and should be
+    // treated as type inference rather than unbounded wildcard
+    ConvertibleArray<TokenIndex> diamond_token_indices;
+    Tuple<TokenIndex> diamond_tokens;
+
+    // Track 'default' tokens that were transformed to modifiers for Java 8 default methods
+    // These are emitted as TK_abstract to satisfy the parser, but semantic analysis
+    // should treat them as 'default' modifiers
+    Tuple<TokenIndex> default_method_tokens;
 
     void CompressSpace();
 
