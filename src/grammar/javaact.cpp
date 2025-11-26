@@ -4988,4 +4988,263 @@ void Parser::MakeTypeBound()
 // void MakeTypeArguments();
 //
 
+// ==========================================================================
+// Java 7 Rules (567-583)
+// ==========================================================================
+
+//
+// Rule 567: TryStatement ::= 'try' ResourceSpecification Block Catchesopt Marker
+// Rule 568: TryStatement ::= 'try' ResourceSpecification Block Catchesopt Finally
+//
+// For now, create a TryStatement and store resources in a temporary way.
+//
+void Parser::MakeTryWithResources()
+{
+    AstTryStatement* p = ast_pool -> NewTryStatement();
+    p -> try_token = Token(1);
+
+    // Sym(2) = ResourceSpecification (list of resources)
+    if (Sym(2))
+    {
+        AstListNode* tail = DYNAMIC_CAST<AstListNode*> (Sym(2));
+        if (tail)
+        {
+            p -> AllocateResources(tail -> index + 1);
+            AstListNode* root = tail;
+            do
+            {
+                root = root -> next;
+                p -> AddResource(DYNAMIC_CAST<AstLocalVariableStatement*>
+                                 (root -> element));
+            } while (root != tail);
+            FreeCircularList(tail);
+        }
+    }
+
+    p -> block = DYNAMIC_CAST<AstBlock*> (Sym(3));
+
+    // Sym(4) = Catchesopt
+    if (Sym(4))
+    {
+        AstListNode* tail = DYNAMIC_CAST<AstListNode*> (Sym(4));
+        p -> AllocateCatchClauses(tail -> index + 1);
+        AstListNode* root = tail;
+        do
+        {
+            root = root -> next;
+            p -> AddCatchClause(DYNAMIC_CAST<AstCatchClause*>
+                                (root -> element));
+        } while (root != tail);
+        FreeCircularList(tail);
+    }
+
+    // Sym(5) = Finally or Marker
+    if (Sym(5))
+    {
+        p -> block -> SetTag(AstBlock::TRY_CLAUSE_WITH_FINALLY);
+        for (unsigned i = 0; i < p -> NumCatchClauses(); i++)
+            p -> CatchClause(i) -> block ->
+                SetTag(AstBlock::TRY_CLAUSE_WITH_FINALLY);
+        p -> finally_clause_opt = DYNAMIC_CAST<AstFinallyClause*> (Sym(5));
+    }
+    Sym(1) = p;
+}
+
+//
+// Rule 573: Resource ::= Type VariableDeclaratorId '=' Expression
+// Rule 574: Resource ::= Modifiers Type VariableDeclaratorId '=' Expression
+//
+// Resources are similar to local variables
+//
+void Parser::MakeResource()
+{
+    // Create a local variable declaration for the resource
+    // This is a simplified implementation
+    AstLocalVariableStatement* p = ast_pool -> NewLocalVariableStatement();
+    p -> semicolon_token_opt = 0; // No semicolon for resources
+
+    // Determine if we have modifiers (rule 574 vs 573)
+    bool has_modifiers = Sym(1) && ! DYNAMIC_CAST<AstType*>(Sym(1));
+    int type_index = has_modifiers ? 2 : 1;
+    int id_index = type_index + 1;
+    int expr_index = id_index + 2;
+
+    if (has_modifiers)
+    {
+        p -> modifiers_opt = MakeModifiers();
+    }
+
+    AstType* type = DYNAMIC_CAST<AstType*> (Sym(type_index));
+
+    // Create variable declarator
+    AstVariableDeclarator* vd = ast_pool -> NewVariableDeclarator();
+    vd -> variable_declarator_name = DYNAMIC_CAST<AstVariableDeclaratorId*> (Sym(id_index));
+    vd -> variable_initializer_opt = DYNAMIC_CAST<AstExpression*> (Sym(expr_index));
+
+    p -> type = type;
+    p -> AllocateVariableDeclarators(1);
+    p -> AddVariableDeclarator(vd);
+
+    Sym(1) = p;
+}
+
+//
+// Rule 575: CatchClause ::= 'catch' '(' UnionType VariableDeclaratorId ')' Block
+// Rule 576: CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
+//
+// Multi-catch with union types
+//
+void Parser::MakeMultiCatch()
+{
+    AstCatchClause* p = ast_pool -> NewCatchClause();
+    p -> SetPool(ast_pool);
+    p -> catch_token = Token(1);
+
+    // Determine indices based on presence of modifiers
+    bool has_modifiers = Sym(3) && DYNAMIC_CAST<AstModifiers*>(Sym(3));
+    int union_index = has_modifiers ? 4 : 3;
+    int id_index = union_index + 1;
+    int block_index = id_index + 2;
+
+    // Get the union type - stored as a list
+    AstType* first_type = NULL;
+    if (AstListNode* list = DYNAMIC_CAST<AstListNode*>(Sym(union_index)))
+    {
+        // Store all union types and use first for formal parameter
+        p -> AllocateUnionTypes(list -> index + 1);
+        AstListNode* root = list;
+        do
+        {
+            root = root -> next;
+            AstType* t = DYNAMIC_CAST<AstType*>(root -> element);
+            p -> AddUnionType(t);
+            if (! first_type) first_type = t;
+        } while (root != list);
+        FreeCircularList(list);
+    }
+    else
+    {
+        first_type = DYNAMIC_CAST<AstType*>(Sym(union_index));
+    }
+
+    // Create a formal parameter for the catch (uses first type)
+    AstFormalParameter* fp = ast_pool -> NewFormalParameter();
+    if (has_modifiers)
+    {
+        fp -> modifiers_opt = MakeModifiers();
+    }
+    fp -> type = first_type;
+    fp -> ellipsis_token_opt = 0;
+
+    // Create variable declarator from variable declarator id
+    AstVariableDeclarator* formal_declarator = ast_pool -> NewVariableDeclarator();
+    formal_declarator -> variable_declarator_name =
+        DYNAMIC_CAST<AstVariableDeclaratorId*> (Sym(id_index));
+    fp -> formal_declarator = formal_declarator;
+
+    p -> formal_parameter = fp;
+    p -> block = DYNAMIC_CAST<AstBlock*> (Sym(block_index));
+
+    Sym(1) = p;
+}
+
+//
+// Rule 577: UnionType ::= ClassOrInterfaceType '|' ClassOrInterfaceType
+// Rule 578: UnionType ::= UnionType '|' ClassOrInterfaceType
+//
+// Build a list of types for union type (multi-catch)
+//
+void Parser::MakeUnionType()
+{
+    // Create a list of types
+    // For rule 577, we have two types; for 578, we extend existing list
+    AstListNode* list;
+
+    if (AstListNode* existing = DYNAMIC_CAST<AstListNode*>(Sym(1)))
+    {
+        // Rule 578: extend existing list
+        list = existing;
+    }
+    else
+    {
+        // Rule 577: create new list and add first type
+        list = AllocateListNode();
+        list -> next = list;
+        list -> element = Sym(1);
+        list -> index = 0;
+    }
+
+    // Add the new type (Sym(3))
+    AstListNode* tail = AllocateListNode();
+    tail -> element = Sym(3);
+    tail -> index = list -> index + 1;
+    tail -> next = list -> next;
+    list -> next = tail;
+
+    Sym(1) = tail;
+}
+
+//
+// Rule 579: ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+// Rule 580: ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+//
+// Diamond operator for type inference
+//
+void Parser::MakeDiamondAllocation()
+{
+    AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
+    p -> new_token = Token(1);
+    p -> base_opt = NULL;
+    p -> uses_diamond = true; // Java 7 diamond operator
+
+    // Determine indices based on presence of type arguments
+    bool has_type_args = Sym(2) && DYNAMIC_CAST<AstTypeArguments*>(Sym(2));
+    int type_index = has_type_args ? 3 : 2;
+    int diamond_index = type_index + 1;
+    int args_index = diamond_index + 1;
+    int body_index = args_index + 1;
+
+    if (has_type_args)
+    {
+        // Has explicit type arguments for constructor
+        p -> type_arguments_opt = DYNAMIC_CAST<AstTypeArguments*> (Sym(2));
+    }
+
+    AstTypeName* name = DYNAMIC_CAST<AstTypeName*> (Sym(type_index));
+    p -> class_type = name;
+
+    p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(args_index));
+    p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(body_index));
+
+    Sym(1) = p;
+}
+
+//
+// Rule 581: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+// Rule 582: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+//
+// Qualified new with diamond operator
+//
+void Parser::MakeQualifiedDiamondNew()
+{
+    AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
+    p -> base_opt = DYNAMIC_CAST<AstExpression*> (Sym(1));
+    p -> new_token = Token(3);
+    p -> type_arguments_opt = DYNAMIC_CAST<AstTypeArguments*> (Sym(4));
+    p -> uses_diamond = true; // Java 7 diamond operator
+
+    // Sym(5) = Identifier
+    // Sym(6) = DiamondMarker
+    // Sym(7) = Arguments
+    // Sym(8) = ClassBodyopt
+
+    AstTypeName* name = ast_pool -> NewTypeName(MakeSimpleName(5));
+    p -> class_type = name;
+
+    p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(7));
+    p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(8));
+
+    Sym(1) = p;
+}
+
 } // Close namespace Jopa block
