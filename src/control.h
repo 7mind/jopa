@@ -1,5 +1,4 @@
-#ifndef control_INCLUDED
-#define control_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "symbol.h"
@@ -528,6 +527,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // control_INCLUDED
 

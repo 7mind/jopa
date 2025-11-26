@@ -1,5 +1,4 @@
-#ifndef zipfile_INCLUDED
-#define zipfile_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -56,4 +55,3 @@ private:
 
 } // Close namespace Jopa block
 
-#endif // zipfile_INCLUDED

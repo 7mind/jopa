@@ -1,5 +1,4 @@
-#ifndef ast_INCLUDED
-#define ast_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "depend.h"
@@ -6663,4 +6662,3 @@ AstArray<T>::AstArray(StoragePool* pool, unsigned estimate)
 
 } // Close namespace Jopa block
 
-#endif // ast_INCLUDED

@@ -1,7 +1,6 @@
 // DO NOT MODIFY THIS FILE - it is generated using jikespg on java.g.
 
-#ifndef javaprs_INCLUDED
-#define javaprs_INCLUDED
+#pragma once
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -62,4 +61,3 @@ public:
 
 } // Close namespace Jopa block
 
-#endif /* javaprs_INCLUDED */

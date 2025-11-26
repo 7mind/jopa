@@ -1,5 +1,4 @@
-#ifndef scanner_INCLUDED
-#define scanner_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "stream.h"
@@ -113,6 +112,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // scanner_INCLUDED
 

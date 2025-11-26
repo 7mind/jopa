@@ -1,5 +1,4 @@
-#ifndef typeparam_INCLUDED
-#define typeparam_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -200,4 +199,3 @@ public:
 
 } // Close namespace Jopa block
 
-#endif // typeparam_INCLUDED

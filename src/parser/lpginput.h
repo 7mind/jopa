@@ -1,5 +1,4 @@
-#ifndef lpginput_INCLUDED
-#define lpginput_INCLUDED
+#pragma once
 
 #include "platform.h"
 
@@ -17,4 +16,3 @@ inline Location Loc(TokenObject i) { return i; }
 #include "grammar/javadef.h" /* definition of parsing names */
 #include "grammar/javaprs.h" /* parsing action functions    */
 
-#endif // lpginput_INCLUDED

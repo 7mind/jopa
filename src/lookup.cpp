@@ -288,64 +288,6 @@ DirectoryEntry* DirectoryTable::InsertEntry(DirectorySymbol* directory_symbol,
 }
 
 
-#ifdef WIN32_FILE_SYSTEM
-DirectoryEntry* DirectoryTable::FindCaseInsensitiveEntry(char* name,
-                                                         int length)
-{
-    char* lower_name = new char[length + 1];
-    for (int i = 0; i < length; i++)
-        lower_name[i] = Case::ToAsciiLower(name[i]);
-    lower_name[length] = U_NULL;
-
-    DirectoryEntry* entry = FindEntry(lower_name, length);
-    delete [] lower_name;
-    return entry ? entry -> Image() : entry;
-}
-
-void DirectoryTable::InsertCaseInsensitiveEntry(DirectoryEntry* image)
-{
-    int length = image -> length;
-    char* lower_name = new char[length + 1];
-    for (int i = 0; i < length; i++)
-        lower_name[i] = Case::ToAsciiLower(image -> name[i]);
-    lower_name[length] = U_NULL;
-
-    int k = Hash(lower_name, length) % hash_size;
-    DirectoryEntry* entry;
-    for (entry = base[k]; entry; entry = entry -> next)
-    {
-        if (length == entry -> length &&
-            memcmp(entry -> name, lower_name, length * sizeof(char)) == 0)
-        {
-            break;
-        }
-    }
-
-    if (! entry)
-    {
-        FoldedDirectoryEntry* folded_entry = new FoldedDirectoryEntry(image);
-        entry_pool.Next() = folded_entry;
-        folded_entry -> Initialize(image, lower_name, length);
-
-        folded_entry -> next = base[k];
-        base[k] = folded_entry;
-
-        //
-        // If the number of unique elements in the hash table exceeds 2 times
-        // the size of the base, and we have not yet reached the maximum
-        // allowable size for a base, reallocate a larger base and rehash
-        // the elements.
-        //
-        if (entry_pool.Length() > (hash_size << 1) &&
-            hash_size < MAX_HASH_SIZE)
-        {
-            Rehash();
-        }
-    }
-
-    delete [] lower_name;
-}
-#endif // WIN32_FILE_SYSTEM
 
 
 time_t DirectoryEntry::Mtime()

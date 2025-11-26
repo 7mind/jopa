@@ -1,5 +1,4 @@
-#ifndef bytecode_INCLUDED
-#define bytecode_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -1030,6 +1029,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // bytecode_INCLUDED
 

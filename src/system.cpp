@@ -401,36 +401,7 @@ void Control::ProcessPath()
         system_table -> InsertDirectorySymbol(status.st_dev, status.st_ino,
                                               default_directory);
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-    char* main_current_directory = option.GetMainCurrentDirectory();
-    int dot_path_name_length = strlen(main_current_directory);
-    wchar_t* dot_path_name = new wchar_t[dot_path_name_length + 1];
-    for (int i = 0; i < dot_path_name_length; i++)
-        dot_path_name[i] = main_current_directory[i];
-    dot_path_name[dot_path_name_length] = U_NULL;
-    NameSymbol* dot_path_name_symbol = FindOrInsertName(dot_path_name,
-                                                        dot_path_name_length);
-    delete [] dot_path_name;
-
-    //
-    // We need a place to start. Allocate a "." directory with no owner
-    // initially. (Hence, the null argument.) Allocate a "." path whose
-    // associated directory is the "." directory. Identify the "." path as
-    // the owner of the "." directory. It's not a sourcepath, so pass false.
-    //
-    DirectorySymbol* default_directory = new DirectorySymbol(dot_name_symbol,
-                                                             NULL, false);
-    // Since the "." directory may not be the first directory, set
-    // dot_classpath_index to the first instance in classpath.
-    dot_classpath_index = classpath.Length();
-    classpath.Next() = classpath_table.InsertPathSymbol(dot_path_name_symbol,
-                                                        default_directory);
-    // Note that the default_directory is reset after it has been assigned
-    // the owner above.
-    default_directory -> ReadDirectory();
-    system_directories.Next() = default_directory;
-#endif // WIN32_FILE_SYSTEM
+#endif
     //
     //
     //
@@ -457,18 +428,11 @@ void Control::ProcessBootClassPath()
         wchar_t* path_name = new wchar_t[max_path_name_length + 1];
 
         wchar_t* input_name = NULL;
-#ifdef WIN32_FILE_SYSTEM
-        char* full_directory_name = NULL;
-#endif
 
         for (char* path = option.bootclasspath,
                  * path_tail = &path[strlen(path)];
              path < path_tail; path++)
         {
-#ifdef WIN32_FILE_SYSTEM
-            delete [] full_directory_name;
-            delete [] input_name;
-#endif
             char* head;
             for (head = path; path < path_tail && *path != PathSeparator();
                  path++);
@@ -487,61 +451,7 @@ void Control::ProcessBootClassPath()
 
             input_name = path_name;
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-            input_name = NULL;
-            full_directory_name = NULL;
-            char disk = (input_name_length >= 2 &&
-                         Case::IsAsciiAlpha(head[0]) &&
-                         head[1] == U_COLON ? head[0] : 0);
-
-            //
-            // Look for the directory. If it is found, update input_name and
-            // head.
-            //
-            option.SaveCurrentDirectoryOnDisk(disk);
-            if (SetCurrentDirectory(head))
-            {
-                char tmp[1];
-                // First, get the right size.
-                DWORD directory_length = GetCurrentDirectory(0, tmp);
-                full_directory_name = new char[directory_length + 1];
-                DWORD length = GetCurrentDirectory(directory_length,
-                                                   full_directory_name);
-                if (length <= directory_length)
-                {
-                    for (char* ptr = full_directory_name; *ptr; ptr++)
-                    {
-                        *ptr = (*ptr != U_BACKSLASH
-                                ? *ptr : (char) U_SLASH); // turn '\' to '/'.
-                    }
-
-                    input_name_length = length;
-                    input_name = new wchar_t[input_name_length + 1];
-                    for (int k = 0; k < input_name_length; k++)
-                        input_name[k] = full_directory_name[k];
-                    input_name[input_name_length] = U_NULL;
-                    head = full_directory_name;
-                }
-            }
-
-            //
-            // Default input_name, in case we do not succeed in finding the
-            // directory.
-            //
-            if (! input_name)
-            {
-                input_name = new wchar_t[input_name_length + 1];
-                for (int j = 0; j < input_name_length; j++)
-                    input_name[j] = path_name[j];
-                input_name[input_name_length] = U_NULL;
-            }
-
-            // Reset the current directory on disk.
-            option.ResetCurrentDirectoryOnDisk(disk);
-            // Reset the real current directory...
-            option.SetMainCurrentDirectory();
-#endif // WIN32_FILE_SYSTEM
+#endif
 
             if (input_name_length > 0)
             {
@@ -630,10 +540,6 @@ void Control::ProcessBootClassPath()
             }
         }
 
-#ifdef WIN32_FILE_SYSTEM
-        delete [] full_directory_name;
-        delete [] input_name;
-#endif // WIN32_FILE_SYSTEM
         delete [] path_name;
     }
 }
@@ -648,17 +554,10 @@ void Control::ProcessExtDirs()
         wchar_t* path_name = new wchar_t[max_path_name_length + 1];
 
         wchar_t* input_name = NULL;
-#ifdef WIN32_FILE_SYSTEM
-        char* full_directory_name = NULL;
-#endif
 
         for (char* path = option.extdirs, *path_tail = &path[strlen(path)];
              path < path_tail; path++)
         {
-#ifdef WIN32_FILE_SYSTEM
-            delete [] full_directory_name;
-            delete [] input_name;
-#endif
             char* head;
             for (head = path; path < path_tail && *path != PathSeparator();
                  path++);
@@ -678,59 +577,7 @@ void Control::ProcessExtDirs()
 
             input_name = path_name;
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-            input_name = NULL;
-            full_directory_name = NULL;
-            char disk = (input_name_length >= 2 &&
-                         Case::IsAsciiAlpha(head[0]) &&
-                         head[1] == U_COLON ? head[0] : 0);
-
-            //
-            // Look for the directory. If it is found, update input_name and
-            // head.
-            //
-            option.SaveCurrentDirectoryOnDisk(disk);
-            if (SetCurrentDirectory(head))
-            {
-                char tmp[1];
-                // First, get the right size.
-                DWORD directory_length = GetCurrentDirectory(0, tmp);
-                full_directory_name = new char[directory_length + 1];
-                DWORD length = GetCurrentDirectory(directory_length,
-                                                   full_directory_name);
-                if (length <= directory_length)
-                {
-                    for (char* ptr = full_directory_name; *ptr; ptr++)
-                        *ptr = (*ptr != U_BACKSLASH
-                                ? *ptr : (char) U_SLASH); // turn '\' to '/'.
-
-                    input_name_length = length;
-                    input_name = new wchar_t[input_name_length + 1];
-                    for (int k = 0; k < input_name_length; k++)
-                        input_name[k] = full_directory_name[k];
-                    input_name[input_name_length] = U_NULL;
-                    head = full_directory_name;
-                }
-            }
-
-            //
-            // Default input_name, in case we do not succeed in finding the
-            // directory.
-            //
-            if (! input_name)
-            {
-                input_name = new wchar_t[input_name_length + 1];
-                for (int j = 0; j < input_name_length; j++)
-                    input_name[j] = path_name[j];
-                input_name[input_name_length] = U_NULL;
-            }
-
-            // Reset the current directory on disk.
-            option.ResetCurrentDirectoryOnDisk(disk);
-            // Reset the real current directory...
-            option.SetMainCurrentDirectory();
-#endif // WIN32_FILE_SYSTEM
+#endif
 
             if (input_name_length > 0)
             {
@@ -831,111 +678,7 @@ void Control::ProcessExtDirs()
                         }
                         closedir(extdir);
                     }
-#elif defined(WIN32_FILE_SYSTEM)
-
-                    // +2 for "/*" +1 for '\0'
-                    char* directory_name = new char[input_name_length + 3];
-                    strcpy(directory_name, head);
-                    if (directory_name[input_name_length - 1] != U_SLASH)
-                        directory_name[input_name_length++] = U_SLASH;
-                    directory_name[input_name_length++] = U_STAR;
-                    directory_name[input_name_length] = U_NULL;
-
-                    WIN32_FIND_DATA entry;
-                    HANDLE file_handle = FindFirstFile(directory_name, &entry);
-                    if (file_handle != INVALID_HANDLE_VALUE)
-                    {
-                        do
-                        {
-                            int entry_length = strlen(entry.cFileName);
-                            // + 1 for possible '/' between path and file.
-                            int fullpath_length = input_name_length +
-                                entry_length + 1;
-                            char* ending = &(entry.cFileName[entry_length-3]);
-                            // skip ., .., and not zip or jar
-                            if ((! strcmp(entry.cFileName, "." )) ||
-                                (! strcmp(entry.cFileName, "..")) ||
-                                ( strcasecmp(ending, "zip") &&
-                                  strcasecmp(ending, "jar")))
-                            {
-                                continue;
-                            }
-
-                            char* extdir_entry = new char[fullpath_length + 1];
-                            wchar_t* extdir_entry_name =
-                                new wchar_t[fullpath_length + 1];
-                            // First put path
-                            strcpy(extdir_entry, head);
-
-                            // If no slash, add slash before copying filename.
-                            if (head[input_name_length - 1] != U_SLASH)
-                            {
-                                int path_length = input_name_length + 1;
-                                strcat(extdir_entry, U8S_SL);
-
-                                for (int i = 0; i < entry_length; i++)
-                                {
-                                    extdir_entry[i + path_length] =
-                                        entry.cFileName[i] == U_BACKSLASH
-                                        ? (char) U_SLASH : entry.cFileName[i];
-                                }
-                            }
-                            else
-                            { // If it's there, just append filename.
-                                for (int i = 0; i < entry_length; i++)
-                                {
-                                    extdir_entry[i + input_name_length] =
-                                        entry.cFileName[i] == U_BACKSLASH
-                                        ? (char) U_SLASH : entry.cFileName[i];
-                                }
-                            }
-
-                            for (int i = 0; i < fullpath_length; ++i)
-                                extdir_entry_name[i] = extdir_entry[i];
-
-                            errno = 0;
-                            Zip* zipinfo = new Zip(*this, extdir_entry);
-                            if (! zipinfo -> IsValid())
-                            {
-                                wchar_t* name =
-                                    new wchar_t[fullpath_length + 1];
-                                for (int i = 0; i < fullpath_length; ++i)
-                                    name[i] = extdir_entry_name[i];
-                                name[fullpath_length] = U_NULL;
-                                if (errno)
-                                {
-                                    const char* std_err = strerror(errno);
-                                    ErrorString err_str;
-                                    err_str << '"' << std_err << '"'
-                                            << " while trying to open "
-                                            << name;
-                                    general_io_warnings.Next() =
-                                        err_str.SafeArray();
-                                }
-                                else bad_zip_filenames.Next() = name;
-                            }
-
-                            unnamed_package -> directory.Next() =
-                                zipinfo -> RootDirectory();
-
-                            NameSymbol* extdir_entry_symbol =
-                                FindOrInsertName(extdir_entry_name,
-                                                 fullpath_length);
-                            //
-                            // Make a new PathSymbol to add to the classpath.
-                            //
-                            PathSymbol* path_symbol =
-                                classpath_table.InsertPathSymbol(extdir_entry_symbol,
-                                                                 zipinfo -> RootDirectory());
-                            path_symbol -> zipfile = zipinfo;
-                            classpath.Next() = path_symbol;
-
-                        } while (FindNextFile(file_handle, &entry));
-                        FindClose(file_handle);
-                    }
-
-                    delete [] directory_name;
-#endif // WIN32_FILE_SYSTEM
+#endif
                 }
                 else
                 {
@@ -948,10 +691,6 @@ void Control::ProcessExtDirs()
             }
         }
 
-#ifdef WIN32_FILE_SYSTEM
-        delete [] full_directory_name;
-        delete [] input_name;
-#endif
 
         delete [] path_name;
     }
@@ -966,17 +705,10 @@ void Control::ProcessClassPath()
         wchar_t* path_name = new wchar_t[max_path_name_length + 1];
 
         wchar_t* input_name = NULL;
-#ifdef WIN32_FILE_SYSTEM
-        char* full_directory_name = NULL;
-#endif
 
         for (char* path = option.classpath, *path_tail = &path[strlen(path)];
              path < path_tail; path++)
         {
-#ifdef WIN32_FILE_SYSTEM
-            delete [] full_directory_name;
-            delete [] input_name;
-#endif
             char* head;
             for (head = path; path < path_tail && *path != PathSeparator();
                  path++);
@@ -995,59 +727,7 @@ void Control::ProcessClassPath()
 
             input_name = path_name;
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-            input_name = NULL;
-            full_directory_name = NULL;
-            char disk = (input_name_length >= 2 &&
-                         Case::IsAsciiAlpha(head[0]) &&
-                         head[1] == U_COLON ? head[0] : 0);
-
-            //
-            // Look for the directory. If it is found, update input_name and
-            // head.
-            //
-            option.SaveCurrentDirectoryOnDisk(disk);
-            if (SetCurrentDirectory(head))
-            {
-                char tmp[1];
-                // First, get the right size.
-                DWORD directory_length = GetCurrentDirectory(0, tmp);
-                full_directory_name = new char[directory_length + 1];
-                DWORD length = GetCurrentDirectory(directory_length,
-                                                   full_directory_name);
-                if (length <= directory_length)
-                {
-                    for (char* ptr = full_directory_name; *ptr; ptr++)
-                        *ptr = (*ptr != U_BACKSLASH
-                                ? *ptr : (char) U_SLASH); // turn '\' to '/'.
-
-                    input_name_length = length;
-                    input_name = new wchar_t[input_name_length + 1];
-                    for (int k = 0; k < input_name_length; k++)
-                        input_name[k] = full_directory_name[k];
-                    input_name[input_name_length] = U_NULL;
-                    head = full_directory_name;
-                }
-            }
-
-            //
-            // Default input_name, in case we do not succeed in finding the
-            // directory.
-            //
-            if (! input_name)
-            {
-                input_name = new wchar_t[input_name_length + 1];
-                for (int j = 0; j < input_name_length; j++)
-                    input_name[j] = path_name[j];
-                input_name[input_name_length] = U_NULL;
-            }
-
-            // Reset the current directory on disk.
-            option.ResetCurrentDirectoryOnDisk(disk);
-            // Reset the real current directory...
-            option.SetMainCurrentDirectory();
-#endif // WIN32_FILE_SYSTEM
+#endif
 
             if (input_name_length > 0)
             {
@@ -1135,10 +815,6 @@ void Control::ProcessClassPath()
             }
         }
 
-#ifdef WIN32_FILE_SYSTEM
-        delete [] full_directory_name;
-        delete [] input_name;
-#endif
 
         delete [] path_name;
     }
@@ -1153,17 +829,10 @@ void Control::ProcessSourcePath()
         wchar_t* path_name = new wchar_t[max_path_name_length + 1];
 
         wchar_t* input_name = NULL;
-#ifdef WIN32_FILE_SYSTEM
-        char* full_directory_name = NULL;
-#endif
 
         for (char* path = option.sourcepath, *path_tail = &path[strlen(path)];
              path < path_tail; path++)
         {
-#ifdef WIN32_FILE_SYSTEM
-            delete [] full_directory_name;
-            delete [] input_name;
-#endif
             char* head;
             for (head = path; path < path_tail && *path != PathSeparator(); path++)
                 ;
@@ -1179,52 +848,7 @@ void Control::ProcessSourcePath()
 
             input_name = path_name;
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-            input_name = NULL;
-            full_directory_name = NULL;
-            char disk = (input_name_length >= 2 && Case::IsAsciiAlpha(head[0]) && head[1] == U_COLON ? head[0] : 0);
-
-            //
-            // Look for the directory. If it is found, update input_name and head.
-            //
-            option.SaveCurrentDirectoryOnDisk(disk);
-            if (SetCurrentDirectory(head))
-            {
-                char tmp[1];
-                DWORD directory_length = GetCurrentDirectory(0, tmp); // first, get the right size
-                full_directory_name = new char[directory_length + 1];  // allocate the directory
-                DWORD length = GetCurrentDirectory(directory_length, full_directory_name);
-                if (length <= directory_length)
-                {
-                    for (char* ptr = full_directory_name; *ptr; ptr++)
-                        *ptr = (*ptr != U_BACKSLASH ? *ptr : (char) U_SLASH); // turn '\' to '/'.
-
-                    input_name_length = length;
-                    input_name = new wchar_t[input_name_length + 1];
-                    for (int k = 0; k < input_name_length; k++)
-                        input_name[k] = full_directory_name[k];
-                    input_name[input_name_length] = U_NULL;
-                    head = full_directory_name;
-                }
-            }
-
-            //
-            // Default input_name, in case we do not succeed in finding the directory
-            //
-            if (! input_name)
-            {
-                input_name = new wchar_t[input_name_length + 1];
-                for (int j = 0; j < input_name_length; j++)
-                    input_name[j] = path_name[j];
-                input_name[input_name_length] = U_NULL;
-            }
-
-            // reset the current directory on disk
-            option.ResetCurrentDirectoryOnDisk(disk);
-            // reset the real current directory...
-            option.SetMainCurrentDirectory();
-#endif // WIN32_FILE_SYSTEM
+#endif
 
             //
             //
@@ -1275,10 +899,6 @@ void Control::ProcessSourcePath()
             }
         }
 
-#ifdef WIN32_FILE_SYSTEM
-        delete [] full_directory_name;
-        delete [] input_name;
-#endif
 
         delete [] path_name;
     }

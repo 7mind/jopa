@@ -1,5 +1,4 @@
-#ifndef JOPA_API_H_FLAG_
-#define JOPA_API_H_FLAG_
+#pragma once
 
 class JopaOption
 {
@@ -204,4 +203,3 @@ private:
     static JopaAPI* instance;
 };
 
-#endif // JOPA_API_H_FLAG_

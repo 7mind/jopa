@@ -1,5 +1,4 @@
-#ifndef long_INCLUDED
-#define long_INCLUDED
+#pragma once
 
 #include "platform.h"
 
@@ -293,4 +292,3 @@ public:
 
 } // Close namespace Jopa block
 
-#endif // long_INCLUDED

@@ -1,5 +1,4 @@
-#ifndef set_INCLUDED
-#define set_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "lookup.h"
@@ -1082,6 +1081,4 @@ void Map<Key, Value>::Resize()
 
 
 } // Close namespace Jopa block
-
-#endif // set_INCLUDED
 

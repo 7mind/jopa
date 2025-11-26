@@ -25,8 +25,7 @@
 //
 //
 
-#ifndef platform_INCLUDED
-#define platform_INCLUDED
+#pragma once
 
 
 #include <config.h>
@@ -89,13 +88,7 @@
 # include <unistd.h>
 #endif
 
-#ifdef HAVE_WINDOWS_H
-# include <windows.h>
-#endif
 
-#ifdef HAVE_DIRECT_H
-# include <direct.h>
-#endif
 
 #ifdef HAVE_DIRENT_H
 # include <dirent.h>
@@ -156,15 +149,11 @@ typedef unsigned int wint_t;
 // The set_new_handler method in <new> is not implemented so
 // the _set_new_handler method in <new.h> must be used.
 
-#ifdef HAVE_VCPP_SET_NEW_HANDLER
-# include <new.h>
-#else
 # ifdef HAVE_STD
 #  include <new>
 # else
 #  include <new.h>
 # endif // ! HAVE_STD
-#endif // ! HAVE_VCPP_SET_NEW_HANDLER
 
 #ifdef HAVE_STD
 # ifdef HAVE_NAMESPACES
@@ -292,11 +281,7 @@ inline TO DYNAMIC_CAST(FROM f)
 //
 void SetNewHandler();
 
-#ifdef HAVE_VCPP_SET_NEW_HANDLER
-extern int OutOfMemory(size_t);
-#else
 extern void OutOfMemory();
-#endif
 
 //
 // When using the ICC compiler on Win95 or OS/2, we need to disable
@@ -997,6 +982,4 @@ extern Ostream Coutput;
 
 
 } // Close namespace Jopa block
-
-#endif // platform_INCLUDED
 

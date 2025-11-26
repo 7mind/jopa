@@ -34,11 +34,7 @@ namespace Jopa { // Open namespace Jopa block
 // Define the PathSeparator() function with the proper
 // impl for each platform.
 
-#ifdef HAVE_PATHNAME_STYLE_DOS
-char PathSeparator() { return U_SEMICOLON; } // ";"
-#else
 char PathSeparator() { return U_COLON; } // ":"
-#endif // ! HAVE_PATHNAME_STYLE_DOS
 
 
 // Define the SystemMkdir() function with the proper
@@ -54,9 +50,6 @@ int SystemMkdir(char* dirname)
     reteurn mkdir(dirname, S_IRWXU);
 #endif // HAVE_LIBC5_MKDIR
 
-#ifdef HAVE_WIN32_MKDIR
-    return mkdir(dirname);
-#endif // HAVE_WIN32_MKDIR
 
 #ifdef HAVE_MAC_MKDIR
     return mkdir(dirname, 0);
@@ -143,26 +136,15 @@ int wcsncmp(const wchar_t* cs, const wchar_t* ct, size_t n)
 // This is tricky because VC++ on windows uses a non standard
 // implementation of the set_new_handler function.
 //
-#ifdef HAVE_VCPP_SET_NEW_HANDLER
-int OutOfMemory(size_t)
-#else
 void OutOfMemory()
-#endif // ! HAVE_VCPP_SET_NEW_HANDLER
 {
     fprintf(stderr, "***System Failure: Out of memory\n");
     exit(1);
-#ifdef HAVE_VCPP_SET_NEW_HANDLER
-    return 0;
-#endif // HAVE_VCPP_SET_NEW_HANDLER
 }
 
 void SetNewHandler()
 {
-#ifdef HAVE_VCPP_SET_NEW_HANDLER
-    _set_new_handler(OutOfMemory);
-#else
     set_new_handler(OutOfMemory);
-#endif // ! HAVE_VCPP_SET_NEW_HANDLER
 }
 
 

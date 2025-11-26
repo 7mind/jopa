@@ -1,7 +1,6 @@
 // DO NOT MODIFY THIS FILE - it is generated using jikespg on java.g.
 
-#ifndef javadcl_INCLUDED
-#define javadcl_INCLUDED
+#pragma once
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -3001,4 +3000,3 @@ const unsigned short CLASS_HEADER in_symb[] = {0,
 
 } // Close namespace Jopa block
 
-#endif /* javadcl_INCLUDED */

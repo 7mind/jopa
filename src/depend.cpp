@@ -333,8 +333,6 @@ void TypeDependenceChecker::OutputMake(FileSymbol* file_symbol)
 
 #ifdef UNIX_FILE_SYSTEM
         buf[dir_length] = (char)U_SLASH;
-#elif defined(WIN32_FILE_SYSTEM)
-        buf[dir_length] = (char)U_BACKSLASH;
 #endif
 
         strcpy(&buf[dir_length+1], name);

@@ -1,5 +1,4 @@
-#ifndef op_INCLUDED
-#define op_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -284,4 +283,3 @@ private:
 
 } // Close namespace Jopa block
 
-#endif // op_INCLUDED

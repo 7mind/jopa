@@ -1,43 +1,49 @@
 set(JOPA_SOURCES
     ast.cpp
     body.cpp
-    bytecode.cpp
     case.cpp
-    class.cpp
     code.cpp
     control.cpp
     decl.cpp
     definite.cpp
     depend.cpp
-    diagnose.cpp
     double.cpp
     dump.cpp
     error.cpp
     expr.cpp
     incrmnt.cpp
     init.cpp
-    grammar/javaact.cpp
     jikes.cpp
     jikesapi.cpp
     long.cpp
     lookup.cpp
-    lpginput.cpp
     modifier.cpp
     op.cpp
     option.cpp
     paramtype.cpp
-    parser.cpp
     platform.cpp
-    scanner.cpp
-    segment.cpp
     set.cpp
-    stream.cpp
     symbol.cpp
     system.cpp
     tab.cpp
     typeparam.cpp
     unparse.cpp
     zip.cpp
+
+    # Parser
+    parser/diagnose.cpp
+    parser/lpginput.cpp
+    parser/parser.cpp
+    parser/scanner.cpp
+    parser/stream.cpp
+
+    # Code generation
+    codegen/bytecode.cpp
+    codegen/class.cpp
+    codegen/segment.cpp
+
+    # Generated grammar
+    grammar/javaact.cpp
 )
 
 include(CheckIncludeFileCXX)
@@ -71,38 +77,21 @@ require_header(sys/types.h HAVE_SYS_TYPES_H)
 require_header(time.h HAVE_TIME_H)
 require_header(wchar.h HAVE_WCHAR_H)
 
-if(NOT WIN32)
-    require_header(dirent.h HAVE_DIRENT_H)
-    require_header(unistd.h HAVE_UNISTD_H)
-    set(UNIX_FILE_SYSTEM 1)
-    set(HAVE_GLIBC_MKDIR 1)
-    set(PATH_SEPARATOR ":")
-else()
-    check_include_file_cxx(windows.h HAVE_WINDOWS_H)
-    check_include_file_cxx(direct.h HAVE_DIRECT_H)
-    set(HAVE_WIN32_MKDIR 1)
-    set(HAVE_PATHNAME_STYLE_DOS 1)
-    set(WIN32_FILE_SYSTEM 1)
-    set(PATH_SEPARATOR ";")
-    if(MSVC)
-        set(HAVE_VCPP_SET_NEW_HANDLER 1)
-    endif()
-endif()
+require_header(dirent.h HAVE_DIRENT_H)
+require_header(unistd.h HAVE_UNISTD_H)
+set(UNIX_FILE_SYSTEM 1)
+set(HAVE_GLIBC_MKDIR 1)
+set(PATH_SEPARATOR ":")
 
 set(STDC_HEADERS 1)
 
-if(WIN32)
-    check_symbol_exists(mkdir "direct.h" HAVE_MKDIR)
-else()
-    check_symbol_exists(mkdir "sys/stat.h;unistd.h" HAVE_MKDIR)
-endif()
+check_symbol_exists(mkdir "sys/stat.h;unistd.h" HAVE_MKDIR)
 check_symbol_exists(wcslen "wchar.h" HAVE_WCSLEN)
 check_symbol_exists(wcscpy "wchar.h" HAVE_WCSCPY)
 check_symbol_exists(wcsncpy "wchar.h" HAVE_WCSNCPY)
 check_symbol_exists(wcscat "wchar.h" HAVE_WCSCAT)
 check_symbol_exists(wcscmp "wchar.h" HAVE_WCSCMP)
 check_symbol_exists(wcsncmp "wchar.h" HAVE_WCSNCMP)
-check_symbol_exists(cygwin_win32_to_posix_path_list "sys/cygwin.h" HAVE_CYGWIN_WIN32_TO_POSIX_PATH_LIST)
 
 check_type_size("wchar_t" SIZEOF_WCHAR_T LANGUAGE CXX)
 if(NOT SIZEOF_WCHAR_T)
@@ -216,6 +205,8 @@ configure_file(
 add_executable(jopa ${JOPA_SOURCES})
 target_include_directories(jopa PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/parser"
+    "${CMAKE_CURRENT_SOURCE_DIR}/codegen"
     "${CMAKE_BINARY_DIR}/generated"
 )
 target_link_libraries(jopa PRIVATE ${JOPA_LIBS})

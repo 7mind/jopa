@@ -1,5 +1,4 @@
-#ifndef tab_INCLUDED
-#define tab_INCLUDED
+#pragma once
 
 #include "platform.h"
 
@@ -21,6 +20,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // tab_INCLUDED
 

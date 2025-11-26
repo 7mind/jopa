@@ -1,5 +1,4 @@
-#ifndef class_INCLUDED
-#define class_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "access.h"
@@ -3209,6 +3208,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // class_INCLUDED
 

@@ -1,5 +1,4 @@
-#ifndef option_INCLUDED
-#define option_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -80,34 +79,6 @@ private:
 class Option: public JopaOption
 {
 
-#ifdef WIN32_FILE_SYSTEM
-    char main_disk, *current_directory[128];
-
-public:
-
-    bool BadMainDisk() { return main_disk == 0; }
-
-    void ResetCurrentDirectoryOnDisk(char d)
-    {
-        if (d != 0)
-        {
-            assert(current_directory[d]);
-            SetCurrentDirectory(current_directory[d]);
-        }
-    }
-    void SetMainCurrentDirectory()
-    {
-        SetCurrentDirectory(current_directory[main_disk]);
-    }
-
-    char *GetMainCurrentDirectory()
-    {
-        return current_directory[main_disk];
-    }
-
-    void SaveCurrentDirectoryOnDisk(char c);
-
-#endif // WIN32_FILE_SYSTEM
 
 public:
 
@@ -148,6 +119,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // option_INCLUDED
 

@@ -1,5 +1,4 @@
-#ifndef case_INCLUDED
-#define case_INCLUDED
+#pragma once
 
 #include "platform.h"
 
@@ -192,6 +191,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // case_INCLUDED
 

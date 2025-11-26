@@ -1112,11 +1112,7 @@ void SemanticError::FormatError(ErrorInfo& err)
                 break;
             case 'F': // A .class or .java file name
                 FormatFile(err, s, *p++,
-#ifdef WIN32_FILE_SYSTEM
-                           U_BACKSLASH
-#else
                            U_SLASH
-#endif
                            );
                 break;
             case 'L':
