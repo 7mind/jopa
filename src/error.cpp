@@ -1665,6 +1665,8 @@ void SemanticError::InitializeMessages()
         "The type of this expression, \"%T1\", is not numeric.";
     messages[TYPE_NOT_INTEGER] =
         "The type of this expression, \"%T1\", is not assignable to \"int\".";
+    messages[TYPE_NOT_STRING] =
+        "The type of this expression, \"%T1\", is not \"java.lang.String\".";
     messages[TYPE_NOT_BOOLEAN] =
         "The type of this expression, \"%T1\", is not \"boolean\".";
     messages[TYPE_NOT_ARRAY] =

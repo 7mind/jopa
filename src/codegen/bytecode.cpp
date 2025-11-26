@@ -1788,6 +1788,14 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
     assert(stack_depth == 0); // stack empty at start of statement
 
     //
+    // String switches require special handling
+    //
+    if (switch_statement -> is_string_switch)
+    {
+        return EmitStringSwitchStatement(switch_statement);
+    }
+
+    //
     // Optimization: When switching on a constant, emit only those blocks
     // that it will flow through.
     // switch (constant) { ... } => single code path
@@ -2053,6 +2061,225 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
     delete [] case_labels;
     method_stack -> Pop();
     assert(abrupt || switch_statement -> can_complete_normally);
+    return abrupt;
+}
+
+
+bool ByteCode::EmitStringSwitchStatement(AstSwitchStatement* switch_statement)
+{
+    AstBlock* switch_block = switch_statement -> switch_block;
+    u2 op_start = code_attribute -> CodeLength();
+    unsigned i;
+    bool abrupt;
+
+    assert(stack_depth == 0);
+
+    if (! switch_statement -> NumBlocks())
+    {
+        EmitExpression(switch_statement -> expression, false);
+        return false;
+    }
+
+    method_stack -> Push(switch_block);
+
+    line_number_table_attribute ->
+        AddLineNumber(code_attribute -> CodeLength(),
+                      semantic.lex_stream -> Line(switch_statement ->
+                                                  expression -> LeftToken()));
+
+    EmitExpression(switch_statement -> expression);
+
+    u2 string_var = switch_block -> block_symbol -> helper_variable_index;
+
+    if (string_var <= 3)
+        PutOp((Opcode) (OP_ASTORE_0 + string_var));
+    else
+        PutOpWide(OP_ASTORE, string_var);
+
+    Label default_jump_label;
+
+    if (string_var <= 3)
+        PutOp((Opcode) (OP_ALOAD_0 + string_var));
+    else
+        PutOpWide(OP_ALOAD, string_var);
+    EmitBranch(OP_IFNULL, default_jump_label, switch_block);
+
+    if (string_var <= 3)
+        PutOp((Opcode) (OP_ALOAD_0 + string_var));
+    else
+        PutOpWide(OP_ALOAD, string_var);
+    PutOp(OP_INVOKEVIRTUAL);
+    PutU2(RegisterLibraryMethodref(control.String_hashCodeMethod()));
+    ChangeStack(1);
+
+    unsigned ncases = switch_statement -> NumCases();
+    unsigned nlabels = ncases;
+    i4 high = 0, low = 0;
+    bool use_lookup = true;
+
+    if (ncases)
+    {
+        low = switch_statement -> Case(0) -> value;
+        high = switch_statement -> Case(ncases - 1) -> value;
+        i4 range = high - low + 1;
+        if (range > 0 && (unsigned) range < (ncases * 2 + 8))
+        {
+            use_lookup = false;
+            nlabels = range;
+        }
+    }
+
+    PutOp(use_lookup ? OP_LOOKUPSWITCH : OP_TABLESWITCH);
+    u2 switch_op_start = last_op_pc;
+
+    while (code_attribute -> CodeLength() % 4 != 0)
+        PutU1(0);
+
+    Label* hash_labels = new Label[nlabels + 1];
+    UseLabel(hash_labels[nlabels], 4,
+             code_attribute -> CodeLength() - switch_op_start);
+
+    if (use_lookup)
+    {
+        PutU4(ncases);
+        for (i = 0; i < ncases; i++)
+        {
+            PutU4(switch_statement -> Case(i) -> value);
+            UseLabel(hash_labels[i], 4,
+                     code_attribute -> CodeLength() - switch_op_start);
+        }
+    }
+    else
+    {
+        PutU4(low);
+        PutU4(high);
+        unsigned j = 0;
+        for (i4 k = low; k <= high; k++, j++)
+        {
+            while (j < ncases && switch_statement -> Case(j) -> value < k)
+                j++;
+            if (j < ncases && switch_statement -> Case(j) -> value == k)
+            {
+                UseLabel(hash_labels[j], 4,
+                         code_attribute -> CodeLength() - switch_op_start);
+            }
+            else
+            {
+                UseLabel(hash_labels[nlabels], 4,
+                         code_attribute -> CodeLength() - switch_op_start);
+            }
+        }
+    }
+
+    Label* case_labels = new Label[switch_statement -> NumCases() + 1];
+
+    for (i = 0; i < ncases; i++)
+    {
+        DefineLabel(hash_labels[i]);
+        CompleteLabel(hash_labels[i]);
+
+        unsigned j = i;
+        while (j < ncases && switch_statement -> Case(j) -> value ==
+               switch_statement -> Case(i) -> value)
+        {
+            CaseElement* case_elt = switch_statement -> Case(j);
+            AstSwitchLabel* label = switch_statement ->
+                Block(case_elt -> block_index) ->
+                SwitchLabel(case_elt -> case_index);
+
+            if (string_var <= 3)
+                PutOp((Opcode) (OP_ALOAD_0 + string_var));
+            else
+                PutOpWide(OP_ALOAD, string_var);
+
+            Utf8LiteralValue* str_value = DYNAMIC_CAST<Utf8LiteralValue*>
+                (label -> expression_opt -> value);
+            PutOp(OP_LDC_W);
+            PutU2(RegisterString(str_value));
+            // Note: LDC_W already adds +1 to stack via PutOp
+
+            PutOp(OP_INVOKEVIRTUAL);
+            PutU2(RegisterLibraryMethodref(control.String_equalsMethod()));
+            // equals(Object)Z: default -1 for receiver, 0 adjustment needed
+            // (arg -1 + return +1 = 0)
+
+            EmitBranch(OP_IFNE, case_labels[j], switch_block);
+            j++;
+        }
+        i = j - 1;
+        EmitBranch(OP_GOTO, hash_labels[nlabels], switch_block);
+    }
+
+    // Emit case bodies in order. Define labels at the appropriate positions.
+    abrupt = false;
+    for (unsigned block_idx = 0; block_idx < switch_block -> NumStatements();
+         block_idx++)
+    {
+        AstSwitchBlockStatement* switch_block_stmt =
+            switch_statement -> Block(block_idx);
+
+        for (unsigned label_idx = 0;
+             label_idx < switch_block_stmt -> NumSwitchLabels(); label_idx++)
+        {
+            AstSwitchLabel* switch_label =
+                switch_block_stmt -> SwitchLabel(label_idx);
+            if (switch_label -> expression_opt)
+            {
+                // Non-default case: define case label
+                DefineLabel(case_labels[switch_label -> map_index]);
+                CompleteLabel(case_labels[switch_label -> map_index]);
+            }
+            else
+            {
+                // Default case: define hash no-match and null-check labels here
+                DefineLabel(hash_labels[nlabels]);
+                CompleteLabel(hash_labels[nlabels]);
+                DefineLabel(default_jump_label);
+                CompleteLabel(default_jump_label);
+            }
+        }
+
+        abrupt = EmitSwitchBlockStatement(switch_block_stmt, false);
+    }
+
+    CloseSwitchLocalVariables(switch_block, op_start);
+
+    // Complete any undefined case labels (and no-match/default if no default case)
+    for (i = 0; i < ncases; i++)
+    {
+        if (! case_labels[i].defined)
+        {
+            abrupt = false;
+            DefineLabel(case_labels[i]);
+        }
+        CompleteLabel(case_labels[i]);
+    }
+
+    // If no default case was defined, define the no-match and null labels here
+    if (! hash_labels[nlabels].defined)
+    {
+        DefineLabel(hash_labels[nlabels]);
+        abrupt = false;
+    }
+    CompleteLabel(hash_labels[nlabels]);
+
+    if (! default_jump_label.defined)
+    {
+        DefineLabel(default_jump_label);
+        abrupt = false;
+    }
+    CompleteLabel(default_jump_label);
+
+    if (IsLabelUsed(method_stack -> TopBreakLabel()))
+    {
+        DefineLabel(method_stack -> TopBreakLabel());
+        CompleteLabel(method_stack -> TopBreakLabel());
+        abrupt = false;
+    }
+
+    delete [] hash_labels;
+    delete [] case_labels;
+    method_stack -> Pop();
     return abrupt;
 }
 

@@ -527,6 +527,8 @@ AttributeInfo::AttributeInfoTag AttributeInfo::Tag(const CPUtf8Info* name)
     case 13:
         if (! strcmp(name -> Bytes(), StringConstant::U8S_ConstantValue))
             return ATTRIBUTE_ConstantValue;
+        if (! strcmp(name -> Bytes(), StringConstant::U8S_StackMapTable))
+            return ATTRIBUTE_StackMapTable;
         break;
     case 15:
         if (! strcmp(name -> Bytes(), StringConstant::U8S_LineNumberTable))
@@ -608,6 +610,9 @@ AttributeInfo* AttributeInfo::AllocateAttributeInfo(ClassFile& buffer)
         return new LocalVariableTableAttribute(buffer, true);
     case ATTRIBUTE_StackMap:
         return new StackMapAttribute(buffer);
+    case ATTRIBUTE_StackMapTable:
+        // TODO: Add proper StackMapTable reading support
+        return new GenericAttribute(buffer);
     case ATTRIBUTE_RuntimeVisibleAnnotations:
         return new AnnotationsAttribute(buffer, true);
     case ATTRIBUTE_RuntimeInvisibleAnnotations:

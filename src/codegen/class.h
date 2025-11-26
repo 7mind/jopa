@@ -753,6 +753,7 @@ public:
         ATTRIBUTE_EnclosingMethod, // defined in JSR 14
         ATTRIBUTE_LocalVariableTypeTable, // defined in JSR 14
         ATTRIBUTE_StackMap, // defined in JSR 139
+        ATTRIBUTE_StackMapTable, // defined in JSR 202 (Java SE 6+)
         ATTRIBUTE_RuntimeVisibleAnnotations, // defined in JSR 175
         ATTRIBUTE_RuntimeInvisibleAnnotations, // defined in JSR 175
         ATTRIBUTE_RuntimeVisibleParameterAnnotations, // defined in JSR 175

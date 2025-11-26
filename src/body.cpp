@@ -807,7 +807,22 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
     ProcessExpression(switch_statement -> expression);
     TypeSymbol* type = switch_statement -> expression -> Type();
 
-    if (! control.IsSimpleIntegerValueType(type) && type != control.no_type)
+    bool is_string_switch = (type == control.String());
+    switch_statement -> is_string_switch = is_string_switch;
+
+    if (is_string_switch)
+    {
+        if (main_block -> helper_variable_index < 0)
+        {
+            main_block -> helper_variable_index =
+                main_block -> max_variable_index;
+            main_block -> max_variable_index++;
+        }
+    }
+
+    if (! control.IsSimpleIntegerValueType(type) &&
+        type != control.String() &&
+        type != control.no_type)
     {
         ReportSemError(SemanticError::TYPE_NOT_INTEGER,
                        switch_statement -> expression,
@@ -844,7 +859,39 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
                     switch_label -> expression_opt -> Type();
                 if (case_type == control.no_type)
                     continue;
-                if (! control.IsSimpleIntegerValueType(case_type))
+
+                if (is_string_switch)
+                {
+                    if (case_type != control.String())
+                    {
+                        ReportSemError(SemanticError::TYPE_NOT_STRING,
+                                       switch_label -> expression_opt,
+                                       case_type -> ContainingPackageName(),
+                                       case_type -> ExternalName());
+                        switch_label -> expression_opt -> symbol = control.no_type;
+                    }
+                    else if (! switch_label -> expression_opt -> IsConstant())
+                    {
+                        ReportSemError(SemanticError::EXPRESSION_NOT_CONSTANT,
+                                       switch_label -> expression_opt);
+                        switch_label -> expression_opt -> symbol = control.no_type;
+                    }
+                    else
+                    {
+                        Utf8LiteralValue* str_value = DYNAMIC_CAST<Utf8LiteralValue*>
+                            (switch_label -> expression_opt -> value);
+                        CaseElement* case_element =
+                            compilation_unit -> ast_pool -> GenCaseElement(j, k);
+                        switch_statement -> AddCase(case_element);
+                        i4 hash_code = 0;
+                        for (int i = 0; i < str_value -> length; i++)
+                            hash_code = 31 * hash_code + (unsigned char)str_value -> value[i];
+                        case_element -> value = hash_code;
+                        case_element -> string_value = lex_stream ->
+                            NameString(switch_label -> expression_opt -> LeftToken());
+                    }
+                }
+                else if (! control.IsSimpleIntegerValueType(case_type))
                 {
                     ReportSemError(SemanticError::TYPE_NOT_INTEGER,
                                    switch_label -> expression_opt,
@@ -868,6 +915,7 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
                     switch_statement -> AddCase(case_element);
                     case_element -> value = DYNAMIC_CAST<IntLiteralValue*>
                         (switch_label -> expression_opt -> value) -> value;
+                    case_element -> string_value = NULL;
                 }
                 else
                 {

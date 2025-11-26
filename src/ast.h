@@ -2849,7 +2849,8 @@ struct CaseElement
 {
     unsigned block_index; // which SwitchBlockStatement
     unsigned case_index; // which case label within the block
-    i4 value; // the value of the case's expression
+    i4 value; // the value of the case's expression (or hash code for strings)
+    const wchar_t* string_value; // for string switches, the string literal value
 
     //
     // This keeps the sort stable, so that duplicates stay later in the list.
@@ -2886,10 +2887,12 @@ public:
     TokenIndex switch_token;
     AstExpression* expression;
     AstBlock* switch_block;
+    bool is_string_switch; // true if switching on String type
 
     inline AstSwitchStatement(StoragePool* p)
         : AstStatement(SWITCH)
         , pool(p)
+        , is_string_switch(false)
     {}
     ~AstSwitchStatement() {}
 

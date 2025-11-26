@@ -292,6 +292,7 @@ public:
         TYPE_NOT_INTEGRAL,
         TYPE_NOT_NUMERIC,
         TYPE_NOT_INTEGER,
+        TYPE_NOT_STRING,
         TYPE_NOT_BOOLEAN,
         TYPE_NOT_ARRAY,
         TYPE_NOT_REFERENCE,

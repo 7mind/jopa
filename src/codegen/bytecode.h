@@ -911,6 +911,7 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
     bool EmitBlockStatement(AstBlock*);
     void EmitStatementExpression(AstExpression*);
     bool EmitSwitchStatement(AstSwitchStatement*);
+    bool EmitStringSwitchStatement(AstSwitchStatement*);
     bool EmitSwitchBlockStatement(AstSwitchBlockStatement*, bool);
     void CloseSwitchLocalVariables(AstBlock*, u2 op_start);
     void EmitTryStatement(AstTryStatement*);
