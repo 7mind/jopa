@@ -11,6 +11,17 @@ option(JOPA_PARSER_TESTS_JDK8 "Enable JDK8 parser tests" ON)
 # Option to enable/disable JVM validation tests
 option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
 
+# Option to use -noverify flag for JVM tests
+# Required until StackMapTable generation is implemented for Java 7+ bytecode
+option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" ON)
+
+# Set up JVM flags based on options
+if(JOPA_USE_NOVERIFY)
+    set(JVM_TEST_FLAGS "-noverify")
+else()
+    set(JVM_TEST_FLAGS "")
+endif()
+
 # Find Java for runtime tests (only if JVM tests are enabled)
 if(JOPA_ENABLE_JVM_TESTS)
     find_package(Java COMPONENTS Runtime Development REQUIRED)
@@ -80,7 +91,7 @@ function(add_jopa_run_test test_name source_file main_class)
         # Runtime test
         add_test(
             NAME "run_${test_name}"
-            COMMAND ${Java_JAVA_EXECUTABLE} -cp "${TEST_OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
+            COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${TEST_OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
         )
         set_tests_properties("run_${test_name}" PROPERTIES
             LABELS "run"
@@ -107,7 +118,7 @@ set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_EnumMethodsTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${EnumMethodsTest_OUTPUT}:${RUNTIME_JAR}" "EnumMethodsTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${EnumMethodsTest_OUTPUT}:${RUNTIME_JAR}" "EnumMethodsTest"
     )
     set_tests_properties("run_EnumMethodsTest" PROPERTIES
         LABELS "run"
@@ -185,7 +196,7 @@ set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_SimpleJava6Test"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${SimpleJava6Test_OUTPUT}:${RUNTIME_JAR}" "SimpleJava6Test"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${SimpleJava6Test_OUTPUT}:${RUNTIME_JAR}" "SimpleJava6Test"
     )
     set_tests_properties("run_SimpleJava6Test" PROPERTIES
         LABELS "run"
@@ -208,7 +219,7 @@ set_tests_properties("compile_ReflectionBasicTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_ReflectionBasicTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${ReflectionBasicTest_OUTPUT}" "ReflectionBasicTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${ReflectionBasicTest_OUTPUT}" "ReflectionBasicTest"
     )
     set_tests_properties("run_ReflectionBasicTest" PROPERTIES
         LABELS "run"
@@ -216,12 +227,16 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
 endif()
 
-# Java 7 Tests (bytecode version 51.0 with diamond operator)
+# Java 7 Tests
+# Note: Using -target 1.6 to emit Java 6 bytecode (v50.0) which doesn't require StackMapTable.
+# This allows tests to run without -noverify until StackMapTable is implemented.
+
+# Diamond Operator Test
 set(DiamondTest_OUTPUT "${OUTPUT_DIR}/DiamondTest")
 file(MAKE_DIRECTORY "${DiamondTest_OUTPUT}")
 add_test(
     NAME "compile_DiamondTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.7
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DiamondTest_OUTPUT}"
@@ -229,14 +244,83 @@ add_test(
 )
 set_tests_properties("compile_DiamondTest" PROPERTIES LABELS "compile;java7")
 if(JOPA_ENABLE_JVM_TESTS)
-    # Use -noverify because StackMapTable is not yet implemented for Java 7+ bytecode
+    add_test(
+        NAME "validate_DiamondTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${DiamondTest_OUTPUT}/DiamondTest.class"
+    )
+    set_tests_properties("validate_DiamondTest" PROPERTIES
+        LABELS "validate;java7"
+        DEPENDS "compile_DiamondTest"
+    )
     add_test(
         NAME "run_DiamondTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${DiamondTest_OUTPUT}:${RUNTIME_JAR}" "DiamondTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${DiamondTest_OUTPUT}:${RUNTIME_JAR}" "DiamondTest"
     )
     set_tests_properties("run_DiamondTest" PROPERTIES
         LABELS "run;java7"
-        DEPENDS "compile_DiamondTest"
+        DEPENDS "validate_DiamondTest"
+    )
+endif()
+
+# Multi-Catch Test
+set(MultiCatchTest_OUTPUT "${OUTPUT_DIR}/MultiCatchTest")
+file(MAKE_DIRECTORY "${MultiCatchTest_OUTPUT}")
+add_test(
+    NAME "compile_MultiCatchTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${MultiCatchTest_OUTPUT}"
+            "${TEST_DIR}/java7/MultiCatchTest.java"
+)
+set_tests_properties("compile_MultiCatchTest" PROPERTIES LABELS "compile;java7")
+if(JOPA_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "validate_MultiCatchTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${MultiCatchTest_OUTPUT}/MultiCatchTest.class"
+    )
+    set_tests_properties("validate_MultiCatchTest" PROPERTIES
+        LABELS "validate;java7"
+        DEPENDS "compile_MultiCatchTest"
+    )
+    add_test(
+        NAME "run_MultiCatchTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${MultiCatchTest_OUTPUT}:${RUNTIME_JAR}" "MultiCatchTest"
+    )
+    set_tests_properties("run_MultiCatchTest" PROPERTIES
+        LABELS "run;java7"
+        DEPENDS "validate_MultiCatchTest"
+    )
+endif()
+
+# Try-with-resources Test
+set(TryWithResourcesTest_OUTPUT "${OUTPUT_DIR}/TryWithResourcesTest")
+file(MAKE_DIRECTORY "${TryWithResourcesTest_OUTPUT}")
+add_test(
+    NAME "compile_TryWithResourcesTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${TryWithResourcesTest_OUTPUT}"
+            "${TEST_DIR}/java7/TryWithResourcesTest.java"
+)
+set_tests_properties("compile_TryWithResourcesTest" PROPERTIES LABELS "compile;java7")
+if(JOPA_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "validate_TryWithResourcesTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${TryWithResourcesTest_OUTPUT}/TryWithResourcesTest.class"
+    )
+    set_tests_properties("validate_TryWithResourcesTest" PROPERTIES
+        LABELS "validate;java7"
+        DEPENDS "compile_TryWithResourcesTest"
+    )
+    add_test(
+        NAME "run_TryWithResourcesTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${TryWithResourcesTest_OUTPUT}:${RUNTIME_JAR}" "TryWithResourcesTest"
+    )
+    set_tests_properties("run_TryWithResourcesTest" PROPERTIES
+        LABELS "run;java7"
+        DEPENDS "validate_TryWithResourcesTest"
     )
 endif()
 
@@ -253,23 +337,32 @@ add_test(
 )
 set_tests_properties("compile_StringSwitchTest" PROPERTIES LABELS "compile;java7")
 if(JOPA_ENABLE_JVM_TESTS)
-    # Using -target 1.6 avoids need for StackMapTable
+    add_test(
+        NAME "validate_StringSwitchTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${StringSwitchTest_OUTPUT}/StringSwitchTest.class"
+    )
+    set_tests_properties("validate_StringSwitchTest" PROPERTIES
+        LABELS "validate;java7"
+        DEPENDS "compile_StringSwitchTest"
+    )
     add_test(
         NAME "run_StringSwitchTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${StringSwitchTest_OUTPUT}:${RUNTIME_JAR}" "StringSwitchTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${StringSwitchTest_OUTPUT}:${RUNTIME_JAR}" "StringSwitchTest"
     )
     set_tests_properties("run_StringSwitchTest" PROPERTIES
         LABELS "run;java7"
-        DEPENDS "compile_StringSwitchTest"
+        DEPENDS "validate_StringSwitchTest"
     )
 endif()
 
-# Java 8 Tests (bytecode version 52.0 with default methods)
+# Java 8 Tests
+# Note: Using -target 1.6 to emit Java 6 bytecode (v50.0) which doesn't require StackMapTable.
+# This allows tests to run without -noverify until StackMapTable is implemented.
 set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
+    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.6
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DefaultMethodTest_OUTPUT}"
@@ -277,14 +370,21 @@ add_test(
 )
 set_tests_properties("compile_DefaultMethodTest" PROPERTIES LABELS "compile;java8")
 if(JOPA_ENABLE_JVM_TESTS)
-    # Use -noverify because StackMapTable is not yet implemented for Java 8 bytecode
+    add_test(
+        NAME "validate_DefaultMethodTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${DefaultMethodTest_OUTPUT}/DefaultMethodTest.class"
+    )
+    set_tests_properties("validate_DefaultMethodTest" PROPERTIES
+        LABELS "validate;java8"
+        DEPENDS "compile_DefaultMethodTest"
+    )
     add_test(
         NAME "run_DefaultMethodTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} -noverify -cp "${DefaultMethodTest_OUTPUT}:${RUNTIME_JAR}" "DefaultMethodTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${DefaultMethodTest_OUTPUT}:${RUNTIME_JAR}" "DefaultMethodTest"
     )
     set_tests_properties("run_DefaultMethodTest" PROPERTIES
         LABELS "run;java8"
-        DEPENDS "compile_DefaultMethodTest"
+        DEPENDS "validate_DefaultMethodTest"
     )
 endif()
 
