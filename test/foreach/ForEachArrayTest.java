@@ -1,51 +1,75 @@
 // Test enhanced for-loop with arrays
 
 public class ForEachArrayTest {
-    public void testIntArray() {
+    public static int testIntArray() {
         int[] numbers = {1, 2, 3, 4, 5};
         int sum = 0;
 
         for (int num : numbers) {
             sum = sum + num;
         }
+        return sum;
     }
 
-    public void testStringArray() {
+    public static int testStringArray() {
         String[] names = {"Alice", "Bob", "Charlie"};
+        int count = 0;
 
         for (String name : names) {
-            // Process name
+            count++;
         }
+        return count;
     }
 
-    public void testObjectArray() {
-        Object[] objects = new Object[3];
-
-        for (Object obj : objects) {
-            // Process object
-        }
-    }
-
-    public void testNestedLoop() {
+    public static int testNestedLoop() {
         int[][] matrix = {{1, 2}, {3, 4}};
+        int sum = 0;
 
         for (int[] row : matrix) {
             for (int value : row) {
-                // Process value
+                sum = sum + value;
             }
         }
+        return sum;
     }
 
-    public void testBreakContinue() {
+    public static int testBreakContinue() {
         int[] numbers = {1, 2, 3, 4, 5};
+        int sum = 0;
 
         for (int num : numbers) {
             if (num == 3) {
                 continue;
             }
-            if (num == 4) {
+            if (num == 5) {
                 break;
             }
+            sum = sum + num;
         }
+        return sum;  // Should be 1+2+4 = 7
+    }
+
+    public static void main(String[] args) {
+        if (testIntArray() != 15) {
+            System.out.println("FAIL: testIntArray");
+            System.exit(1);
+        }
+
+        if (testStringArray() != 3) {
+            System.out.println("FAIL: testStringArray");
+            System.exit(1);
+        }
+
+        if (testNestedLoop() != 10) {
+            System.out.println("FAIL: testNestedLoop");
+            System.exit(1);
+        }
+
+        if (testBreakContinue() != 7) {
+            System.out.println("FAIL: testBreakContinue");
+            System.exit(1);
+        }
+
+        System.out.println("PASS: ForEachArrayTest passed");
     }
 }

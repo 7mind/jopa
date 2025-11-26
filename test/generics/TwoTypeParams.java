@@ -14,4 +14,15 @@ public class TwoTypeParams<K, V> {
     public V getValue() {
         return value;
     }
+
+    public static void main(String[] args) {
+        TwoTypeParams<String, Integer> pair = new TwoTypeParams<String, Integer>("key", Integer.valueOf(42));
+        Object k = pair.getKey();
+        Object v = pair.getValue();
+        if (k == null || v == null) {
+            System.out.println("FAIL: getKey or getValue returned null");
+            System.exit(1);
+        }
+        System.out.println("PASS: TwoTypeParams works");
+    }
 }

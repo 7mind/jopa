@@ -1,52 +1,75 @@
 // Test generic methods
 
-class Container<T> {
+class GMContainer<T> {
     T value;
 
-    Container(T v) {
+    GMContainer(T v) {
         value = v;
+    }
+
+    T get() {
+        return value;
     }
 }
 
-class GenericMethodTest {
-    // Generic method with single type parameter
+class GMTestNumber {
+    int value;
+    GMTestNumber() { value = 0; }
+}
+
+class GenericMethodHelper {
+    // Generic method with single type parameter (erases to Object)
     static <T> T identity(T arg) {
         return arg;
     }
 
     // Generic method with multiple type parameters
-    static <K, V> Container<K> firstOfPair(K key, V value) {
-        return new Container<K>(key);
+    static <K, V> GMContainer<K> firstOfPair(K key, V value) {
+        return new GMContainer<K>(key);
     }
 
-    // Generic method with bounded type parameter
-    static <T extends TestNumber> T max(T a, T b) {
+    // Generic method with bounded type parameter (erases to GMTestNumber)
+    static <T extends GMTestNumber> T max(T a, T b) {
         return a;  // Simplified - would need actual comparison
     }
 
     // Instance generic method
-    <E> void processElement(E element) {
-        // Process element
-    }
-
-    // Generic method that uses class type parameter and method type parameter
-    <E> void combine(E methodParam) {
-        // Can use both E (method type param) here
+    <E> E processElement(E element) {
+        return element;
     }
 }
 
-class TestNumber {
-    int value;
-}
-
-class TestGenericMethods {
-    void test() {
+public class GenericMethods {
+    public static void main(String[] args) {
         // Call generic methods
-        Object obj = GenericMethodTest.identity(new Object());
-        Container<Object> c = GenericMethodTest.firstOfPair(new Object(), new Object());
+        Object obj = GenericMethodHelper.identity(new Object());
+        if (obj == null) {
+            System.out.println("FAIL: identity returned null");
+            System.exit(1);
+        }
 
-        GenericMethodTest gmt = new GenericMethodTest();
-        gmt.processElement(new Object());
-        gmt.combine(new Object());
+        GMContainer<Object> c = GenericMethodHelper.firstOfPair(new Object(), new Object());
+        if (c == null || c.get() == null) {
+            System.out.println("FAIL: firstOfPair returned null");
+            System.exit(1);
+        }
+
+        // Test bounded generic method
+        GMTestNumber tn = new GMTestNumber();
+        GMTestNumber result = GenericMethodHelper.max(tn, tn);
+        if (result == null) {
+            System.out.println("FAIL: max returned null");
+            System.exit(1);
+        }
+
+        // Test instance generic method
+        GenericMethodHelper gmt = new GenericMethodHelper();
+        Object processed = gmt.processElement(new Object());
+        if (processed == null) {
+            System.out.println("FAIL: processElement returned null");
+            System.exit(1);
+        }
+
+        System.out.println("PASS: GenericMethods work");
     }
 }

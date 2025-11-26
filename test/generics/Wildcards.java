@@ -1,9 +1,9 @@
 // Test wildcard types
 
-class Container<T> {
+class WildcardContainer<T> {
     T item;
 
-    Container(T item) {
+    WildcardContainer(T item) {
         this.item = item;
     }
 
@@ -12,30 +12,43 @@ class Container<T> {
     }
 }
 
-class TestWildcards {
-    // Unbounded wildcard: ? erases to Object
-    Container<?> unbounded;
+class WildcardTestNumber {
+    int value;
+    WildcardTestNumber() { value = 0; }
+}
 
-    // Upper bounded wildcard: ? extends TestNumber erases to TestNumber
-    Container<? extends TestNumber> upperBounded;
-
-    // Lower bounded wildcard: ? super TestInteger erases to Object
-    Container<? super TestInteger> lowerBounded;
-
-    void test() {
-        // Local variables with wildcards
-        Container<?> c1 = new Container<Object>(new Object());
-        Container<? extends TestNumber> c2 = new Container<TestNumber>(new TestInteger(42));
-        Container<? super TestInteger> c3 = new Container<Object>(new Object());
+class WildcardTestInteger extends WildcardTestNumber {
+    WildcardTestInteger(int v) {
+        value = v;
     }
 }
 
-class TestNumber {
-    int value;
-}
+public class Wildcards {
+    public static void main(String[] args) {
+        // Unbounded wildcard: ? erases to Object
+        WildcardContainer<?> c1 = new WildcardContainer<Object>(new Object());
+        Object o1 = c1.get();
+        if (o1 == null) {
+            System.out.println("FAIL: unbounded wildcard get returned null");
+            System.exit(1);
+        }
 
-class TestInteger extends TestNumber {
-    TestInteger(int v) {
-        value = v;
+        // Upper bounded wildcard: ? extends WildcardTestNumber erases to WildcardTestNumber
+        WildcardContainer<? extends WildcardTestNumber> c2 = new WildcardContainer<WildcardTestNumber>(new WildcardTestInteger(42));
+        WildcardTestNumber n = c2.get();
+        if (n == null) {
+            System.out.println("FAIL: upper bounded wildcard get returned null");
+            System.exit(1);
+        }
+
+        // Lower bounded wildcard: ? super WildcardTestInteger erases to Object
+        WildcardContainer<? super WildcardTestInteger> c3 = new WildcardContainer<Object>(new Object());
+        Object o3 = c3.get();
+        if (o3 == null) {
+            System.out.println("FAIL: lower bounded wildcard get returned null");
+            System.exit(1);
+        }
+
+        System.out.println("PASS: Wildcards work");
     }
 }

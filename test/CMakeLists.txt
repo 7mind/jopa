@@ -50,25 +50,6 @@ set(RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/runtime")
 set(RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
 set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
-# Helper function to add a compile-only test
-# Usage: add_jopa_compile_test(test_name source_file [extra_sources...])
-# Each test gets its own output directory to avoid class file collisions
-function(add_jopa_compile_test test_name source_file)
-    set(TEST_OUTPUT_DIR "${OUTPUT_DIR}/${test_name}")
-    file(MAKE_DIRECTORY "${TEST_OUTPUT_DIR}")
-    add_test(
-        NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
-                -sourcepath "${TEST_DIR}"
-                -classpath "${RUNTIME_JAR}"
-                -d "${TEST_OUTPUT_DIR}"
-                "${source_file}" ${ARGN}
-    )
-    set_tests_properties("compile_${test_name}" PROPERTIES
-        LABELS "compile"
-    )
-endfunction()
-
 # Helper function to add a compile+run test
 # Usage: add_jopa_run_test(test_name source_file main_class [extra_sources...])
 # Each test gets its own output directory to avoid class file collisions
@@ -113,7 +94,7 @@ function(add_jopa_run_test test_name source_file main_class)
 endfunction()
 
 # Enum Tests
-add_jopa_compile_test(Color "${TEST_DIR}/enums/Color.java")
+add_jopa_run_test(Color "${TEST_DIR}/enums/Color.java" "Color")
 add_jopa_run_test(ColorTest "${TEST_DIR}/enums/ColorTest.java" "ColorTest" "${TEST_DIR}/enums/Color.java")
 set(EnumMethodsTest_OUTPUT "${OUTPUT_DIR}/EnumMethodsTest")
 file(MAKE_DIRECTORY "${EnumMethodsTest_OUTPUT}")
@@ -140,26 +121,26 @@ endif()
 
 # Varargs Tests
 add_jopa_run_test(VarargsTest "${TEST_DIR}/varargs/VarargsTest.java" "VarargsTest")
-add_jopa_compile_test(VarargsImplicitTest "${TEST_DIR}/varargs/VarargsImplicitTest.java")
+add_jopa_run_test(VarargsImplicitTest "${TEST_DIR}/varargs/VarargsImplicitTest.java" "VarargsImplicitTest")
 
 # Enhanced For-Loop Tests
 add_jopa_run_test(ForEachTest "${TEST_DIR}/foreach/ForEachTest.java" "ForEachTest")
-add_jopa_compile_test(ForEachArrayTest "${TEST_DIR}/foreach/ForEachArrayTest.java")
+add_jopa_run_test(ForEachArrayTest "${TEST_DIR}/foreach/ForEachArrayTest.java" "ForEachArrayTest")
 add_jopa_run_test(ForEachIterableTest "${TEST_DIR}/foreach/ForEachIterableTest.java" "ForEachIterableTest")
 
 # Generics Tests
-add_jopa_compile_test(GenericBox "${TEST_DIR}/generics/GenericBox.java")
+add_jopa_run_test(GenericBox "${TEST_DIR}/generics/GenericBox.java" "GenericBox")
 add_jopa_run_test(GenericTest "${TEST_DIR}/generics/GenericTest.java" "GenericTest" "${TEST_DIR}/generics/GenericBox.java")
-add_jopa_compile_test(SimpleGeneric "${TEST_DIR}/generics/SimpleGeneric.java")
-add_jopa_compile_test(TwoTypeParams "${TEST_DIR}/generics/TwoTypeParams.java")
-add_jopa_compile_test(BoundedGeneric "${TEST_DIR}/generics/BoundedGeneric.java")
-add_jopa_compile_test(Wildcards "${TEST_DIR}/generics/Wildcards.java")
-add_jopa_compile_test(GenericMethods "${TEST_DIR}/generics/GenericMethods.java")
-add_jopa_compile_test(CovariantReturnTest "${TEST_DIR}/generics/CovariantReturnTest.java")
-add_jopa_compile_test(BridgeTest "${TEST_DIR}/generics/BridgeTest.java")
-add_jopa_compile_test(SimpleSameFileTest "${TEST_DIR}/generics/SimpleSameFileTest.java")
-add_jopa_compile_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTest.java")
-add_jopa_compile_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java")
+add_jopa_run_test(SimpleGeneric "${TEST_DIR}/generics/SimpleGeneric.java" "SimpleGeneric")
+add_jopa_run_test(TwoTypeParams "${TEST_DIR}/generics/TwoTypeParams.java" "TwoTypeParams")
+add_jopa_run_test(BoundedGeneric "${TEST_DIR}/generics/BoundedGeneric.java" "BoundedGeneric")
+add_jopa_run_test(Wildcards "${TEST_DIR}/generics/Wildcards.java" "Wildcards")
+add_jopa_run_test(GenericMethods "${TEST_DIR}/generics/GenericMethods.java" "GenericMethods")
+add_jopa_run_test(CovariantReturnTest "${TEST_DIR}/generics/CovariantReturnTest.java" "CovariantReturnTest")
+add_jopa_run_test(BridgeTest "${TEST_DIR}/generics/BridgeTest.java" "BridgeTest")
+add_jopa_run_test(SimpleSameFileTest "${TEST_DIR}/generics/SimpleSameFileTest.java" "SimpleSameFileTest")
+add_jopa_run_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTest.java" "TypeSubstitutionTest")
+add_jopa_run_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java" "FieldAccessTest")
 add_jopa_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
 add_jopa_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
 
