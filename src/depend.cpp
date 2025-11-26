@@ -14,7 +14,8 @@ namespace Jopa { // Open namespace Jopa block
 //
 inline void TypeCycleChecker::ReverseTypeList()
 {
-    for (int head = 0, tail = type_list.Length() - 1;
+    int len = type_list.Length();
+    for (int head = 0, tail = len - 1;
          head < tail; head++, tail--)
     {
         TypeSymbol* temp = type_list[head];

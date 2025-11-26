@@ -10,6 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        jdk = pkgs.openjdk8;
       in
       {
         devShells.default = pkgs.mkShell {
@@ -44,6 +45,7 @@
             echo "================================================"
             echo "Jopa Development Environment (Clang)"
             echo "================================================"
+            export JAVA_HOME=${jdk.home}
             echo "C++ Compiler: $(clang++ --version | head -1)"
             echo "CMake: $(${pkgs.cmake}/bin/cmake --version | head -1)"
             echo "Java: $(java -version 2>&1 | head -1)"

@@ -2353,6 +2353,62 @@ void ByteCode::CloseSwitchLocalVariables(AstBlock* switch_block,
 
 
 //
+// Java 7: Helper to emit close() calls for try-with-resources
+// Closes resources in reverse declaration order
+//
+void ByteCode::EmitResourceCleanup(AstTryStatement* statement)
+{
+    // Close resources in reverse order
+    for (int r = statement -> NumResources() - 1; r >= 0; r--)
+    {
+        AstLocalVariableStatement* resource = statement -> Resource(r);
+        for (int v = resource -> NumVariableDeclarators() - 1; v >= 0; v--)
+        {
+            AstVariableDeclarator* vd = resource -> VariableDeclarator(v);
+            VariableSymbol* var = vd -> symbol;
+            if (! var) continue;
+
+            // Load the resource variable
+            LoadLocal(var -> LocalVariableIndex(), var -> Type());
+
+            // Check for null before calling close()
+            Label skip_close;
+            Label after_close;
+            PutOp(OP_DUP);
+
+            // Save stack depth at branch point (we have [ref, ref] = 2)
+            // Both paths will leave [ref] on stack before diverging
+            int stack_at_branch = stack_depth;  // = 2
+
+            EmitBranch(OP_IFNULL, skip_close);
+            // Fall-through (not null) path: stack = 1 [ref]
+
+            // Call close() - AutoCloseable is an interface, so use invokeinterface
+            // close() takes 'this' (1 arg), returns void
+            PutOp(OP_INVOKEINTERFACE);
+            PutU2(RegisterLibraryMethodref(control.AutoCloseable_closeMethod()));
+            PutU1(1);  // 1 argument (just 'this')
+            PutU1(0);  // reserved
+            // After close(): stack = 0
+
+            EmitBranch(OP_GOTO, after_close, statement);
+            // Stack = 0, but we need to handle the null path
+
+            // Null path: restore stack to state after IFNULL branch
+            // At skip_close, stack = 1 [ref] (IFNULL consumed one ref from [ref, ref])
+            stack_depth = stack_at_branch - 1;  // IFNULL pops 1, so 2 - 1 = 1
+            DefineLabel(skip_close);
+            CompleteLabel(skip_close);
+            PutOp(OP_POP);  // pop the null reference, stack = 0
+
+            DefineLabel(after_close);
+            CompleteLabel(after_close);
+            // Both paths converge with stack = 0
+        }
+    }
+}
+
+//
 //  13.18       The try statement
 //
 void ByteCode::EmitTryStatement(AstTryStatement* statement)
@@ -2366,12 +2422,30 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     assert(method_stack -> TopFinallyLabel().defined == false);
     assert(method_stack -> TopFinallyLabel().definition == 0);
 
+    //
+    // Java 7: Emit resource initializations for try-with-resources
+    // Resources are stored in local variables before the try block
+    //
+    for (unsigned r = 0; r < statement -> NumResources(); r++)
+    {
+        AstLocalVariableStatement* resource = statement -> Resource(r);
+        for (unsigned v = 0; v < resource -> NumVariableDeclarators(); v++)
+        {
+            AstVariableDeclarator* vd = resource -> VariableDeclarator(v);
+            DeclareLocalVariable(vd);
+        }
+    }
+
     u2 start_try_block_pc = code_attribute -> CodeLength(); // start pc
     assert(method_stack -> TopHandlerRangeStart().Length() == 0 &&
            method_stack -> TopHandlerRangeEnd().Length() == 0);
     method_stack -> TopHandlerRangeStart().Push(start_try_block_pc);
-    bool emit_finally_clause = statement -> finally_clause_opt &&
+
+    // Java 7: Try-with-resources creates a synthetic finally for close() calls
+    bool has_resources = statement -> NumResources() > 0;
+    bool emit_explicit_finally = statement -> finally_clause_opt &&
         ! IsNop(statement -> finally_clause_opt -> block);
+    bool emit_finally_clause = emit_explicit_finally || has_resources;
 
     //
     // If we determined the finally clause is a nop, remove the tag
@@ -2384,7 +2458,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     //
     if (statement -> finally_clause_opt)
     {
-        if (! emit_finally_clause)
+        if (! emit_explicit_finally && ! has_resources)
         {
             statement -> block -> SetTag(AstBlock::NONE);
         }
@@ -2393,6 +2467,11 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         {
             statement -> block -> SetTag(AstBlock::ABRUPT_TRY_FINALLY);
         }
+    }
+    // For try-with-resources without explicit finally, set the finally tag
+    else if (has_resources)
+    {
+        statement -> block -> SetTag(AstBlock::TRY_CLAUSE_WITH_FINALLY);
     }
     if (statement -> block -> Tag() == AstBlock::NONE &&
         statement -> NumCatchClauses())
@@ -2505,7 +2584,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             }
         }
         //
-        // If this try statement contains a finally clause, then ...
+        // If this try statement contains a finally clause (explicit or synthetic), then ...
         //
         if (emit_finally_clause)
         {
@@ -2513,6 +2592,12 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 block_symbol -> helper_variable_index;
             u2 finally_start_pc = code_attribute -> CodeLength();
             u2 special_end_pc = finally_start_pc;
+
+            // For try-with-resources, the synthetic finally can always complete normally
+            // (it just calls close() on resources)
+            bool finally_can_complete = has_resources ||
+                (emit_explicit_finally && statement -> finally_clause_opt -> block ->
+                 can_complete_normally);
 
             //
             // Emit code for "special" handler to make sure finally clause is
@@ -2523,8 +2608,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             //
             assert(stack_depth == 0);
             stack_depth = 1; // account for the exception already on stack
-            if (statement -> finally_clause_opt -> block ->
-                can_complete_normally)
+            if (finally_can_complete)
             {
                 StoreLocal(variable_index, control.Throwable()); // Save,
                 EmitBranch(OP_JSR, finally_label, statement);
@@ -2558,8 +2642,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             //
             DefineLabel(finally_label);
             assert(stack_depth == 0);
-            if (statement -> finally_clause_opt -> block ->
-                can_complete_normally)
+            if (finally_can_complete)
             {
                 stack_depth = 1; // account for the return location on stack
                 StoreLocal(variable_index + 1, control.Object());
@@ -2569,14 +2652,24 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 DefineLabel(end_label);
                 CompleteLabel(end_label);
             }
-            EmitBlockStatement(statement -> finally_clause_opt -> block);
+
+            // Java 7: Emit close() calls for resources before explicit finally
+            if (has_resources)
+            {
+                EmitResourceCleanup(statement);
+            }
+
+            // Emit explicit finally block if present
+            if (emit_explicit_finally)
+            {
+                EmitBlockStatement(statement -> finally_clause_opt -> block);
+            }
 
             //
             // If a finally block can complete normally, return to the saved
             // address of the caller.
             //
-            if (statement -> finally_clause_opt -> block ->
-                can_complete_normally)
+            if (finally_can_complete)
             {
                 PutOpWide(OP_RET, variable_index + 1);
                 //
@@ -2589,8 +2682,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 {
                     DefineLabel(end_label);
                     CompleteLabel(end_label);
-                    EmitBranch(OP_JSR, finally_label,
-                               statement -> finally_clause_opt -> block);
+                    EmitBranch(OP_JSR, finally_label, statement);
                     special_end_pc = code_attribute -> CodeLength();
                     code_attribute -> AddException(special_end_pc - 3,
                                                    special_end_pc,
