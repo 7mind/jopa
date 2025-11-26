@@ -2487,6 +2487,77 @@ void Parser::InitRuleAction()
     rule_action[566] = &Parser::MakeTypeArguments;
 #endif
 
+// Java 7 rules - placeholder actions until properly implemented
+// These rule numbers need to be verified against the generated grammar
+
+#ifndef HEADERS
+    rule_action[567] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[568] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[569] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[570] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[571] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[572] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[573] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[574] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[575] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[576] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[577] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[578] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[579] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[580] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[581] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[582] = &Parser::NoAction;
+#endif
+
+#ifndef HEADERS
+    rule_action[583] = &Parser::NoAction;
+#endif
+
 #ifndef HEADERS
     return;
 }
