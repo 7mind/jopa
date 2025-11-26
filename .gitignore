@@ -92,6 +92,11 @@ core.*
 result
 result-*
 
+# Generated grammar files (should only exist in build directory)
+src/grammar2/java*.h
+src/grammar2/javaact.h
+src/grammar2/javahdr.h
+
 # Local environment
 .env
 .envrc.local
