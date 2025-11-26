@@ -447,6 +447,11 @@ public:
         INVALID_ENCLOSING_INSTANCE,
         STATIC_TYPE_ACCESSING_MEMBER_TYPE,
 
+        // Java 7 errors
+        TYPE_NOT_AUTOCLOSEABLE,
+        DUPLICATE_EXCEPTION_IN_MULTICATCH,
+        REDUNDANT_EXCEPTION_IN_MULTICATCH,
+
         // This counts the number of legitimate types in the enum
         // it must follow all of the real error types.
         _num_kinds,

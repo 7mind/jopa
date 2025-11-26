@@ -2108,6 +2108,17 @@ void SemanticError::InitializeMessages()
         "The static type \"%T1\" must use a qualified name to access the "
         "non-static member type \"%T3\" of the enclosing type \"%T5\".";
 
+    // Java 7 errors
+    messages[TYPE_NOT_AUTOCLOSEABLE] =
+        "The type \"%T1.%T3\" must implement java.lang.AutoCloseable to be "
+        "used in a try-with-resources statement.";
+    messages[DUPLICATE_EXCEPTION_IN_MULTICATCH] =
+        "The exception type \"%T1.%T3\" appears more than once in this "
+        "multi-catch clause.";
+    messages[REDUNDANT_EXCEPTION_IN_MULTICATCH] =
+        "The exception type \"%T1.%T3\" is a subtype of \"%T5.%T7\" in this "
+        "multi-catch clause.";
+
     //
     // Make sure that there is a message associated with each code
     //

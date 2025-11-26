@@ -206,8 +206,9 @@ FloatingPointType ::= 'double'
 VoidType ::= 'void'
 ReferenceType ::= ClassOrInterfaceType
 ReferenceType ::= ArrayType
-ClassOrInterfaceType ::= ClassOrInterface
-ClassOrInterfaceType ::= ClassOrInterface '<' TypeArgumentList1 Marker
+-- ClassOrInterfaceType forwards to implementations (defined at end for Java 7 diamond support)
+ClassOrInterfaceType ::= ClassOrInterfaceTypePlain
+ClassOrInterfaceType ::= ClassOrInterfaceTypeParameterized
 ClassOrInterface ::= Name
 ClassOrInterface ::= ClassOrInterface '<' TypeArgumentList1 '.' Name
 ArrayType ::= PrimitiveType Dims
@@ -790,20 +791,14 @@ UnionType ::= ClassOrInterfaceType '|' ClassOrInterfaceType
 -- Rule 578: Union type - additional types
 UnionType ::= UnionType '|' ClassOrInterfaceType
 
--- Java 7: Diamond operator
--- Rule 580: new Type<>(...) without explicit type arguments
-ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+-- Java 7: ClassOrInterfaceType implementations with diamond support
+-- Rule 579: Plain class/interface type (no type arguments)
+ClassOrInterfaceTypePlain ::= ClassOrInterface
 
--- Rule 581: new <T>Type<>(...) with constructor type args but diamond for class
-ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+-- Rule 580: Parameterized type with type arguments
+ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' TypeArgumentList1 Marker
 
--- Rule 582: Qualified new with diamond
-ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-
--- Rule 583: Qualified new with diamond (via name)
-ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-
--- Rule 584: DiamondMarker matches '<>'
-DiamondMarker ::= '<' '>'
+-- Rule 581: Diamond type (empty type arguments) - Java 7
+ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' '>'
 
 %End

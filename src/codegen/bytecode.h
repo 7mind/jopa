@@ -915,6 +915,7 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
     bool EmitSwitchBlockStatement(AstSwitchBlockStatement*, bool);
     void CloseSwitchLocalVariables(AstBlock*, u2 op_start);
     void EmitTryStatement(AstTryStatement*);
+    void EmitResourceCleanup(AstTryStatement*);  // Java 7 try-with-resources
     void EmitAssertStatement(AstAssertStatement*);
     void EmitForeachStatement(AstForeachStatement*);
     void EmitBranchIfExpression(AstExpression*, bool, Label&,

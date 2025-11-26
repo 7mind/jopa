@@ -217,6 +217,8 @@ public:                                                         \
                     "<init>", "(D)V");
     METHOD_ACCESSOR(AssertionError_InitWithObject, AssertionError(),
                     "<init>", "(Ljava/lang/Object;)V");
+    TYPE_ACCESSOR(AutoCloseable, lang_package);
+    METHOD_ACCESSOR(AutoCloseable_close, AutoCloseable(), "close", "()V");
     TYPE_ACCESSOR(Boolean, lang_package);
     FIELD_ACCESSOR(Boolean, TYPE, "java/lang/Class");
     TYPE_ACCESSOR(Byte, lang_package);
@@ -340,6 +342,8 @@ public:                                                         \
                     "getMessage", "()Ljava/lang/String;");
     METHOD_ACCESSOR(Throwable_initCause, Throwable(), "initCause",
                     "(Ljava/lang/Throwable;)Ljava/lang/Throwable;");
+    METHOD_ACCESSOR(Throwable_addSuppressed, Throwable(), "addSuppressed",
+                    "(Ljava/lang/Throwable;)V");
     TYPE_ACCESSOR(Void, lang_package);
     FIELD_ACCESSOR(Void, TYPE, "java/lang/Class");
 

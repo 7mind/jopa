@@ -1328,6 +1328,29 @@ void Semantic::DefiniteTryStatement(Ast* stmt)
                                   block -> nesting_level);
     }
 
+    // Java 7: Process resources before the try block
+    // Resource variables are definitely assigned after initialization
+    for (unsigned r = 0; r < try_statement -> NumResources(); r++)
+    {
+        AstLocalVariableStatement* resource = try_statement -> Resource(r);
+        for (unsigned v = 0; v < resource -> NumVariableDeclarators(); v++)
+        {
+            AstVariableDeclarator* vd = resource -> VariableDeclarator(v);
+            // Process the initializer expression
+            AstExpression* init = vd -> variable_initializer_opt
+                ? vd -> variable_initializer_opt -> ExpressionCast() : NULL;
+            if (init)
+                DefiniteExpression(init, *DefinitelyAssignedVariables());
+            // Mark the resource variable as definitely assigned
+            VariableSymbol* variable = vd -> symbol;
+            if (variable)
+            {
+                int index = variable -> LocalVariableIndex(this);
+                DefinitelyAssignedVariables() -> AssignElement(index);
+            }
+        }
+    }
+
     DefinitePair starting_pair(*DefinitelyAssignedVariables());
     BitSet already_assigned(*ReachableAssignments());
     ReachableAssignments() -> SetEmpty();

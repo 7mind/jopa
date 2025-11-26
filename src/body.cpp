@@ -1366,7 +1366,8 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
     // Firstly, check the stack of try statements to see if the exception in
     // question is catchable.
     //
-    for (int i = TryStatementStack().Size() - 1; i >= 0; i--)
+    int stack_size = TryStatementStack().Size();
+    for (int i = stack_size - 1; i >= 0; i--)
     {
         AstTryStatement* try_statement = TryStatementStack()[i];
 
@@ -1568,7 +1569,8 @@ void Semantic::ProcessTryStatement(Ast* stmt)
     int max_variable_index =
         enclosing_block -> block_symbol -> max_variable_index;
 
-    if (try_statement -> finally_clause_opt)
+    // Java 7: Try-with-resources also needs helper variables for synthetic finally
+    if (try_statement -> finally_clause_opt || try_statement -> NumResources() > 0)
     {
         BlockSymbol* enclosing_block_symbol = enclosing_block -> block_symbol;
         if (enclosing_block_symbol -> helper_variable_index < 0)
@@ -1584,7 +1586,11 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                 else enclosing_block_symbol -> max_variable_index++;
             }
         }
+    }
 
+    // Process explicit finally block if present
+    if (try_statement -> finally_clause_opt)
+    {
         //
         // A finally block is processed in the environment of its immediate
         // enclosing block (as opposed to the environment of its associated
@@ -1610,7 +1616,7 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         {
             ReportSemError(SemanticError::EJ_EMPTY_FINALLY_BLOCK, block_body);
         }
-        
+
         //
         // If the finally ends abruptly, then it discards any throw generated
         // by the try or catch blocks.
@@ -1619,6 +1625,71 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         {
             TryExceptionTableStack().Push(new SymbolSet());
             AbruptFinallyStack().Push(block_body -> nesting_level);
+        }
+    }
+
+    //
+    // Java 7: Process try-with-resources
+    // Resources must be processed before catch clauses and must implement AutoCloseable
+    //
+    for (unsigned r = 0; r < try_statement -> NumResources(); r++)
+    {
+        AstLocalVariableStatement* resource = try_statement -> Resource(r);
+        ProcessType(resource -> type);
+        TypeSymbol* resource_type = resource -> type -> symbol;
+
+        // Check that the resource type implements AutoCloseable (an interface)
+        TypeSymbol* auto_closeable = control.AutoCloseable();
+        if (resource_type != control.no_type && auto_closeable &&
+            ! resource_type -> IsSubtype(auto_closeable))
+        {
+            ReportSemError(SemanticError::TYPE_NOT_AUTOCLOSEABLE,
+                           resource,
+                           resource_type -> ContainingPackageName(),
+                           resource_type -> ExternalName());
+        }
+
+        // Process the resource variable declarations (usually just one)
+        for (unsigned v = 0; v < resource -> NumVariableDeclarators(); v++)
+        {
+            AstVariableDeclarator* variable_declarator =
+                resource -> VariableDeclarator(v);
+            AstVariableDeclaratorId* name =
+                variable_declarator -> variable_declarator_name;
+            NameSymbol* name_symbol =
+                lex_stream -> NameSymbol(name -> identifier_token);
+
+            VariableSymbol* duplicate =
+                LocalSymbolTable().FindVariableSymbol(name_symbol);
+            if (duplicate)
+            {
+                ReportSemError(SemanticError::DUPLICATE_LOCAL_VARIABLE_DECLARATION,
+                               name -> identifier_token, name_symbol -> Name(),
+                               duplicate -> FileLoc());
+            }
+
+            AstBlock* block = LocalBlockStack().TopBlock();
+            VariableSymbol* symbol =
+                LocalSymbolTable().Top() -> InsertVariableSymbol(name_symbol);
+            variable_declarator -> symbol = symbol;
+
+            unsigned dims = resource_type -> num_dimensions + name -> NumBrackets();
+            symbol -> SetType(resource_type -> GetArrayType(this, dims));
+            symbol -> SetFlags(ProcessLocalModifiers(resource));
+            symbol -> SetACC_FINAL();  // Resources are implicitly final
+            symbol -> SetOwner(ThisMethod());
+            symbol -> declarator = variable_declarator;
+            symbol -> SetLocation();
+            symbol -> SetLocalVariableIndex(block -> block_symbol ->
+                                            max_variable_index++);
+            if (control.IsDoubleWordType(symbol -> Type()))
+                block -> block_symbol -> max_variable_index++;
+
+            // Process the initializer
+            if (variable_declarator -> variable_initializer_opt)
+            {
+                ProcessVariableInitializer(variable_declarator);
+            }
         }
     }
 
@@ -1645,21 +1716,83 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         AstVariableDeclaratorId* name =
             parameter -> formal_declarator -> variable_declarator_name;
 
-        ProcessType(parameter -> type);
-        TypeSymbol* parm_type = parameter -> type -> symbol;
-        if (name -> NumBrackets())
+        TypeSymbol* parm_type;
+
+        // Java 7: Handle multi-catch
+        if (clause -> NumUnionTypes() > 0)
         {
-            parm_type = parm_type ->
-                GetArrayType(this, (parm_type -> num_dimensions +
-                                    name -> NumBrackets()));
+            // Multi-catch: process each union type
+            parm_type = control.Throwable();  // Common supertype for multi-catch
+
+            for (unsigned u = 0; u < clause -> NumUnionTypes(); u++)
+            {
+                AstType* union_type = clause -> UnionType(u);
+                ProcessType(union_type);
+                TypeSymbol* type = union_type -> symbol;
+
+                if (type != control.no_type &&
+                    ! type -> IsSubclass(control.Throwable()))
+                {
+                    ReportSemError(SemanticError::TYPE_NOT_THROWABLE,
+                                   union_type,
+                                   type -> ContainingPackageName(),
+                                   type -> ExternalName());
+                }
+
+                // Check for duplicate types in the multi-catch
+                for (unsigned prev = 0; prev < u; prev++)
+                {
+                    TypeSymbol* prev_type = clause -> UnionType(prev) -> symbol;
+                    if (type == prev_type)
+                    {
+                        ReportSemError(SemanticError::DUPLICATE_EXCEPTION_IN_MULTICATCH,
+                                       union_type,
+                                       type -> ContainingPackageName(),
+                                       type -> ExternalName());
+                        break;
+                    }
+                    // Check for redundant types (one is subclass of another)
+                    if (type -> IsSubclass(prev_type))
+                    {
+                        ReportSemError(SemanticError::REDUNDANT_EXCEPTION_IN_MULTICATCH,
+                                       union_type,
+                                       type -> ContainingPackageName(),
+                                       type -> ExternalName(),
+                                       prev_type -> ContainingPackageName(),
+                                       prev_type -> ExternalName());
+                        break;
+                    }
+                    if (prev_type -> IsSubclass(type))
+                    {
+                        ReportSemError(SemanticError::REDUNDANT_EXCEPTION_IN_MULTICATCH,
+                                       clause -> UnionType(prev),
+                                       prev_type -> ContainingPackageName(),
+                                       prev_type -> ExternalName(),
+                                       type -> ContainingPackageName(),
+                                       type -> ExternalName());
+                    }
+                }
+            }
         }
-        if (! parm_type -> IsSubclass(control.Throwable()) &&
-            parm_type != control.no_type)
+        else
         {
-            ReportSemError(SemanticError::TYPE_NOT_THROWABLE, parameter,
-                           parm_type -> ContainingPackageName(),
-                           parm_type -> ExternalName());
-            parm_type = control.no_type;
+            // Normal single-type catch
+            ProcessType(parameter -> type);
+            parm_type = parameter -> type -> symbol;
+            if (name -> NumBrackets())
+            {
+                parm_type = parm_type ->
+                    GetArrayType(this, (parm_type -> num_dimensions +
+                                        name -> NumBrackets()));
+            }
+            if (! parm_type -> IsSubclass(control.Throwable()) &&
+                parm_type != control.no_type)
+            {
+                ReportSemError(SemanticError::TYPE_NOT_THROWABLE, parameter,
+                               parm_type -> ContainingPackageName(),
+                               parm_type -> ExternalName());
+                parm_type = control.no_type;
+            }
         }
 
         NameSymbol* name_symbol =

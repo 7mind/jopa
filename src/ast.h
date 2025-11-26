@@ -1197,11 +1197,13 @@ public:
     AstName* name;
     AstTypeArguments* type_arguments_opt;
     ParameterizedType* parameterized_type; // For tracking type arguments
+    bool uses_diamond; // Java 7 diamond operator
 
     inline AstTypeName(AstName* n)
         : AstType(TYPE)
         , name(n)
         , parameterized_type(NULL)
+        , uses_diamond(false)
     {}
     ~AstTypeName() {}
 
@@ -3415,8 +3417,12 @@ public:
     virtual TokenIndex LeftToken() { return try_token; }
     virtual TokenIndex RightToken()
     {
-        return finally_clause_opt ? finally_clause_opt -> RightToken()
-            : CatchClause(NumCatchClauses() - 1) -> RightToken();
+        // Java 7: try-with-resources may have no catch or finally clauses
+        if (finally_clause_opt)
+            return finally_clause_opt -> RightToken();
+        if (NumCatchClauses() > 0)
+            return CatchClause(NumCatchClauses() - 1) -> RightToken();
+        return block -> RightToken();
     }
 };
 

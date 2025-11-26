@@ -228,7 +228,7 @@ void Parser::InitRuleAction()
 #endif
 
 #ifndef HEADERS
-    rule_action[30] = &Parser::MakeTypeArguments;
+    rule_action[30] = &Parser::NoAction;
 #endif
 
 #ifndef HEADERS
@@ -2559,33 +2559,21 @@ void Parser::InitRuleAction()
     rule_action[578] = &Parser::MakeUnionType;
 #endif
 
-// Rule 579: ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+// Rule 579: ClassOrInterfaceTypePlain ::= ClassOrInterface
 #ifndef HEADERS
-    rule_action[579] = &Parser::MakeDiamondAllocation;
+    rule_action[579] = &Parser::NoAction;
+#endif
+
+// Rule 580: ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' TypeArgumentList1 Marker
+#ifndef HEADERS
+    rule_action[580] = &Parser::MakeTypeArguments;
+#endif
+
+// Rule 581: ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' '>' (Diamond)
+#ifndef HEADERS
+    rule_action[581] = &Parser::MakeDiamondType;
 #else
-    void MakeDiamondAllocation();
-#endif
-
-// Rule 580: ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
-#ifndef HEADERS
-    rule_action[580] = &Parser::MakeDiamondAllocation;
-#endif
-
-// Rule 581: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-#ifndef HEADERS
-    rule_action[581] = &Parser::MakeQualifiedDiamondNew;
-#else
-    void MakeQualifiedDiamondNew();
-#endif
-
-// Rule 582: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-#ifndef HEADERS
-    rule_action[582] = &Parser::MakeQualifiedDiamondNew;
-#endif
-
-// Rule 583: DiamondMarker ::= '<' '>'
-#ifndef HEADERS
-    rule_action[583] = &Parser::NullAction;
+    void MakeDiamondType();
 #endif
 
 #ifndef HEADERS

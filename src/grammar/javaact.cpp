@@ -3228,6 +3228,7 @@ void Parser::Act326()
     AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
     p -> new_token = Token(1);
     p -> class_type = DYNAMIC_CAST<AstTypeName*> (Sym(2));
+    p -> uses_diamond = p -> class_type -> uses_diamond; // Java 7 diamond
     p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(3));
     p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(4));
     if (p -> class_body_opt)
@@ -3246,6 +3247,7 @@ void Parser::Act327()
     p -> new_token = Token(1);
     p -> type_arguments_opt = MakeExplicitTypeArguments(2);
     p -> class_type = DYNAMIC_CAST<AstTypeName*> (Sym(3));
+    p -> uses_diamond = p -> class_type -> uses_diamond; // Java 7 diamond
     p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(4));
     p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(5));
     if (p -> class_body_opt)
@@ -5006,7 +5008,7 @@ void Parser::MakeTryWithResources()
     // Sym(2) = ResourceSpecification (list of resources)
     if (Sym(2))
     {
-        AstListNode* tail = DYNAMIC_CAST<AstListNode*> (Sym(2));
+        AstListNode* tail = Sym(2) -> ListNodeCast();
         if (tail)
         {
             p -> AllocateResources(tail -> index + 1);
@@ -5014,10 +5016,19 @@ void Parser::MakeTryWithResources()
             do
             {
                 root = root -> next;
-                p -> AddResource(DYNAMIC_CAST<AstLocalVariableStatement*>
-                                 (root -> element));
+                AstLocalVariableStatement* res = DYNAMIC_CAST<AstLocalVariableStatement*>(root -> element);
+                p -> AddResource(res);
             } while (root != tail);
             FreeCircularList(tail);
+        }
+        else
+        {
+            AstLocalVariableStatement* res = DYNAMIC_CAST<AstLocalVariableStatement*>(Sym(2));
+            if (res)
+            {
+                p -> AllocateResources(1);
+                p -> AddResource(res);
+            }
         }
     }
 
@@ -5064,7 +5075,8 @@ void Parser::MakeResource()
     p -> semicolon_token_opt = 0; // No semicolon for resources
 
     // Determine if we have modifiers (rule 574 vs 573)
-    bool has_modifiers = Sym(1) && ! DYNAMIC_CAST<AstType*>(Sym(1));
+    // Use safe cast method to check if Sym(1) is modifiers
+    bool has_modifiers = Sym(1) && Sym(1) -> ModifiersCast();
     int type_index = has_modifiers ? 2 : 1;
     int id_index = type_index + 1;
     int expr_index = id_index + 2;
@@ -5101,14 +5113,16 @@ void Parser::MakeMultiCatch()
     p -> catch_token = Token(1);
 
     // Determine indices based on presence of modifiers
-    bool has_modifiers = Sym(3) && DYNAMIC_CAST<AstModifiers*>(Sym(3));
+    // Use safe cast methods to check type
+    bool has_modifiers = Sym(3) && Sym(3) -> ModifiersCast();
     int union_index = has_modifiers ? 4 : 3;
     int id_index = union_index + 1;
     int block_index = id_index + 2;
 
     // Get the union type - stored as a list
     AstType* first_type = NULL;
-    if (AstListNode* list = DYNAMIC_CAST<AstListNode*>(Sym(union_index)))
+    AstListNode* list = Sym(union_index) -> ListNodeCast();
+    if (list)
     {
         // Store all union types and use first for formal parameter
         p -> AllocateUnionTypes(list -> index + 1);
@@ -5160,7 +5174,9 @@ void Parser::MakeUnionType()
     // For rule 577, we have two types; for 578, we extend existing list
     AstListNode* list;
 
-    if (AstListNode* existing = DYNAMIC_CAST<AstListNode*>(Sym(1)))
+    // Use safe cast to check if Sym(1) is already a list (rule 578)
+    AstListNode* existing = Sym(1) -> ListNodeCast();
+    if (existing)
     {
         // Rule 578: extend existing list
         list = existing;
@@ -5185,65 +5201,18 @@ void Parser::MakeUnionType()
 }
 
 //
-// Rule 579: ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
-// Rule 580: ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+// Rule 581: ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' '>'
 //
-// Diamond operator for type inference
+// Diamond operator - creates a type name marked for type inference
 //
-void Parser::MakeDiamondAllocation()
+void Parser::MakeDiamondType()
 {
-    AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
-    p -> new_token = Token(1);
-    p -> base_opt = NULL;
-    p -> uses_diamond = true; // Java 7 diamond operator
-
-    // Determine indices based on presence of type arguments
-    bool has_type_args = Sym(2) && DYNAMIC_CAST<AstTypeArguments*>(Sym(2));
-    int type_index = has_type_args ? 3 : 2;
-    int diamond_index = type_index + 1;
-    int args_index = diamond_index + 1;
-    int body_index = args_index + 1;
-
-    if (has_type_args)
-    {
-        // Has explicit type arguments for constructor
-        p -> type_arguments_opt = DYNAMIC_CAST<AstTypeArguments*> (Sym(2));
-    }
-
-    AstTypeName* name = DYNAMIC_CAST<AstTypeName*> (Sym(type_index));
-    p -> class_type = name;
-
-    p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(args_index));
-    p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(body_index));
-
-    Sym(1) = p;
-}
-
-//
-// Rule 581: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-// Rule 582: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-//
-// Qualified new with diamond operator
-//
-void Parser::MakeQualifiedDiamondNew()
-{
-    AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
-    p -> base_opt = DYNAMIC_CAST<AstExpression*> (Sym(1));
-    p -> new_token = Token(3);
-    p -> type_arguments_opt = DYNAMIC_CAST<AstTypeArguments*> (Sym(4));
-    p -> uses_diamond = true; // Java 7 diamond operator
-
-    // Sym(5) = Identifier
-    // Sym(6) = DiamondMarker
-    // Sym(7) = Arguments
-    // Sym(8) = ClassBodyopt
-
-    AstTypeName* name = ast_pool -> NewTypeName(MakeSimpleName(5));
-    p -> class_type = name;
-
-    p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(7));
-    p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(8));
-
+    AstTypeName* p = Sym(1) -> NameCast()
+        ? ast_pool -> NewTypeName(DYNAMIC_CAST<AstName*> (Sym(1)))
+        : DYNAMIC_CAST<AstTypeName*> (Sym(1));
+    p -> uses_diamond = true;
+    // Don't set type_arguments_opt - diamond has no explicit type args
+    // The uses_diamond flag indicates type inference is needed
     Sym(1) = p;
 }
 
