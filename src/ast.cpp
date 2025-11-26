@@ -303,6 +303,18 @@ Ast* AstWildcard::Clone(StoragePool* ast_pool)
     return clone;
 }
 
+Ast* AstUnionType::Clone(StoragePool* ast_pool)
+{
+    AstUnionType* clone = ast_pool -> GenUnionType();
+    if (NumTypes() > 0)
+    {
+        clone -> AllocateTypes(NumTypes());
+        for (unsigned i = 0; i < NumTypes(); i++)
+            clone -> AddType((AstType*) Type(i) -> Clone(ast_pool));
+    }
+    return clone;
+}
+
 Ast* AstTypeArguments::Clone(StoragePool* ast_pool)
 {
     AstTypeArguments* clone = ast_pool -> GenTypeArguments(left_angle_token,
@@ -1341,6 +1353,16 @@ void AstWildcard::Print(LexStream& lex_stream)
     Coutput << endl;
     if (bounds_opt)
         bounds_opt -> Print(lex_stream);
+}
+
+void AstUnionType::Print(LexStream& lex_stream)
+{
+    Coutput << '#' << id << " (UnionType):";
+    for (unsigned i = 0; i < NumTypes(); i++)
+        Coutput << " #" << Type(i) -> id;
+    Coutput << endl;
+    for (unsigned i = 0; i < NumTypes(); i++)
+        Type(i) -> Print(lex_stream);
 }
 
 void AstTypeArguments::Print(LexStream& lex_stream)

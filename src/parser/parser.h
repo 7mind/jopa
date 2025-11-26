@@ -183,6 +183,10 @@ protected:
                                      SecondaryRepairInfo repair);
     int ParseCheck(int stack[], int stack_top, int first_token,
                    int buffer_position);
+
+    bool TryHandleMultiCatch(TokenObject& curtok, int& current_kind);
+    bool IsMultiCatchContext();
+    AstType* ParseType(TokenObject& curtok);
 };
 
 

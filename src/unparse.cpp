@@ -107,6 +107,21 @@ void AstWildcard::Unparse(Ostream& os, LexStream* lex_stream)
         os << "/*:AstWildcard#" << id << "*/";
 }
 
+void AstUnionType::Unparse(Ostream& os, LexStream* lex_stream)
+{
+    if (debug_unparse)
+        os << "/*AstUnionType:#" << id << "*/";
+    if (NumTypes() > 0)
+        Type(0) -> Unparse(os, lex_stream);
+    for (unsigned i = 1; i < NumTypes(); i++)
+    {
+        os << " | ";
+        Type(i) -> Unparse(os, lex_stream);
+    }
+    if (debug_unparse)
+        os << "/*:AstUnionType#" << id << "*/";
+}
+
 void AstTypeArguments::Unparse(Ostream& os, LexStream* lex_stream)
 {
     if (debug_unparse)

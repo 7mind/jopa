@@ -1,4 +1,5 @@
-// DO NOT MODIFY THIS FILE - it is generated using gencode.java.
+// Originally generated using gencode.java.
+// Now maintained manually.
 
 #include "code.h"
 
