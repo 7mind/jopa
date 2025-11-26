@@ -216,43 +216,6 @@ const wchar_t* OptionError::GetErrorMessage()
 }
 
 
-#ifdef WIN32_FILE_SYSTEM
-void Option::SaveCurrentDirectoryOnDisk(char c)
-{
-    if (! current_directory[c])
-    {
-        char *disk_directory = NULL,
-             disk[3] = { c, U_COLON, U_NULL },
-             tmp[1];
-
-        if (SetCurrentDirectory(disk))
-        {
-            // first, get the right size
-            DWORD directory_length = GetCurrentDirectory(0, tmp);
-            // allocate the directory
-            disk_directory = new char[directory_length + 1];
-            DWORD length = GetCurrentDirectory(directory_length,
-                                               disk_directory);
-            if (length <= directory_length)
-            {
-                for (char *ptr = disk_directory; *ptr; ptr++)
-                    // turn '\' to '/'.
-                    *ptr = (*ptr != U_BACKSLASH ? *ptr : (char) U_SLASH);
-            }
-        }
-
-        if (! disk_directory)
-        {
-            disk_directory = new char[2];
-            disk_directory[0] = U_DOT;
-            disk_directory[1] = U_NULL;
-        }
-
-        current_directory[Case::ToAsciiLower(c)] = disk_directory;
-        current_directory[Case::ToAsciiUpper(c)] = disk_directory;
-    }
-}
-#endif // WIN32_FILE_SYSTEM
 
 
 //
@@ -272,25 +235,6 @@ static inline char* makeStrippedCopy(char* value)
     char* result = new char[strlen(value) + 1];
     strcpy(result, value);
 
-#ifdef HAVE_CYGWIN_WIN32_TO_POSIX_PATH_LIST
-    if (*value)
-    {
-        //
-        // Under Cygwin, we convert a Windows-style path into a UNIX-style
-        // path.  A path like "C:\Cygwin\tmp;C:\Windows" is converted into
-        // "/tmp:/cygdrive/c/Windows" (assuming C:\Cygwin is cygroot).  We
-        // can then parse it using the UNIX path seperator char ':'.
-        //
-        if (! cygwin_posix_path_list_p(result))
-        {
-            char* temp =
-                new char[cygwin_win32_to_posix_path_list_buf_size(result)];
-            cygwin_win32_to_posix_path_list(result, temp);
-            delete[] result;
-            result = temp;
-        }
-    }
-#endif // CYGWIN_WIN32_TO_POSIX_PATH_LIST
     return result;
 }
 
@@ -320,36 +264,6 @@ Option::Option(ArgumentExpander& arguments,
       noassert(false),
       dependence_report_name(NULL)
 {
-#ifdef WIN32_FILE_SYSTEM
-    for (int j = 0; j < 128; j++)
-        current_directory[j] = NULL;
-
-    char tmp[1];
-    // first, get the right size
-    DWORD directory_length = GetCurrentDirectory(0, tmp);
-    // allocate the directory
-    char *main_current_directory = new char[directory_length + 1];
-    DWORD length = GetCurrentDirectory(directory_length,
-                                       main_current_directory);
-    if (length > directory_length)
-    {
-        main_current_directory[0] = U_DOT;
-        main_current_directory[1] = U_NULL;
-        main_disk = 0;
-    }
-    else
-    {
-        for (char *ptr = main_current_directory; *ptr; ptr++)
-            // turn '\' to '/'.
-            *ptr = (*ptr != U_BACKSLASH ? *ptr : (char) U_SLASH);
-        main_disk = main_current_directory[0]; // the first character
-        current_directory[Case::ToAsciiLower(main_disk)] =
-            main_current_directory;
-        current_directory[Case::ToAsciiUpper(main_disk)] =
-            main_current_directory;
-    }
-    current_directory[0] = main_current_directory;
-#endif // WIN32_FILE_SYSTEM
 
     Tuple<int> filename_index(2048);
 
@@ -410,39 +324,7 @@ Option::Option(ArgumentExpander& arguments,
                 int length = strlen(arguments.argv[i]);
                 directory = new char[length + 1];
                 strcpy(directory, arguments.argv[i]);
-#elif defined(WIN32_FILE_SYSTEM)
-                char disk = (Case::IsAsciiAlpha(arguments.argv[i][0]) &&
-                             arguments.argv[i][1] == U_COLON)
-                    ? arguments.argv[i][0] : 0;
-                SaveCurrentDirectoryOnDisk(disk);
-                if (SetCurrentDirectory(arguments.argv[i]))
-                {
-                    char tmp[1];
-                    // first, get the right size
-                    DWORD directory_length = GetCurrentDirectory(0, tmp);
-                    // allocate the directory
-                    directory = new char[directory_length + 1];
-                    DWORD length = GetCurrentDirectory(directory_length,
-                                                       directory);
-                    if (length > directory_length)
-                    {
-                        delete [] directory;
-                        directory = NULL;
-                    }
-                }
-
-                // reset the current directory on the disk
-                ResetCurrentDirectoryOnDisk(disk);
-                // reset the real current directory...
-                SetMainCurrentDirectory();
-
-                if (! directory)
-                {
-                    bad_options.Next() =
-                        new OptionError(OptionError::INVALID_DIRECTORY,
-                                        arguments.argv[i]);
-                }
-#endif // WIN32_FILE_SYSTEM
+#endif
                 if (directory)
                 {
                     for (char *ptr = directory; *ptr; ptr++)
@@ -1058,10 +940,6 @@ Option::~Option()
 {
     delete [] dependence_report_name;
 
-#ifdef WIN32_FILE_SYSTEM
-    for (char c = 'a'; c <= 'z'; c++)
-        delete [] current_directory[c];
-#endif // WIN32_FILE_SYSTEM
 }
 
 

@@ -1,5 +1,4 @@
-#ifndef tuple_INCLUDED
-#define tuple_INCLUDED
+#pragma once
 
 #include "jikesapi.h"
 
@@ -536,6 +535,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // tuple_INCLUDED
 

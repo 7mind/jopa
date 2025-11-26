@@ -1,7 +1,6 @@
 // DO NOT MODIFY THIS FILE - it is generated using jikespg on java.g.
 
-#ifndef javasym_INCLUDED
-#define javasym_INCLUDED
+#pragma once
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -125,4 +124,3 @@ enum {
 
 } // Close namespace Jopa block
 
-#endif /* javasym_INCLUDED */

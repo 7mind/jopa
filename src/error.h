@@ -1,5 +1,4 @@
-#ifndef error_INCLUDED
-#define error_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -514,6 +513,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // error_INCLUDED
 

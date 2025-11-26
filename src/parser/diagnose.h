@@ -1,5 +1,4 @@
-#ifndef diagnose_INCLUDED
-#define diagnose_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "parser.h"
@@ -172,6 +171,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // diagnose_INCLUDED
 

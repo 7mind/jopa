@@ -1,5 +1,4 @@
-#ifndef parser_INCLUDED
-#define parser_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "lpginput.h"
@@ -188,6 +187,4 @@ protected:
 
 
 } // Close namespace Jopa block
-
-#endif // parser_INCLUDED
 

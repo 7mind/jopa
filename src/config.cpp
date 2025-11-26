@@ -826,12 +826,6 @@ int StringConstant::U8S_ConstantValue_length = strlen(U8S_ConstantValue),
     }
 #endif
 
-#elif defined(WIN32_FILE_SYSTEM)
-#include <direct.h>
-    int SystemMkdir(char *dirname)
-    {
-        return mkdir(dirname);
-    }
 #endif
 
 

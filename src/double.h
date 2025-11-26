@@ -44,8 +44,7 @@
 //
 //
 
-#ifndef double_INCLUDED
-#define double_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "long.h"
@@ -708,6 +707,4 @@ inline void BigInt::resize(int k)
 
 
 } // Close namespace Jopa block
-
-#endif // double_INCLUDED
 

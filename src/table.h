@@ -1,5 +1,4 @@
-#ifndef table_INCLUDED
-#define table_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "symbol.h"
@@ -467,6 +466,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // table_INCLUDED
 

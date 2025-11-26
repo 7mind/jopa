@@ -1,5 +1,4 @@
-#ifndef stream_INCLUDED
-#define stream_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -585,6 +584,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // stream_INCLUDED
 

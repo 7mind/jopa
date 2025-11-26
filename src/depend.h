@@ -1,5 +1,4 @@
-#ifndef depend_INCLUDED
-#define depend_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -116,6 +115,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // depend_INCLUDED
 

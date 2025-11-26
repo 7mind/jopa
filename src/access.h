@@ -1,6 +1,5 @@
 
-#ifndef access_INCLUDED
-#define access_INCLUDED
+#pragma once
 
 #include "platform.h"
 
@@ -213,6 +212,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // access_INCLUDED
 

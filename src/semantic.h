@@ -1,5 +1,4 @@
-#ifndef semantic_INCLUDED
-#define semantic_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "ast.h"
@@ -1360,6 +1359,4 @@ private:
 
 
 } // Close namespace Jopa block
-
-#endif // semantic_INCLUDED
 

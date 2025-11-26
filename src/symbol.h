@@ -1,5 +1,4 @@
-#ifndef symbol_INCLUDED
-#define symbol_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "lookup.h"
@@ -102,21 +101,6 @@ public:
             : (DirectoryEntry*) NULL;
     }
 
-#ifdef WIN32_FILE_SYSTEM
-    DirectoryEntry* FindCaseInsensitiveEntry(char* name, unsigned length)
-    {
-        return entries ? entries -> FindCaseInsensitiveEntry(name, length)
-            : (DirectoryEntry*) NULL;
-    }
-
-    void InsertEntry(char* name, unsigned length)
-    {
-        assert(entries);
-
-        DirectoryEntry* entry = entries -> InsertEntry(this, name, length);
-        entries -> InsertCaseInsensitiveEntry(entry);
-    }
-#endif // WIN32_FILE_SYSTEM
 
     PathSymbol* PathSym()
     {
@@ -2486,6 +2470,4 @@ inline SymbolTable* BlockSymbol::Table()
 
 
 } // Close namespace Jopa block
-
-#endif // symbol_INCLUDED
 

@@ -1,5 +1,4 @@
-#ifndef lookup_INCLUDED
-#define lookup_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -140,23 +139,6 @@ protected:
 };
 
 
-#ifdef WIN32_FILE_SYSTEM
-//
-// This object is needed only for systems such as Windows NT/95/98 that
-// treat filenames in a case-insensitive fashion.
-//
-class FoldedDirectoryEntry : public DirectoryEntry
-{
-public:
-    FoldedDirectoryEntry(DirectoryEntry* image_)
-    {
-        DirectoryEntry::image = image_;
-    }
-    virtual ~FoldedDirectoryEntry() {}
-
-    virtual DirectoryEntry* Image() { return image; }
-};
-#endif // WIN32_FILE_SYSTEM
 
 
 class SystemTable
@@ -220,13 +202,6 @@ public:
     DirectoryEntry* FindEntry(char*, int);
     DirectoryEntry* InsertEntry(DirectorySymbol*, char*, int);
 
-#ifdef WIN32_FILE_SYSTEM
-    //
-    // See FoldedDirectoryEntry for an explanation of the use of this function
-    //
-    DirectoryEntry* FindCaseInsensitiveEntry(char*, int);
-    void InsertCaseInsensitiveEntry(DirectoryEntry*);
-#endif
 
 private:
     enum
@@ -866,4 +841,3 @@ inline unsigned Symbol::HashCode() const
 
 } // Close namespace Jopa block
 
-#endif // lookup_INCLUDED

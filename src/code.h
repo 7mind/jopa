@@ -2,8 +2,8 @@
 
 
 namespace Jopa { // Open namespace Jopa block
-#ifndef code_INCLUDED
-#define code_INCLUDED
+
+#pragma once
 
 class Code
 {
@@ -163,7 +163,6 @@ public:
     }
 };
 
-#endif // code_INCLUDED
 
 
 } // Close namespace Jopa block

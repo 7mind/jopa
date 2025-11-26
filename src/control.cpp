@@ -292,16 +292,6 @@ Control::Control(char** arguments, Option& option_)
     system_semantic = main_file_clone -> semantic;
     scanner -> SetUp(main_file_clone);
 
-#ifdef WIN32_FILE_SYSTEM
-    //
-    //
-    //
-    if (option.BadMainDisk())
-    {
-        system_semantic -> ReportSemError(SemanticError::NO_CURRENT_DIRECTORY,
-                                          BAD_TOKEN);
-    }
-#endif // WIN32_FILE_SYSTEM
 
     unsigned i;
     for (i = 0; i < bad_dirnames.Length(); i++)
@@ -897,155 +887,7 @@ DirectorySymbol* Control::ProcessSubdirectories(wchar_t* source_name,
     delete [] input_name;
     return directory_symbol;
 }
-#elif defined(WIN32_FILE_SYSTEM)
-DirectorySymbol* Control::ProcessSubdirectories(wchar_t* source_name,
-                                                int source_name_length,
-                                                bool source_dir)
-{
-    DirectorySymbol* directory_symbol =
-        classpath[dot_classpath_index] -> RootDirectory();
-
-    int name_length = (source_name_length < 0 ? 0 : source_name_length);
-    wchar_t* name = new wchar_t[name_length + 1];
-    char* input_name = new char[name_length + 1];
-    for (int i = 0; i < name_length; i++)
-        input_name[i] = name[i] = source_name[i];
-    input_name[name_length] = name[name_length] = U_NULL;
-
-    if (name_length >= 2 && Case::IsAsciiAlpha(input_name[0]) &&
-        input_name[1] == U_COLON) // a disk was specified
-    {
-        char disk = input_name[0];
-        option.SaveCurrentDirectoryOnDisk(disk);
-        if (SetCurrentDirectory(input_name))
-        {
-            // First, get the right size.
-            DWORD directory_length = GetCurrentDirectory(0, input_name);
-            char* full_directory_name = new char[directory_length + 1];
-            DWORD length = GetCurrentDirectory(directory_length, full_directory_name);
-            if (length <= directory_length)
-            {
-                // Turn '\' to '/'.
-                for (char* ptr = full_directory_name; *ptr; ptr++)
-                    *ptr = (*ptr != U_BACKSLASH ? *ptr : (char) U_SLASH);
-
-                char* current_directory = option.GetMainCurrentDirectory();
-                int prefix_length = strlen(current_directory);
-                int start = (prefix_length <= (int) length &&
-                             Case::StringSegmentEqual(current_directory,
-                                                      full_directory_name,
-                                                      prefix_length) &&
-                             (full_directory_name[prefix_length] == U_SLASH ||
-                              full_directory_name[prefix_length] == U_NULL)
-                             ? prefix_length + 1
-                             : 0);
-
-                if (start > (int) length)
-                    name_length = 0;
-                else if (start <= (int) length) // note that we can assert that (start != length)
-                {
-                    delete [] name;
-                    name_length = length - start;
-                    name = new wchar_t[name_length + 1];
-                    for (int k = 0, i = start; i < (int) length; i++, k++)
-                        name[k] = full_directory_name[i];
-                    name[name_length] = U_NULL;
-                }
-            }
-
-            delete [] full_directory_name;
-        }
-
-        // Reset the current directory on this disk.
-        option.ResetCurrentDirectoryOnDisk(disk);
-        option.SetMainCurrentDirectory(); // Reset the real current directory.
-    }
-
-    int end;
-    if (name_length > 2 && Case::IsAsciiAlpha(name[0]) &&
-        name[1] == U_COLON && name[2] == U_SLASH)
-    {
-        end = 3;
-    }
-    else
-    {
-        for (end = 0;
-             end < name_length && name[end] == U_SLASH;
-             end++); // keep all extra leading '/'
-    }
-
-    wchar_t* directory_name = new wchar_t[name_length];
-    int length;
-    if (end > 0)
-    {
-        for (length = 0; length < end; length++)
-            directory_name[length] = name[length];
-        NameSymbol* name_symbol = FindOrInsertName(directory_name, length);
-        DirectorySymbol* subdirectory_symbol =
-            directory_symbol -> FindDirectorySymbol(name_symbol);
-        if (! subdirectory_symbol)
-            subdirectory_symbol =
-                directory_symbol -> InsertDirectorySymbol(name_symbol,
-                                                          source_dir);
-        directory_symbol = subdirectory_symbol;
-    }
-
-    for (int start = end; start < name_length; start = end)
-    {
-        for (length = 0;
-             end < name_length && name[end] != U_SLASH;
-             length++, end++)
-        {
-            directory_name[length] = name[end];
-        }
-
-        if (length != 1 || directory_name[0] != U_DOT)
-        {
-            // Not the current directory.
-            if (length == 2 && directory_name[0] == U_DOT &&
-                directory_name[1] == U_DOT)
-            {
-                // Keep the current directory.
-                if (directory_symbol -> Identity() == dot_name_symbol ||
-                    directory_symbol -> Identity() == dot_dot_name_symbol)
-                {
-                    DirectorySymbol* subdirectory_symbol =
-                        directory_symbol -> FindDirectorySymbol(dot_dot_name_symbol);
-                    if (! subdirectory_symbol)
-                        subdirectory_symbol =
-                            directory_symbol -> InsertDirectorySymbol(dot_dot_name_symbol,
-                                                                      source_dir);
-                    directory_symbol = subdirectory_symbol;
-                }
-                else directory_symbol = directory_symbol -> owner -> DirectoryCast();
-            }
-            else
-            {
-                NameSymbol* name_symbol = FindOrInsertName(directory_name,
-                                                           length);
-                DirectorySymbol* subdirectory_symbol =
-                    directory_symbol -> FindDirectorySymbol(name_symbol);
-                if (! subdirectory_symbol)
-                    subdirectory_symbol =
-                        directory_symbol -> InsertDirectorySymbol(name_symbol,
-                                                                  source_dir);
-                directory_symbol = subdirectory_symbol;
-            }
-        }
-
-        for (end++;
-             end < name_length && name[end] == U_SLASH;
-             end++); // skip all extra '/'
-    }
-
-    directory_symbol -> ReadDirectory();
-
-    delete [] directory_name;
-    delete [] name;
-    delete [] input_name;
-    return directory_symbol;
-}
-#endif // WIN32_FILE_SYSTEM
+#endif
 
 
 void Control::ProcessNewInputFiles(SymbolSet& file_set, char** arguments)
@@ -1156,19 +998,7 @@ FileSymbol* Control::FindOrInsertJavaInputFile(wchar_t* name, int name_length)
     directory_symbol = ProcessSubdirectories(name, len, true);
     file_name_symbol = FindOrInsertName(&name[len + 1],
                                         name_length - (len + 1));
-#elif defined(WIN32_FILE_SYSTEM)
-    int len;
-    for (len = name_length - 1;
-         len >= 0 && name[len] != U_SLASH && name[len] != U_COLON;
-         len--);
-
-    directory_symbol = ProcessSubdirectories(name,
-                                             (name[len] == U_COLON ? len + 1
-                                              : len),
-                                             true);
-    file_name_symbol = FindOrInsertName(&name[len + 1],
-                                        name_length - (len + 1));
-#endif // WIN32_FILE_SYSTEM
+#endif
 
     for (unsigned i = 1; i < classpath.Length(); i++)
     {
@@ -1389,40 +1219,6 @@ void Control::ProcessBodies(TypeSymbol* type)
     if (type -> declaration &&
         ! sem -> compilation_unit -> BadCompilationUnitCast())
     {
-#ifdef WIN32_FILE_SYSTEM
-        if (! type -> file_symbol -> IsZip())
-        {
-            int length = type -> Utf8NameLength() +
-                FileSymbol::class_suffix_length;
-            char* classfile_name = new char[length + 1]; // +1 for "\0"
-            strcpy(classfile_name, type -> Utf8Name());
-            strcat(classfile_name, FileSymbol::class_suffix);
-
-            DirectorySymbol* directory =
-                type -> file_symbol -> OutputDirectory();
-            DirectoryEntry* entry =
-                directory -> FindCaseInsensitiveEntry(classfile_name, length);
-
-            //
-            // If an entry is found and it is not identical (in a
-            // case-sensitive test) to the name of the type, issue an
-            // appropriate message.
-            //
-            if (entry && strcmp(classfile_name, entry -> name) != 0)
-            {
-                wchar_t* entry_name = new wchar_t[entry -> length + 1];
-                for (int i = 0; i < length; i++)
-                    entry_name[i] = entry -> name[i];
-                entry_name[entry -> length] = U_NULL;
-                sem -> ReportSemError(SemanticError::FILE_FILE_CONFLICT,
-                                      type -> declaration -> identifier_token,
-                                      type -> Name(), entry_name,
-                                      directory -> Name());
-                delete [] entry_name;
-            }
-            delete [] classfile_name;
-        }
-#endif // WIN32_FILE_SYSTEM
 
         if (type -> declaration -> UnparsedClassBodyCast())
         {

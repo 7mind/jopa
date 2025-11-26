@@ -1,5 +1,4 @@
-#ifndef paramtype_INCLUDED
-#define paramtype_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "tuple.h"
@@ -431,4 +430,3 @@ public:
 
 } // Close namespace Jopa block
 
-#endif // paramtype_INCLUDED

@@ -973,65 +973,6 @@ void DirectorySymbol::ReadDirectory()
             closedir(directory);
         }
 
-#elif defined(WIN32_FILE_SYSTEM)
-
-        // +2 for "/*" +1 for '\0'
-        int dir_name_len = DirectoryNameLength();
-        char* directory_name = new char[dir_name_len + 3];
-        strcpy(directory_name, DirectoryName());
-        if (directory_name[dir_name_len - 1] != U_SLASH)
-            directory_name[dir_name_len++] = U_SLASH;
-        directory_name[dir_name_len++] = U_STAR;
-        directory_name[dir_name_len] = U_NULL;
-
-        WIN32_FIND_DATA entry;
-        HANDLE file_handle = FindFirstFile(directory_name, &entry);
-        if (file_handle != INVALID_HANDLE_VALUE)
-        {
-            do
-            {
-                unsigned length = strlen(entry.cFileName);
-
-                //
-                // Check if the file is a java source, a java class file or a
-                // subdirectory. Since packages cannot start with '.', we skip
-                // all files that start with a dot. That includes this
-                // directory "." and its parent ".."
-                //
-                bool is_java = (length > FileSymbol::java_suffix_length &&
-                                FileSymbol::IsJavaSuffix(&entry.cFileName[length - FileSymbol::java_suffix_length])),
-                     is_class = (! source_dir_only &&
-                                 length > FileSymbol::class_suffix_length &&
-                                 FileSymbol::IsClassSuffix(&entry.cFileName[length - FileSymbol::class_suffix_length]));
-
-                if (is_java ||
-                    is_class ||
-                    (entry.dwFileAttributes == FILE_ATTRIBUTE_DIRECTORY &&
-                     Case::Index(entry.cFileName, U_DOT) < 0))
-                {
-                    char* clean_name = new char[length + 1];
-                    for (unsigned i = 0; i < length; i++)
-                    {
-                        clean_name[i] = entry.cFileName[i] == U_BACKSLASH
-                            ? (char) U_SLASH : entry.cFileName[i];
-                    }
-                    if (is_java)
-                        strcpy(&clean_name[length - FileSymbol::java_suffix_length],
-                               FileSymbol::java_suffix);
-                    else if (is_class)
-                        strcpy(&clean_name[length - FileSymbol::class_suffix_length],
-                               FileSymbol::class_suffix);
-                    DirectoryEntry* entry =
-                        entries -> InsertEntry(this, clean_name, length);
-                    if (! is_java)
-                        entries -> InsertCaseInsensitiveEntry(entry);
-                    delete [] clean_name;
-                }
-            } while (FindNextFile(file_handle, &entry));
-            FindClose(file_handle);
-        }
-
-        delete [] directory_name;
 #endif
     }
 }
@@ -1094,17 +1035,7 @@ bool FileSymbol::IsJavaSuffix(char* suffix)
 {
     return strncmp(suffix, java_suffix, java_suffix_length) == 0;
 }
-#elif defined(WIN32_FILE_SYSTEM)
-bool FileSymbol::IsClassSuffix(char* suffix)
-{
-    return Case::StringSegmentEqual(suffix, class_suffix, class_suffix_length);
-}
-
-bool FileSymbol::IsJavaSuffix(char* suffix)
-{
-    return Case::StringSegmentEqual(suffix, java_suffix, java_suffix_length);
-}
-#endif // WIN32_FILE_SYSTEM
+#endif
 
 void FileSymbol::SetFileNameLiteral(Control* control)
 {

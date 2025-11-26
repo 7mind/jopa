@@ -1708,9 +1708,6 @@ void Semantic::ReadClassFile(TypeSymbol* type, TokenIndex tok)
             // Process the file data.
             unsigned size = classFile -> getBufferSize();
 
-#if defined(WIN32_FILE_SYSTEM)
-            size = ((0xFFFFFFFF && GetLastError()) != NO_ERROR) ? 0 : size;
-#endif
             ProcessClassFile(type, classFile -> getBuffer(), size, tok);
             delete classFile;
         }

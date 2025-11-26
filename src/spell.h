@@ -1,5 +1,4 @@
-#ifndef spell_INCLUDED
-#define spell_INCLUDED
+#pragma once
 
 #include "platform.h"
 #include "case.h"
@@ -127,6 +126,4 @@ public:
 
 
 } // Close namespace Jopa block
-
-#endif // spell_INCLUDED
 
