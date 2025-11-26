@@ -1,3 +1,6 @@
+# Grammar generation
+add_subdirectory(grammar2)
+
 set(JOPA_SOURCES
     ast.cpp
     body.cpp
@@ -208,8 +211,14 @@ target_include_directories(jopa PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/parser"
     "${CMAKE_CURRENT_SOURCE_DIR}/codegen"
     "${CMAKE_BINARY_DIR}/generated"
+    "${GRAMMAR2_INCLUDE_DIR}"
 )
 target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
+
+# Depend on grammar generation if available
+if(TARGET generate_parser)
+    add_dependencies(jopa generate_parser)
+endif()
 
 # Enable strict warnings
 target_compile_options(jopa PRIVATE
