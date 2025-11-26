@@ -27,6 +27,20 @@ fi
 PREFIX="parse_${JDK_VERSION}_"
 DISPLAY_NAME=$(echo "$JDK_VERSION" | tr '[:lower:]' '[:upper:]')
 
+# Check that the required submodule is initialized
+if [[ "$JDK_VERSION" == "jdk7" ]]; then
+    SUBMODULE_DIR="${PROJECT_DIR}/assets/jdk7u-langtools"
+else
+    SUBMODULE_DIR="${PROJECT_DIR}/assets/jdk8u_langtools"
+fi
+
+if [[ ! -e "${SUBMODULE_DIR}/.git" ]]; then
+    echo "Error: Git submodule not initialized: ${SUBMODULE_DIR}" >&2
+    echo "" >&2
+    echo "Run: git submodule update --init" >&2
+    exit 1
+fi
+
 # Build if requested
 if [[ "$BUILD_FLAG" == "--build" ]]; then
     echo "=== Configuring Build ==="

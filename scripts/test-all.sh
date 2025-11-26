@@ -21,6 +21,20 @@ echo "Build:   ${BUILD_DIR}"
 echo "Parallel jobs: ${NPROC}"
 echo ""
 
+# Check that submodules are initialized
+JDK7_ASSETS="${PROJECT_DIR}/assets/jdk7u-langtools"
+JDK8_ASSETS="${PROJECT_DIR}/assets/jdk8u_langtools"
+
+if [[ ! -e "${JDK7_ASSETS}/.git" ]] || [[ ! -e "${JDK8_ASSETS}/.git" ]]; then
+    echo "Error: Git submodules are not initialized." >&2
+    echo "" >&2
+    echo "Run: git submodule update --init" >&2
+    echo "" >&2
+    [[ ! -e "${JDK7_ASSETS}/.git" ]] && echo "  Missing: assets/jdk7u-langtools" >&2
+    [[ ! -e "${JDK8_ASSETS}/.git" ]] && echo "  Missing: assets/jdk8u_langtools" >&2
+    exit 1
+fi
+
 # Configure and build (Debug with sanitizers for primary tests)
 echo "=== Configuring Build ==="
 CMAKE_OUTPUT=$(cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
