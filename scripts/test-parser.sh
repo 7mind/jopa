@@ -30,19 +30,13 @@ DISPLAY_NAME=$(echo "$JDK_VERSION" | tr '[:lower:]' '[:upper:]')
 # Build if requested
 if [[ "$BUILD_FLAG" == "--build" ]]; then
     echo "=== Configuring Build ==="
-    CMAKE_OUTPUT=$(cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
+    cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
         -DCMAKE_BUILD_TYPE=Debug \
         -DJOPA_ENABLE_SANITIZERS=ON \
         -DJOPA_ENABLE_CPPTRACE=ON \
         -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
         -DJOPA_PARSER_TESTS_JDK7=$([[ "$JDK_VERSION" == "jdk7" ]] && echo "ON" || echo "OFF") \
-        -DJOPA_PARSER_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF") 2>&1)
-    echo "$CMAKE_OUTPUT"
-
-    # Extract skipped count from cmake output and save it
-    JDK_NUM="${JDK_VERSION#jdk}"
-    SKIPPED=$(echo "$CMAKE_OUTPUT" | grep -oP "Added \d+ JDK${JDK_NUM} parser tests \(skipped \K\d+" || echo "0")
-    echo "$SKIPPED" > "${BUILD_DIR}/parser_${JDK_VERSION}_skipped.txt"
+        -DJOPA_PARSER_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF")
 
     echo ""
     echo "=== Building ==="
@@ -69,18 +63,19 @@ set -e
 # Save output for later analysis
 echo "$TEST_OUTPUT" > parser_results.txt
 
-# Get total count
-TOTAL=$(ctest -R "^${PREFIX}" -N 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' | tr -d ' ')
-TOTAL=${TOTAL:-0}
+# Get whitelisted count (tests that will run)
+WHITELISTED=$(ctest -R "^${PREFIX}" -N 2>/dev/null | grep "Total Tests:" | sed 's/Total Tests: //' | tr -d ' ')
+WHITELISTED=${WHITELISTED:-0}
 
-# Get skipped count from saved file (if exists)
-SKIPPED_FILE="${BUILD_DIR}/parser_${JDK_VERSION}_skipped.txt"
-if [[ -f "$SKIPPED_FILE" ]]; then
-    SKIPPED=$(cat "$SKIPPED_FILE" | tr -d ' \n')
+# Get total .java file count from assets
+JDK_NUM="${JDK_VERSION#jdk}"
+if [[ "$JDK_NUM" == "7" ]]; then
+    ASSETS_DIR="${PROJECT_DIR}/assets/jdk7u-langtools/test"
 else
-    SKIPPED=0
+    ASSETS_DIR="${PROJECT_DIR}/assets/jdk8u_langtools/test"
 fi
-SKIPPED=${SKIPPED:-0}
+TOTAL=$(find "$ASSETS_DIR" -name "*.java" 2>/dev/null | wc -l | tr -d ' ')
+TOTAL=${TOTAL:-0}
 
 # Count different failure types from the "The following tests FAILED:" section
 # Format: "123 - test_name (Failed)" or "(Subprocess aborted)" or "(Timeout)"
@@ -97,17 +92,17 @@ TIMEOUT=${TIMEOUT:-0}
 CRASHED=${CRASHED:-0}
 
 TOTAL_FAILURES=$((FAILED + TIMEOUT + CRASHED))
-PASSED=$((TOTAL - TOTAL_FAILURES))
+PASSED=$((WHITELISTED - TOTAL_FAILURES))
 
 # Console output
 echo ""
 echo "${DISPLAY_NAME} Parser Tests:"
-echo "  Total:   ${TOTAL}"
-echo "  Skipped: ${SKIPPED} (negative tests)"
-echo "  Passed:  ${PASSED}"
-echo "  Failed:  ${FAILED}"
-echo "  Timeout: ${TIMEOUT}"
-echo "  Crashed: ${CRASHED}"
+echo "  Total:       ${TOTAL}"
+echo "  Whitelisted: ${WHITELISTED}"
+echo "  Passed:      ${PASSED}"
+echo "  Failed:      ${FAILED}"
+echo "  Timeout:     ${TIMEOUT}"
+echo "  Crashed:     ${CRASHED}"
 
 # Write summary (markdown format for GitHub, plain for stdout)
 {
@@ -115,8 +110,8 @@ echo "  Crashed: ${CRASHED}"
     echo ""
     echo "| Metric | Count |"
     echo "|--------|-------|"
-    echo "| Total Tests | ${TOTAL} |"
-    echo "| Skipped (negative) | ${SKIPPED} |"
+    echo "| Total Files | ${TOTAL} |"
+    echo "| Whitelisted | ${WHITELISTED} |"
     echo "| Passed | ${PASSED} |"
     echo "| Failed | ${FAILED} |"
     echo "| Timeout | ${TIMEOUT} |"
@@ -132,7 +127,7 @@ echo "  Crashed: ${CRASHED}"
 RESULTS_FILE="${BUILD_DIR}/parser_${JDK_VERSION}_results.env"
 {
     echo "PARSER_TOTAL=$TOTAL"
-    echo "PARSER_SKIPPED=$SKIPPED"
+    echo "PARSER_WHITELISTED=$WHITELISTED"
     echo "PARSER_PASSED=$PASSED"
     echo "PARSER_FAILED=$FAILED"
     echo "PARSER_TIMEOUT=$TIMEOUT"
