@@ -7,6 +7,9 @@
 %Options gp=cpp
 %Options fp=java
 %Options prefix=TK_
+%Options error-maps
+%Options scopes
+%Options names=max
 
 %Terminals
     Identifier

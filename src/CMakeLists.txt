@@ -207,11 +207,11 @@ configure_file(
 
 add_executable(jopa ${JOPA_SOURCES})
 target_include_directories(jopa PRIVATE
+    "${CMAKE_BINARY_DIR}/src"  # For generated grammar/ headers
     "${CMAKE_CURRENT_SOURCE_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/parser"
     "${CMAKE_CURRENT_SOURCE_DIR}/codegen"
     "${CMAKE_BINARY_DIR}/generated"
-    "${GRAMMAR2_INCLUDE_DIR}"
 )
 target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
 
