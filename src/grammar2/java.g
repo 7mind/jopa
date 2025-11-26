@@ -479,27 +479,13 @@ ContinueStatement ::= 'continue' Identifieropt ';'
 ReturnStatement ::= 'return' Expressionopt ';'
 ThrowStatement ::= 'throw' Expression ';'
 SynchronizedStatement ::= 'synchronized' '(' Expression ')' Block
--- Java 7: Try-with-resources
 TryStatement ::= 'try' Block Catches Marker
 TryStatement ::= 'try' Block Catchesopt Finally
-TryStatement ::= 'try' ResourceSpecification Block Catchesopt Marker
-TryStatement ::= 'try' ResourceSpecification Block Catchesopt Finally
-ResourceSpecification ::= '(' Resources Marker ')'
-ResourceSpecification ::= '(' Resources ';' ')'
-Resources ::= Resource
-Resources ::= Resources ';' Resource
-Resource ::= Type VariableDeclaratorId '=' Expression
-Resource ::= Modifiers Type VariableDeclaratorId '=' Expression
 Catches ::= CatchClause
 Catches ::= Catches CatchClause
 Catchesopt ::= %empty
 Catchesopt ::= Catches
--- Java 7: Multi-catch
-CatchClause ::= 'catch' '(' CatchFormalParameter ')' Block
-CatchFormalParameter ::= CatchType VariableDeclaratorId
-CatchFormalParameter ::= Modifiers CatchType VariableDeclaratorId
-CatchType ::= ClassOrInterfaceType
-CatchType ::= CatchType '|' ClassOrInterfaceType
+CatchClause ::= 'catch' '(' FormalParameter ')' Block
 Finally ::= 'finally' Block
 Primary ::= PrimaryNoNewArray
 Primary ::= ArrayCreationUninitialized
@@ -519,15 +505,8 @@ PrimaryNoNewArray ::= MethodInvocation
 PrimaryNoNewArray ::= ArrayAccess
 ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType Arguments ClassBodyopt
--- Java 7: Diamond operator
-ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
-ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' TypeArgumentsopt Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' TypeArgumentsopt Arguments ClassBodyopt
--- Java 7: Diamond in qualified new
-ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
-DiamondMarker ::= '<' '>'
 ArgumentList ::= Expression
 ArgumentList ::= ArgumentList ',' Expression
 ArgumentListopt ::= %empty
@@ -765,5 +744,66 @@ AdditionalBound ::= '&' ClassOrInterfaceType
 AdditionalBound1 ::= '&' ClassOrInterfaceType1
 ClassOrInterfaceType1 ::= ClassOrInterfaceType '>'
 ClassOrInterfaceType1 ::= ClassOrInterface '<' TypeArgumentList2 Marker
+
+-- =========================================================================
+-- Java 7 Features (Rules 567+)
+-- =========================================================================
+
+-- Java 7: Try-with-resources
+-- Rule 567: TryStatement with resources and optional catches (no finally)
+TryStatement ::= 'try' ResourceSpecification Block Catchesopt Marker
+
+-- Rule 568: TryStatement with resources and optional catches and finally
+TryStatement ::= 'try' ResourceSpecification Block Catchesopt Finally
+
+-- Rule 569: ResourceSpecification without trailing semicolon
+ResourceSpecification ::= '(' Resources Marker ')'
+
+-- Rule 570: ResourceSpecification with trailing semicolon
+ResourceSpecification ::= '(' Resources ';' ')'
+
+-- Rule 571: Single resource
+Resources ::= Resource
+
+-- Rule 572: Multiple resources
+Resources ::= Resources ';' Resource
+
+-- Rule 573: Resource without modifiers
+Resource ::= Type VariableDeclaratorId '=' Expression
+
+-- Rule 574: Resource with modifiers (e.g., final)
+Resource ::= Modifiers Type VariableDeclaratorId '=' Expression
+
+-- Java 7: Multi-catch - extends FormalParameter to support union types
+-- The original CatchClause (rule 308) uses FormalParameter, which uses Type.
+-- For multi-catch, we add a new production that allows union types.
+
+-- Rule 575: CatchClause with union catch type (multi-catch)
+CatchClause ::= 'catch' '(' UnionType VariableDeclaratorId ')' Block
+
+-- Rule 576: CatchClause with union catch type and modifiers
+CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
+
+-- Rule 577: Union type - at least two exception types joined with |
+UnionType ::= ClassOrInterfaceType '|' ClassOrInterfaceType
+
+-- Rule 578: Union type - additional types
+UnionType ::= UnionType '|' ClassOrInterfaceType
+
+-- Java 7: Diamond operator
+-- Rule 580: new Type<>(...) without explicit type arguments
+ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+
+-- Rule 581: new <T>Type<>(...) with constructor type args but diamond for class
+ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+
+-- Rule 582: Qualified new with diamond
+ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+
+-- Rule 583: Qualified new with diamond (via name)
+ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+
+-- Rule 584: DiamondMarker matches '<>'
+DiamondMarker ::= '<' '>'
 
 %End

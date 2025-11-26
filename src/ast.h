@@ -3297,9 +3297,13 @@ public:
 
 //
 // CatchClause --> <CATCH, catch_token, FormalParameter, Block>
+// Java 7: For multi-catch, union_types contains the list of exception types
 //
 class AstCatchClause : public Ast
 {
+    StoragePool* pool;
+    AstArray<AstType*>* union_types; // Java 7 multi-catch union types
+
 public:
     VariableSymbol* parameter_symbol;
 
@@ -3309,8 +3313,17 @@ public:
 
     inline AstCatchClause()
         : Ast(CATCH)
+        , pool(NULL)
+        , union_types(NULL)
     {}
     ~AstCatchClause() {}
+
+    // Java 7 multi-catch support
+    inline void SetPool(StoragePool* p) { pool = p; }
+    inline AstType*& UnionType(unsigned i) { return (*union_types)[i]; }
+    inline unsigned NumUnionTypes() { return union_types ? union_types->Length() : 0; }
+    inline void AllocateUnionTypes(unsigned estimate = 2);
+    inline void AddUnionType(AstType*);
 
 #ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
@@ -3353,11 +3366,13 @@ public:
 //
 // TryStatement --> <TRY, Label_opt, try-token, Block CatchClauses,
 // FinallyClause_opt>
+// Java 7: Resources for try-with-resources statement
 //
 class AstTryStatement : public AstStatement
 {
     StoragePool* pool;
     AstArray<AstCatchClause*>* catch_clauses;
+    AstArray<AstLocalVariableStatement*>* resources; // Java 7 try-with-resources
 
 public:
     TokenIndex try_token;
@@ -3368,6 +3383,8 @@ public:
     inline AstTryStatement(StoragePool* p)
         : AstStatement(TRY)
         , pool(p)
+        , catch_clauses(NULL)
+        , resources(NULL)
     {}
     ~AstTryStatement() {}
 
@@ -3381,6 +3398,12 @@ public:
     }
     inline void AllocateCatchClauses(unsigned estimate = 1);
     inline void AddCatchClause(AstCatchClause*);
+
+    // Java 7 try-with-resources support
+    inline AstLocalVariableStatement*& Resource(unsigned i) { return (*resources)[i]; }
+    inline unsigned NumResources() { return resources ? resources->Length() : 0; }
+    inline void AllocateResources(unsigned estimate = 1);
+    inline void AddResource(AstLocalVariableStatement*);
 
 #ifdef JOPA_DEBUG
     virtual void Print(LexStream&);
@@ -3771,6 +3794,7 @@ public:
 // during semantic analysis an artificial base_opt expression is constructed.
 // In such a case, the user can determine this condition by testing
 // base_opt -> generated.
+// Java 7: uses_diamond indicates the diamond operator <> was used for type inference.
 //
 class AstClassCreationExpression : public AstExpression
 {
@@ -3781,6 +3805,7 @@ public:
     AstTypeName* class_type;
     AstArguments* arguments;
     AstClassBody* class_body_opt;
+    bool uses_diamond; // Java 7 diamond operator
 
     //
     // For anonymous classes, we resolve the original statement into a new
@@ -3791,6 +3816,7 @@ public:
 
     inline AstClassCreationExpression()
         : AstExpression(CLASS_CREATION)
+        , uses_diamond(false)
     {}
     ~AstClassCreationExpression() {}
 
@@ -6686,6 +6712,32 @@ inline void AstTryStatement::AddCatchClause(AstCatchClause* catch_clause)
 {
     assert(catch_clauses);
     catch_clauses -> Next() = catch_clause;
+}
+
+// Java 7 try-with-resources support
+inline void AstTryStatement::AllocateResources(unsigned estimate)
+{
+    assert(! resources);
+    resources = new (pool) AstArray<AstLocalVariableStatement*> (pool, estimate);
+}
+
+inline void AstTryStatement::AddResource(AstLocalVariableStatement* resource)
+{
+    assert(resources);
+    resources -> Next() = resource;
+}
+
+// Java 7 multi-catch support
+inline void AstCatchClause::AllocateUnionTypes(unsigned estimate)
+{
+    assert(! union_types && pool);
+    union_types = new (pool) AstArray<AstType*> (pool, estimate);
+}
+
+inline void AstCatchClause::AddUnionType(AstType* type)
+{
+    assert(union_types);
+    union_types -> Next() = type;
 }
 
 inline void AstArrayCreationExpression::AllocateDimExprs(unsigned estimate)

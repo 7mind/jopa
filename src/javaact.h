@@ -2487,75 +2487,105 @@ void Parser::InitRuleAction()
     rule_action[566] = &Parser::MakeTypeArguments;
 #endif
 
-// Java 7 rules - placeholder actions until properly implemented
-// These rule numbers need to be verified against the generated grammar
+// ==========================================================================
+// Java 7 Rules (567-583)
+// ==========================================================================
 
+// Rule 567: TryStatement ::= 'try' ResourceSpecification Block Catchesopt Marker
 #ifndef HEADERS
-    rule_action[567] = &Parser::NoAction;
+    rule_action[567] = &Parser::MakeTryWithResources;
+#else
+    void MakeTryWithResources();
 #endif
 
+// Rule 568: TryStatement ::= 'try' ResourceSpecification Block Catchesopt Finally
 #ifndef HEADERS
-    rule_action[568] = &Parser::NoAction;
+    rule_action[568] = &Parser::MakeTryWithResources;
 #endif
 
+// Rule 569: ResourceSpecification ::= '(' Resources Marker ')'
 #ifndef HEADERS
-    rule_action[569] = &Parser::NoAction;
+    rule_action[569] = &Parser::SetSym1ToSym2;
 #endif
 
+// Rule 570: ResourceSpecification ::= '(' Resources ';' ')'
 #ifndef HEADERS
-    rule_action[570] = &Parser::NoAction;
+    rule_action[570] = &Parser::SetSym1ToSym2;
 #endif
 
+// Rule 571: Resources ::= Resource
 #ifndef HEADERS
-    rule_action[571] = &Parser::NoAction;
+    rule_action[571] = &Parser::StartList;
 #endif
 
+// Rule 572: Resources ::= Resources ';' Resource
 #ifndef HEADERS
-    rule_action[572] = &Parser::NoAction;
+    rule_action[572] = &Parser::AddList3;
 #endif
 
+// Rule 573: Resource ::= Type VariableDeclaratorId '=' Expression
 #ifndef HEADERS
-    rule_action[573] = &Parser::NoAction;
+    rule_action[573] = &Parser::MakeResource;
+#else
+    void MakeResource();
 #endif
 
+// Rule 574: Resource ::= Modifiers Type VariableDeclaratorId '=' Expression
 #ifndef HEADERS
-    rule_action[574] = &Parser::NoAction;
+    rule_action[574] = &Parser::MakeResource;
 #endif
 
+// Rule 575: CatchClause ::= 'catch' '(' UnionType VariableDeclaratorId ')' Block
 #ifndef HEADERS
-    rule_action[575] = &Parser::NoAction;
+    rule_action[575] = &Parser::MakeMultiCatch;
+#else
+    void MakeMultiCatch();
 #endif
 
+// Rule 576: CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
 #ifndef HEADERS
-    rule_action[576] = &Parser::NoAction;
+    rule_action[576] = &Parser::MakeMultiCatch;
 #endif
 
+// Rule 577: UnionType ::= ClassOrInterfaceType '|' ClassOrInterfaceType
 #ifndef HEADERS
-    rule_action[577] = &Parser::NoAction;
+    rule_action[577] = &Parser::MakeUnionType;
+#else
+    void MakeUnionType();
 #endif
 
+// Rule 578: UnionType ::= UnionType '|' ClassOrInterfaceType
 #ifndef HEADERS
-    rule_action[578] = &Parser::NoAction;
+    rule_action[578] = &Parser::MakeUnionType;
 #endif
 
+// Rule 579: ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
 #ifndef HEADERS
-    rule_action[579] = &Parser::NoAction;
+    rule_action[579] = &Parser::MakeDiamondAllocation;
+#else
+    void MakeDiamondAllocation();
 #endif
 
+// Rule 580: ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
 #ifndef HEADERS
-    rule_action[580] = &Parser::NoAction;
+    rule_action[580] = &Parser::MakeDiamondAllocation;
 #endif
 
+// Rule 581: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
 #ifndef HEADERS
-    rule_action[581] = &Parser::NoAction;
+    rule_action[581] = &Parser::MakeQualifiedDiamondNew;
+#else
+    void MakeQualifiedDiamondNew();
 #endif
 
+// Rule 582: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
 #ifndef HEADERS
-    rule_action[582] = &Parser::NoAction;
+    rule_action[582] = &Parser::MakeQualifiedDiamondNew;
 #endif
 
+// Rule 583: DiamondMarker ::= '<' '>'
 #ifndef HEADERS
-    rule_action[583] = &Parser::NoAction;
+    rule_action[583] = &Parser::NullAction;
 #endif
 
 #ifndef HEADERS

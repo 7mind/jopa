@@ -8,6 +8,8 @@ A totally Claude'd effort in modernizing `jikes`, the historical independent `ja
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
+Note: I've made multiple attempts to replace the legacy parser with a more modern one but Claude failed to deliver due to extremely tight coupling.
+
 ## Java 5 & 6 Support
 
 This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language features:
