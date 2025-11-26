@@ -2354,9 +2354,20 @@ void ByteCode::CloseSwitchLocalVariables(AstBlock* switch_block,
 
 //
 // Java 7: Helper to emit close() calls for try-with-resources
-// Closes resources in reverse declaration order
+// Closes resources in reverse declaration order with exception suppression.
 //
-void ByteCode::EmitResourceCleanup(AstTryStatement* statement)
+// Exception handling follows JLS 14.20.3:
+// - If primary_exception exists (try body threw): catch close exceptions and
+//   call primary_exception.addSuppressed(closeException)
+// - If primary_exception is null: accumulate first close exception and
+//   suppress subsequent ones with close_exception.addSuppressed()
+// - After all closes, throw close_exception if primary_exception is null
+//
+// Variable layout (relative to variable_index):
+//   +0: primary_exception (set by catch-all handler if try throws)
+//   +2: close_exception (accumulated close exceptions in normal path)
+//
+void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_index)
 {
     // Close resources in reverse order
     for (int r = statement -> NumResources() - 1; r >= 0; r--)
@@ -2373,39 +2384,137 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement)
 
             // Check for null before calling close()
             Label skip_close;
-            Label after_close;
+            Label after_catch;
             PutOp(OP_DUP);
-
-            // Save stack depth at branch point (we have [ref, ref] = 2)
-            // Both paths will leave [ref] on stack before diverging
             int stack_at_branch = stack_depth;  // = 2
 
             EmitBranch(OP_IFNULL, skip_close);
             // Fall-through (not null) path: stack = 1 [ref]
 
-            // Call close() - AutoCloseable is an interface, so use invokeinterface
-            // close() takes 'this' (1 arg), returns void
+            // Record start of try block for close()
+            u2 close_try_start = code_attribute -> CodeLength();
+
+            // Call close() - AutoCloseable is an interface
             PutOp(OP_INVOKEINTERFACE);
             PutU2(RegisterLibraryMethodref(control.AutoCloseable_closeMethod()));
             PutU1(1);  // 1 argument (just 'this')
             PutU1(0);  // reserved
             // After close(): stack = 0
 
-            EmitBranch(OP_GOTO, after_close, statement);
-            // Stack = 0, but we need to handle the null path
+            // Record end of try block
+            u2 close_try_end = code_attribute -> CodeLength();
 
-            // Null path: restore stack to state after IFNULL branch
-            // At skip_close, stack = 1 [ref] (IFNULL consumed one ref from [ref, ref])
-            stack_depth = stack_at_branch - 1;  // IFNULL pops 1, so 2 - 1 = 1
+            EmitBranch(OP_GOTO, after_catch, statement);
+
+            // Exception handler for close(): catches any Throwable
+            u2 catch_handler_pc = code_attribute -> CodeLength();
+            stack_depth = 1;  // caught exception is on stack
+
+            // Logic:
+            // if (primary_exception != null):
+            //     primary_exception.addSuppressed(caught)
+            // else if (close_exception != null):
+            //     close_exception.addSuppressed(caught)
+            // else:
+            //     close_exception = caught
+
+            Label check_close_exception;
+            Label first_close_exception;
+
+            // Load primary_exception and check if non-null
+            // Stack: [caught]
+            LoadLocal(variable_index, control.Throwable());
+            // Stack: [caught, primary]
+            PutOp(OP_DUP);
+            // Stack: [caught, primary, primary]
+            EmitBranch(OP_IFNULL, check_close_exception);
+            // Stack: [caught, primary]
+
+            // Primary exception exists: call primary.addSuppressed(caught)
+            PutOp(OP_SWAP);
+            // Stack: [primary, caught]
+            PutOp(OP_INVOKEVIRTUAL);
+            PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+            // Stack: []
+            EmitBranch(OP_GOTO, after_catch, statement);
+
+            // check_close_exception:
+            stack_depth = 2;  // [caught, null]
+            DefineLabel(check_close_exception);
+            CompleteLabel(check_close_exception);
+            PutOp(OP_POP);  // pop null (was primary)
+            // Stack: [caught]
+
+            // Load close_exception and check if non-null
+            LoadLocal(variable_index + 2, control.Throwable());
+            // Stack: [caught, close]
+            PutOp(OP_DUP);
+            // Stack: [caught, close, close]
+            EmitBranch(OP_IFNULL, first_close_exception);
+            // Stack: [caught, close]
+
+            // Close exception exists: call close.addSuppressed(caught)
+            PutOp(OP_SWAP);
+            // Stack: [close, caught]
+            PutOp(OP_INVOKEVIRTUAL);
+            PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+            // Stack: []
+            EmitBranch(OP_GOTO, after_catch, statement);
+
+            // first_close_exception: no previous exception, store caught as close_exception
+            stack_depth = 2;  // [caught, null]
+            DefineLabel(first_close_exception);
+            CompleteLabel(first_close_exception);
+            PutOp(OP_POP);  // pop null (was close)
+            // Stack: [caught]
+            StoreLocal(variable_index + 2, control.Throwable());
+            // Stack: []
+            EmitBranch(OP_GOTO, after_catch, statement);
+
+            // Null path: resource was null, just pop it
+            stack_depth = stack_at_branch - 1;  // IFNULL pops 1
             DefineLabel(skip_close);
             CompleteLabel(skip_close);
-            PutOp(OP_POP);  // pop the null reference, stack = 0
+            PutOp(OP_POP);  // pop the null reference
+            // Stack: []
 
-            DefineLabel(after_close);
-            CompleteLabel(after_close);
-            // Both paths converge with stack = 0
+            // After all paths converge
+            stack_depth = 0;
+            DefineLabel(after_catch);
+            CompleteLabel(after_catch);
+
+            // Register exception handler for close() call
+            // Catch type is java/lang/Throwable
+            code_attribute -> AddException(close_try_start, close_try_end,
+                                           catch_handler_pc,
+                                           RegisterClass(control.Throwable()));
         }
     }
+
+    //
+    // After all resources are closed, check if we need to throw close_exception.
+    // This happens when primary_exception is null (normal path) and close_exception
+    // is non-null (some close() threw).
+    //
+    Label done_cleanup;
+    // if (primary_exception != null) goto done_cleanup (it will be rethrown by caller)
+    LoadLocal(variable_index, control.Throwable());
+    EmitBranch(OP_IFNONNULL, done_cleanup);
+    // stack = 0 after IFNONNULL
+
+    // if (close_exception == null) goto done_cleanup
+    LoadLocal(variable_index + 2, control.Throwable());
+    EmitBranch(OP_IFNULL, done_cleanup);
+    // stack = 0 after IFNULL
+
+    // Reload close_exception and throw it
+    LoadLocal(variable_index + 2, control.Throwable());
+    PutOp(OP_ATHROW);
+
+    // done_cleanup: both paths arrive with stack = 0
+    stack_depth = 0;
+    DefineLabel(done_cleanup);
+    CompleteLabel(done_cleanup);
 }
 
 //
@@ -2426,6 +2535,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     // Java 7: Emit resource initializations for try-with-resources
     // Resources are stored in local variables before the try block
     //
+    bool has_resources = statement -> NumResources() > 0;
     for (unsigned r = 0; r < statement -> NumResources(); r++)
     {
         AstLocalVariableStatement* resource = statement -> Resource(r);
@@ -2436,13 +2546,27 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         }
     }
 
+    //
+    // Java 7: Initialize exception variables for try-with-resources suppression.
+    // variable_index+0: primary exception (set by catch-all handler if try throws)
+    // variable_index+2: close exception (accumulated close exceptions in normal path)
+    //
+    if (has_resources)
+    {
+        int variable_index = method_stack -> TopBlock() ->
+            block_symbol -> helper_variable_index;
+        PutOp(OP_ACONST_NULL);
+        StoreLocal(variable_index, control.Throwable());  // primary_exception = null
+        PutOp(OP_ACONST_NULL);
+        StoreLocal(variable_index + 2, control.Throwable());  // close_exception = null
+    }
+
     u2 start_try_block_pc = code_attribute -> CodeLength(); // start pc
     assert(method_stack -> TopHandlerRangeStart().Length() == 0 &&
            method_stack -> TopHandlerRangeEnd().Length() == 0);
     method_stack -> TopHandlerRangeStart().Push(start_try_block_pc);
 
     // Java 7: Try-with-resources creates a synthetic finally for close() calls
-    bool has_resources = statement -> NumResources() > 0;
     bool emit_explicit_finally = statement -> finally_clause_opt &&
         ! IsNop(statement -> finally_clause_opt -> block);
     bool emit_finally_clause = emit_explicit_finally || has_resources;
@@ -2656,7 +2780,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             // Java 7: Emit close() calls for resources before explicit finally
             if (has_resources)
             {
-                EmitResourceCleanup(statement);
+                EmitResourceCleanup(statement, variable_index);
             }
 
             // Emit explicit finally block if present
@@ -2708,10 +2832,16 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     {
         //
         // Try block was empty; skip all catch blocks, and a finally block
-        // is treated normally.
+        // is treated normally. For try-with-resources, just close resources.
         //
         method_stack -> TopHandlerRangeStart().Reset();
-        if (emit_finally_clause)
+        if (has_resources)
+        {
+            int variable_index = method_stack -> TopBlock() ->
+                block_symbol -> helper_variable_index;
+            EmitResourceCleanup(statement, variable_index);
+        }
+        if (emit_explicit_finally)
             EmitBlockStatement(statement -> finally_clause_opt -> block);
     }
 }

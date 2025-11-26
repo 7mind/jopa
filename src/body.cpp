@@ -1578,7 +1578,12 @@ void Semantic::ProcessTryStatement(Ast* stmt)
             // first such statement encountered in enclosing block?
             enclosing_block_symbol -> helper_variable_index =
                 enclosing_block_symbol -> max_variable_index;
-            enclosing_block_symbol -> max_variable_index += 2;
+            // Allocate slots:
+            //   +0: primary exception (caught by catch-all handler)
+            //   +1: JSR return address
+            //   +2: close exception (for try-with-resources suppression in normal path)
+            int base_slots = (try_statement -> NumResources() > 0) ? 3 : 2;
+            enclosing_block_symbol -> max_variable_index += base_slots;
             if (ThisMethod() -> Type() != control.void_type)
             {
                 if (control.IsDoubleWordType(ThisMethod() -> Type()))
