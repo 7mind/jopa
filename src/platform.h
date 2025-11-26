@@ -644,6 +644,7 @@ public:
     static const char U8S_Signature[]; // "Signature"
     static const char U8S_SourceFile[]; // "SourceFile"
     static const char U8S_StackMap[]; // "StackMap"
+    static const char U8S_StackMapTable[]; // "StackMapTable"
     static const char U8S_Synthetic[]; // "Synthetic"
 
     //

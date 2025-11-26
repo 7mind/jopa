@@ -240,6 +240,30 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
 endif()
 
+# Java 7 String Switch Test
+set(StringSwitchTest_OUTPUT "${OUTPUT_DIR}/StringSwitchTest")
+file(MAKE_DIRECTORY "${StringSwitchTest_OUTPUT}")
+add_test(
+    NAME "compile_StringSwitchTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${StringSwitchTest_OUTPUT}"
+            "${TEST_DIR}/java7/StringSwitchTest.java"
+)
+set_tests_properties("compile_StringSwitchTest" PROPERTIES LABELS "compile;java7")
+if(JOPA_ENABLE_JVM_TESTS)
+    # Using -target 1.6 avoids need for StackMapTable
+    add_test(
+        NAME "run_StringSwitchTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} -cp "${StringSwitchTest_OUTPUT}:${RUNTIME_JAR}" "StringSwitchTest"
+    )
+    set_tests_properties("run_StringSwitchTest" PROPERTIES
+        LABELS "run;java7"
+        DEPENDS "compile_StringSwitchTest"
+    )
+endif()
+
 # Java 8 Tests (bytecode version 52.0 with default methods)
 set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")

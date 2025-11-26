@@ -1420,6 +1420,8 @@ const char StringConstant::U8S_SourceFile[] = {
     U_S, U_o, U_u, U_r, U_c, U_e, U_F, U_i, U_l, U_e, U_NU}; // "SourceFile"
 const char StringConstant::U8S_StackMap[] = {
     U_S, U_t, U_a, U_c, U_k, U_M, U_a, U_p, U_NU}; // "StackMap"
+const char StringConstant::U8S_StackMapTable[] = {
+    U_S, U_t, U_a, U_c, U_k, U_M, U_a, U_p, U_T, U_a, U_b, U_l, U_e, U_NU}; // "StackMapTable"
 const char StringConstant::U8S_Synthetic[] = {
     U_S, U_y, U_n, U_t, U_h, U_e, U_t, U_i, U_c, U_NU}; // "Synthetic"
 

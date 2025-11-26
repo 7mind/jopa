@@ -288,6 +288,8 @@ public:                                                         \
     TYPE_ACCESSOR(Short, lang_package);
     FIELD_ACCESSOR(Short, TYPE, "java/lang/Class");
     TYPE_ACCESSOR(String, lang_package);
+    METHOD_ACCESSOR(String_hashCode, String(), "hashCode", "()I");
+    METHOD_ACCESSOR(String_equals, String(), "equals", "(Ljava/lang/Object;)Z");
     TYPE_ACCESSOR(StringBuffer, lang_package);
     METHOD_ACCESSOR(StringBuffer_Init, StringBuffer(), "<init>", "()V");
     METHOD_ACCESSOR(StringBuffer_InitWithString, StringBuffer(),
