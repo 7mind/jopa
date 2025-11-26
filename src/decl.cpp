@@ -913,10 +913,10 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 {
                     bound_type = java_lang -> FindTypeSymbol(bound_name);
 
-                    // If still not found, try to read the type from source
+                    // If still not found, try to read the type from file (.java or .class)
                     if (!bound_type)
                     {
-                        FileSymbol* file_symbol = Control::GetJavaFile(java_lang, bound_name);
+                        FileSymbol* file_symbol = Control::GetFile(control, java_lang, bound_name);
                         if (file_symbol)
                         {
                             ReadType(file_symbol, java_lang, bound_name, bound_ast -> name -> identifier_token);
@@ -1012,6 +1012,17 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
                 if (java_lang)
                 {
                     bound_type = java_lang -> FindTypeSymbol(bound_name);
+
+                    // If still not found, try to read the type from file (.java or .class)
+                    if (!bound_type)
+                    {
+                        FileSymbol* file_symbol = Control::GetFile(control, java_lang, bound_name);
+                        if (file_symbol)
+                        {
+                            ReadType(file_symbol, java_lang, bound_name, bound_ast -> name -> identifier_token);
+                            bound_type = java_lang -> FindTypeSymbol(bound_name);
+                        }
+                    }
                 }
             }
 
