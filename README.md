@@ -30,7 +30,7 @@ This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language f
 ### Java 7 Features
 - ✅ **Diamond Operator** - Type inference for generic instance creation (`new ArrayList<>()`)
 - ✅ **Multi-catch** - Catching multiple exception types in a single catch block (`catch (IOException | SQLException e)`)
-- ✅ **Try-with-resources** - Automatic resource management with `AutoCloseable` interface
+- ✅ **Try-with-resources** - Automatic resource management with `AutoCloseable` interface and exception suppression via `addSuppressed()`
 - ✅ **Strings in Switch** - Switch statements with String expressions
 - ✅ **Binary Literals** - Integer literals in binary form (`0b1010`)
 - ✅ **Underscores in Numeric Literals** - Improved readability (`1_000_000`)
@@ -44,7 +44,7 @@ Java 7 language features are fully supported for parsing and semantic analysis. 
 | Multi-catch | ✅ Works | ⚠️ Needs StackMapTable |
 | Try-with-resources | ✅ Works | ⚠️ Needs StackMapTable |
 | String switch | ✅ Works | ⚠️ Needs StackMapTable |
-| Exception suppression (`addSuppressed`) | ❌ Not implemented | ❌ Not implemented |
+| Exception suppression (`addSuppressed`) | ✅ Works | ⚠️ Needs StackMapTable |
 
 **Note:** Use `-source 1.7 -target 1.6` to compile Java 7 code to Java 6 bytecode, which runs on any JVM without verification issues. Full `-target 1.7` support requires StackMapTable generation (not yet implemented).
 
