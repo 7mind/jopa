@@ -1,4 +1,5 @@
-// DO NOT MODIFY THIS FILE - it is generated using jikespg on java.g.
+// Originally generated using jikespg on java.g.
+// Now maintained manually - the grammar tool is no longer available.
 
 #pragma once
 

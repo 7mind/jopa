@@ -612,7 +612,7 @@ AttributeInfo* AttributeInfo::AllocateAttributeInfo(ClassFile& buffer)
         return new StackMapAttribute(buffer);
     case ATTRIBUTE_StackMapTable:
         // TODO: Add proper StackMapTable reading support
-        return new GenericAttribute(buffer);
+        return new UnknownAttribute(buffer);
     case ATTRIBUTE_RuntimeVisibleAnnotations:
         return new AnnotationsAttribute(buffer, true);
     case ATTRIBUTE_RuntimeInvisibleAnnotations:

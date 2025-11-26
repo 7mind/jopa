@@ -173,6 +173,7 @@ class AstPrimitiveType;
 class AstBrackets;
 class AstArrayType;
 class AstWildcard;
+class AstUnionType;
 class AstTypeArguments;
 class AstTypeName;
 class AstMemberValuePair;
@@ -344,6 +345,7 @@ public:
         VOID_TYPE,
         ARRAY,
         WILDCARD,
+        UNION_TYPE,
         TYPE_ARGUMENTS,
         TYPE,
         COMPILATION,
@@ -1088,6 +1090,53 @@ public:
         return bounds_opt ? bounds_opt -> RightToken() : question_token;
     }
     virtual TokenIndex IdentifierToken() { return question_token; }
+};
+
+
+//
+// Represents a union type for multi-catch clauses (Java 7).
+// Example: catch (IOException | SQLException e)
+//
+class AstUnionType : public AstType
+{
+    StoragePool* pool;
+    AstArray<AstType*>* type_list;
+
+public:
+    inline AstUnionType(StoragePool* p)
+        : AstType(UNION_TYPE)
+        , pool(p)
+        , type_list(NULL)
+    {}
+    ~AstUnionType() {}
+
+    inline AstType*& Type(unsigned i) { return (*type_list)[i]; }
+    inline unsigned NumTypes() { return type_list ? type_list -> Length() : 0; }
+    inline void AllocateTypes(unsigned estimate = 2);
+    inline void AddType(AstType*);
+
+#ifdef JOPA_DEBUG
+    virtual void Print(LexStream&);
+    virtual void Unparse(Ostream&, LexStream*);
+#endif // JOPA_DEBUG
+
+    virtual Ast* Clone(StoragePool*);
+
+    virtual TokenIndex LeftToken()
+    {
+        return type_list && type_list -> Length() > 0
+            ? (*type_list)[0] -> LeftToken() : 0;
+    }
+    virtual TokenIndex RightToken()
+    {
+        return type_list && type_list -> Length() > 0
+            ? (*type_list)[type_list -> Length() - 1] -> RightToken() : 0;
+    }
+    virtual TokenIndex IdentifierToken()
+    {
+        return type_list && type_list -> Length() > 0
+            ? (*type_list)[0] -> IdentifierToken() : 0;
+    }
 };
 
 
@@ -4555,6 +4604,11 @@ public:
         return new (this) AstWildcard(question);
     }
 
+    inline AstUnionType* NewUnionType()
+    {
+        return new (this) AstUnionType(this);
+    }
+
     inline AstTypeArguments* NewTypeArguments(TokenIndex l, TokenIndex r)
     {
         return new (this) AstTypeArguments(this, l, r);
@@ -5005,6 +5059,13 @@ public:
     inline AstWildcard* GenWildcard(TokenIndex question)
     {
         AstWildcard* p = NewWildcard(question);
+        p -> generated = true;
+        return p;
+    }
+
+    inline AstUnionType* GenUnionType()
+    {
+        AstUnionType* p = NewUnionType();
         p -> generated = true;
         return p;
     }
@@ -6164,6 +6225,19 @@ inline void AstTypeArguments::AddTypeArgument(AstType* argument)
     assert(! argument -> PrimitiveTypeCast());
     assert(type_arguments);
     type_arguments -> Next() = argument;
+}
+
+inline void AstUnionType::AllocateTypes(unsigned estimate)
+{
+    assert(! type_list && estimate);
+    type_list = new (pool) AstArray<AstType*> (pool, estimate);
+}
+
+inline void AstUnionType::AddType(AstType* type)
+{
+    if (! type_list)
+        AllocateTypes(2);
+    type_list -> Next() = type;
 }
 
 inline void AstAnnotation::AllocateMemberValuePairs(unsigned estimate)

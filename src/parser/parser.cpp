@@ -388,7 +388,20 @@ AstMethodBody* Parser::ParseSegment(TokenObject start_token)
 
             continue;
         }
-        else break;
+        else
+        {
+            // ERROR_ACTION or ACCEPT_ACTION
+            // Before giving up on errors, try to handle multi-catch
+            if (act == ERROR_ACTION && current_kind == TK_OR &&
+                TryHandleMultiCatch(curtok, current_kind))
+            {
+                // Multi-catch handled, we need to continue with new state
+                // Set act to current state and continue
+                act = stack[state_stack_top];
+                continue;
+            }
+            break;
+        }
 
         //
         // Process a nonterminal
@@ -655,6 +668,100 @@ int Parser::ParseCheck(int stck[], int stack_top, int first_token,
     } // process_terminal;
 
     return 0;
+}
+
+
+//
+// Check if we're in a context where multi-catch might be valid.
+// We're looking for the pattern: catch ( Type |
+// The parse stack should have catch and ( tokens nearby.
+//
+bool Parser::IsMultiCatchContext()
+{
+    // Check if parse_stack has an AstType at or near the top
+    if (state_stack_top < 2)
+        return false;
+
+    // Look for 'catch' keyword in recent tokens
+    for (int i = state_stack_top; i >= 0 && i >= state_stack_top - 5; i--)
+    {
+        TokenObject tok = location_stack[i];
+        if (lex_stream -> Kind(tok) == TK_catch)
+            return true;
+    }
+
+    return false;
+}
+
+
+//
+// Parse a type for multi-catch handling.
+// This is a simplified type parser that handles:
+// - Simple names (IOException)
+// - Qualified names (java.io.IOException)
+// Returns the parsed type, or NULL if parsing fails.
+//
+AstType* Parser::ParseType(TokenObject& curtok)
+{
+    if (lex_stream -> Kind(curtok) != TK_Identifier)
+        return NULL;
+
+    // Build a Name (possibly qualified)
+    AstName* name = ast_pool -> NewName(curtok);
+    curtok = lex_stream -> Gettoken(end_token);
+
+    // Handle qualified names: a.b.c
+    while (lex_stream -> Kind(curtok) == TK_DOT)
+    {
+        curtok = lex_stream -> Gettoken(end_token); // consume '.'
+        if (lex_stream -> Kind(curtok) != TK_Identifier)
+            return NULL;
+
+        AstName* qualified = ast_pool -> NewName(curtok);
+        qualified -> base_opt = name;
+        name = qualified;
+        curtok = lex_stream -> Gettoken(end_token);
+    }
+
+    // Convert Name to TypeName
+    AstTypeName* type_name = ast_pool -> NewTypeName(name);
+    return type_name;
+}
+
+
+//
+// Try to handle multi-catch syntax: catch (Type1 | Type2 | ... identifier)
+// Called when we hit an error and the current token is '|'.
+// Returns true if we successfully handled multi-catch, false otherwise.
+//
+// IMPLEMENTATION NOTE:
+// Multi-catch (Java 7) requires extending the parser grammar to accept:
+//   CatchClause ::= 'catch' '(' CatchType Identifier ')' Block
+//   CatchType ::= Type
+//   CatchType ::= CatchType '|' Type
+//
+// The parser is table-driven (LPG/LR style) and the grammar tool (jikespg)
+// that generated the tables is no longer available. Manually modifying the
+// parser tables (javaprs.h, javadcl.h) to add these rules is complex because:
+// 1. term_action and base_action tables encode state transitions
+// 2. New rules need new rule numbers and actions
+// 3. State machine consistency is hard to maintain manually
+//
+// Alternative approaches to consider:
+// 1. Pre-process token stream to transform multi-catch into standard form
+// 2. Use a separate parser for catch clauses with union types
+// 3. Regenerate tables if a compatible grammar tool can be found
+//
+// The AST infrastructure for union types (AstUnionType) is in place.
+// This function currently detects multi-catch syntax but cannot resume
+// the LR parser correctly after manual parsing.
+//
+bool Parser::TryHandleMultiCatch(TokenObject& /* curtok */, int& /* current_kind */)
+{
+    // Multi-catch parsing is not yet implemented.
+    // The AST types (AstUnionType) are ready, but the parser cannot be
+    // easily extended without the original grammar tool.
+    return false;
 }
 
 
