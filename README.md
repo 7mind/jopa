@@ -27,6 +27,33 @@ This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language f
 - ✅ **Class file version 50.0** - Generate Java 6 bytecode with `-target 1.6`
 - ✅ **Debug information** - Enhanced debugging with `-g` flag for parameter names and local variables
 
+### Java 7 Features
+- ✅ **Diamond Operator** - Type inference for generic instance creation (`new ArrayList<>()`)
+- ✅ **Multi-catch** - Catching multiple exception types in a single catch block (`catch (IOException | SQLException e)`)
+- ✅ **Try-with-resources** - Automatic resource management with `AutoCloseable` interface
+- ✅ **Strings in Switch** - Switch statements with String expressions
+- ✅ **Binary Literals** - Integer literals in binary form (`0b1010`)
+- ✅ **Underscores in Numeric Literals** - Improved readability (`1_000_000`)
+
+### Java 7 Bytecode Status
+Java 7 language features are fully supported for parsing and semantic analysis. However, bytecode generation has limitations:
+
+| Feature | `-target 1.6` | `-target 1.7` |
+|---------|---------------|---------------|
+| Diamond operator | ✅ Works | ⚠️ Needs StackMapTable |
+| Multi-catch | ✅ Works | ⚠️ Needs StackMapTable |
+| Try-with-resources | ✅ Works | ⚠️ Needs StackMapTable |
+| String switch | ✅ Works | ⚠️ Needs StackMapTable |
+| Exception suppression (`addSuppressed`) | ❌ Not implemented | ❌ Not implemented |
+
+**Note:** Use `-source 1.7 -target 1.6` to compile Java 7 code to Java 6 bytecode, which runs on any JVM without verification issues. Full `-target 1.7` support requires StackMapTable generation (not yet implemented).
+
+### Java 8 Features (Partial)
+- ✅ **Default Methods** - Interface methods with default implementations
+- ❌ **Static Methods in Interfaces** - Requires class file version 52.0
+- ❌ **Lambda Expressions** - Not implemented
+- ❌ **Method References** - Not implemented
+
 ## Building
 
 - Requirements:
@@ -54,7 +81,8 @@ This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language f
   - `-DJIKES_ENABLE_DEBUG=ON` — Enable internal compiler debugging hooks
   - `-DJIKES_ENABLE_NATIVE_FP=OFF` — Force emulated floating point
   - `-DJIKES_ENABLE_ENCODING=OFF` — Skip iconv/ICU; otherwise CMake fails if neither is present
-  - `-DJIKES_ENABLE_JVM_TESTS=OFF` — Disable runtime validation tests (javap/JVM execution)
+  - `-DJOPA_ENABLE_JVM_TESTS=OFF` — Disable runtime validation tests (javap/JVM execution)
+  - `-DJOPA_USE_NOVERIFY=OFF` — Disable `-noverify` flag for JVM tests (requires StackMapTable)
 
 jikes
 =====
