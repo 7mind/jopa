@@ -93,13 +93,11 @@ ParseResult LegacyParserAdapter::parseCompilationUnit(FileSymbol* file_symbol) {
         return result;
     }
 
-    // Create a storage pool for the AST
-    StoragePool* ast_pool = new StoragePool(64);
-
     // Phase 1: Header parse
+    // Let HeaderParse create its own body_pool which gets stored in compilation_unit->ast_pool
     lex_stream->Reset();
     AstCompilationUnit* compilation_unit =
-        control_.parser->HeaderParse(lex_stream, ast_pool);
+        control_.parser->HeaderParse(lex_stream);
 
     if (!compilation_unit) {
         ParseError err;
@@ -108,14 +106,15 @@ ParseResult LegacyParserAdapter::parseCompilationUnit(FileSymbol* file_symbol) {
         err.message = "Failed to parse compilation unit";
         err.severity = "error";
         result.errors.push_back(err);
-        delete ast_pool;
         return result;
     }
+
+    // Store compilation_unit in file_symbol for cleanup (even on error)
+    file_symbol->compilation_unit = compilation_unit;
 
     // Check for header parse errors
     if (compilation_unit->BadCompilationUnitCast()) {
         collectLexErrors(lex_stream, result.errors);
-        delete ast_pool;
         return result;
     }
 
@@ -124,16 +123,19 @@ ParseResult LegacyParserAdapter::parseCompilationUnit(FileSymbol* file_symbol) {
     for (unsigned i = 0; i < compilation_unit->NumTypeDeclarations(); i++) {
         AstDeclaredType* type_decl = compilation_unit->TypeDeclaration(i);
         if (type_decl && type_decl->class_body) {
-            // Parse initializers
-            if (!control_.parser->InitializerParse(lex_stream, type_decl->class_body)) {
-                body_parse_success = false;
-                break;
-            }
+            // Only parse if the body is unparsed (some bodies like empty enums are already parsed)
+            if (type_decl->class_body->UnparsedClassBodyCast()) {
+                // Parse initializers
+                if (!control_.parser->InitializerParse(lex_stream, type_decl->class_body)) {
+                    body_parse_success = false;
+                    break;
+                }
 
-            // Parse method bodies
-            if (!control_.parser->BodyParse(lex_stream, type_decl->class_body)) {
-                body_parse_success = false;
-                break;
+                // Parse method bodies
+                if (!control_.parser->BodyParse(lex_stream, type_decl->class_body)) {
+                    body_parse_success = false;
+                    break;
+                }
             }
 
             // Recursively parse nested types
@@ -146,7 +148,6 @@ ParseResult LegacyParserAdapter::parseCompilationUnit(FileSymbol* file_symbol) {
 
     if (!body_parse_success) {
         collectLexErrors(lex_stream, result.errors);
-        delete ast_pool;
         return result;
     }
 
@@ -157,9 +158,6 @@ ParseResult LegacyParserAdapter::parseCompilationUnit(FileSymbol* file_symbol) {
     AstSerializer serializer(*lex_stream);
     result.ast = serializer.serialize(compilation_unit);
     result.success = true;
-
-    // Store references for later cleanup
-    file_symbol->compilation_unit = compilation_unit;
 
     return result;
 }

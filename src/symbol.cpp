@@ -10,6 +10,7 @@
 #include "option.h"
 #include "paramtype.h"
 #include "typeparam.h"
+#include "jast2.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -1048,6 +1049,7 @@ FileSymbol::~FileSymbol()
 {
     delete [] file_name;
     delete lex_stream;
+    delete jast2_compilation_unit;
 }
 
 

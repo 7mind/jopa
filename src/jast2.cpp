@@ -57,8 +57,14 @@ std::unique_ptr<Modifiers> Modifiers::fromJson(const nlohmann::json& j, Node* pa
             Modifier mod;
             mod.kind = m.value("kind", "");
             mod.value = m.value("modifier", "");
-            if (mod.value.empty()) {
-                mod.value = m.value("name", "");
+            if (mod.value.empty() && m.contains("name")) {
+                // "name" can be a string or an object (for annotations)
+                if (m["name"].is_string()) {
+                    mod.value = m["name"].get<std::string>();
+                } else if (m["name"].is_object()) {
+                    // For annotations, extract the identifier from the name object
+                    mod.value = m["name"].value("identifier", "");
+                }
             }
             mods->modifiers.push_back(mod);
         }

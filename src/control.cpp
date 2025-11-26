@@ -1310,7 +1310,8 @@ void Control::ProcessFile(FileSymbol* file_symbol)
 
 void Control::ProcessFileJast2(FileSymbol* file_symbol)
 {
-    // jast2 pipeline: parse to JSON -> convert to jast2 -> delegate to legacy for rest
+    // jast2 pipeline: parse headers -> serialize to JSON -> convert to jast2
+    // Then delegate to legacy ProcessFile for semantic analysis and bytecode.
     //
     // This validates the jast2 parsing infrastructure works. The jast2 AST is stored
     // in file_symbol->jast2_compilation_unit for future use when JastSemantic and
@@ -1333,38 +1334,48 @@ void Control::ProcessFileJast2(FileSymbol* file_symbol)
         return; // Scan failed
     }
 
-    // Step 2: Parse to JSON using parser_facade
-    // This also creates the legacy AST in file_symbol->compilation_unit
-    ParseResult result = parser_facade->parseCompilationUnit(file_symbol);
-    if (!result.success || result.ast.is_null()) {
-        // Report parse errors
-        for (const auto& err : result.errors) {
-            Coutput << file_symbol->FileName() << ":"
-                    << err.line << ":" << err.column << ": "
-                    << err.severity.c_str() << ": " << err.message.c_str() << endl;
+    // Step 2: Do header parse only (not full body parse)
+    // This creates the legacy AST that ProcessFile will use
+    if (!file_symbol->compilation_unit) {
+        file_symbol->compilation_unit =
+            parser_facade->headerParse(file_symbol->lex_stream);
+    }
+
+    if (!file_symbol->compilation_unit ||
+        file_symbol->compilation_unit->BadCompilationUnitCast()) {
+        return_code = 1;
+        return;
+    }
+
+    // Step 3: Serialize the header-parsed AST to JSON
+    AstSerializer serializer(*file_symbol->lex_stream);
+    nlohmann::json ast_json = serializer.serialize(file_symbol->compilation_unit);
+
+    if (ast_json.is_null()) {
+        if (option.verbose) {
+            Coutput << "[jast2: failed to serialize AST for "
+                    << file_symbol->FileName() << "]" << endl;
         }
-        return_code = 1;
-        return;
+        // Continue with legacy pipeline even if serialization fails
+    } else {
+        // Step 4: Convert JSON to jast2 AST
+        auto jast2_unit = jast2::CompilationUnit::fromJson(ast_json);
+        if (jast2_unit) {
+            // Store the jast2 compilation unit in the file symbol
+            file_symbol->jast2_compilation_unit = jast2_unit.release();
+
+            if (option.verbose) {
+                Coutput << "[jast2: created jast2 AST for "
+                        << file_symbol->FileName() << "]" << endl;
+            }
+        } else if (option.verbose) {
+            Coutput << "[jast2: failed to create jast2 AST for "
+                    << file_symbol->FileName() << "]" << endl;
+        }
     }
 
-    // Step 3: Convert JSON to jast2 AST
-    auto compilation_unit = jast2::CompilationUnit::fromJson(result.ast);
-    if (!compilation_unit) {
-        Coutput << file_symbol->FileName() << ": failed to convert JSON to jast2 AST" << endl;
-        return_code = 1;
-        return;
-    }
-
-    // Store the jast2 compilation unit in the file symbol
-    file_symbol->jast2_compilation_unit = compilation_unit.release();
-
-    if (option.verbose) {
-        Coutput << "[jast2: created jast2 AST for "
-                << file_symbol->FileName() << "]" << endl;
-    }
-
-    // Step 4: Delegate to the legacy ProcessFile for semantic analysis and bytecode
-    // This ensures the compiler still works while we develop the jast2 pipeline
+    // Step 5: Delegate to the legacy ProcessFile for semantic analysis and bytecode
+    // ProcessFile will handle body parsing, semantic analysis, and bytecode generation
     ProcessFile(file_symbol);
 }
 

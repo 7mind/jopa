@@ -739,6 +739,10 @@ Option::Option(ArgumentExpander& arguments,
             {
                 jast2 = true;
             }
+            else if (strcmp(arguments.argv[i], "--no-jast2") == 0)
+            {
+                jast2 = false;
+            }
             else if (strcmp(arguments.argv[i], "+B") == 0 ||
                      strcmp(arguments.argv[i], "--nobytecode") == 0)
             {
