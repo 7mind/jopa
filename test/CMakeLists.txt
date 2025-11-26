@@ -272,6 +272,23 @@ if(JOPA_ENABLE_JDK_PARSER_TESTS)
     set(PARSER_TEST_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/parser_tests")
     file(MAKE_DIRECTORY "${PARSER_TEST_OUTPUT_DIR}")
 
+    # Load blacklist file
+    set(BLACKLIST_FILE "${CMAKE_CURRENT_SOURCE_DIR}/parser_test_blacklist.txt")
+    set(BLACKLISTED_TESTS "")
+    if(EXISTS "${BLACKLIST_FILE}")
+        file(STRINGS "${BLACKLIST_FILE}" BLACKLIST_LINES)
+        foreach(line ${BLACKLIST_LINES})
+            # Skip comments and empty lines
+            string(REGEX MATCH "^#" is_comment "${line}")
+            string(STRIP "${line}" line_stripped)
+            if(NOT is_comment AND NOT "${line_stripped}" STREQUAL "")
+                list(APPEND BLACKLISTED_TESTS "${line_stripped}")
+            endif()
+        endforeach()
+        list(LENGTH BLACKLISTED_TESTS blacklist_count)
+        message(STATUS "Loaded ${blacklist_count} blacklisted parser tests")
+    endif()
+
     # Function to add parser tests for a JDK version
     function(add_jdk_parser_tests jdk_version jdk_assets_dir)
         if(NOT EXISTS "${jdk_assets_dir}")
@@ -345,6 +362,14 @@ if(JOPA_ENABLE_JDK_PARSER_TESTS)
             file(RELATIVE_PATH rel_path "${jdk_assets_dir}" "${java_file}")
             string(REPLACE "/" "_" test_name "${rel_path}")
             string(REPLACE ".java" "" test_name "${test_name}")
+
+            # Check if test is blacklisted
+            set(full_test_name "parse_jdk${jdk_version}_${test_name}")
+            list(FIND BLACKLISTED_TESTS "${full_test_name}" is_blacklisted)
+            if(NOT is_blacklisted EQUAL -1)
+                math(EXPR skipped_count "${skipped_count} + 1")
+                continue()
+            endif()
 
             # Create output file for this test
             set(output_file "${PARSER_TEST_OUTPUT_DIR}/jdk${jdk_version}_${test_name}.result")
