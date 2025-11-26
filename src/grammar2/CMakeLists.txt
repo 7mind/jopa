@@ -3,7 +3,7 @@
 set(JIKESPG_EXECUTABLE "${CMAKE_SOURCE_DIR}/tools/jikespg/src/jikespg")
 set(GRAMMAR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/java.g")
 set(GRAMMAR_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
-set(GRAMMAR_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
+set(GRAMMAR_OUTPUT_DIR "${CMAKE_BINARY_DIR}/src/grammar")
 set(POSTPROCESS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/postprocess.py")
 
 # Raw output files from jikespg (in source directory)
@@ -53,6 +53,3 @@ else()
         COMMENT "Parser generation complete"
     )
 endif()
-
-# Export the include directory for the processed headers
-set(GRAMMAR2_INCLUDE_DIR ${GRAMMAR_OUTPUT_DIR} PARENT_SCOPE)
