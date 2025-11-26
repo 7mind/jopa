@@ -1,5 +1,12 @@
 # Java Feature Tests for Jopa Compiler
-# Tests both compilation and runtime execution with real JVM
+# Tests compilation and runtime execution with real JVM
+#
+# All tests use -source 1.7 (Java 7 language features).
+# Bytecode target is controlled by JOPA_TARGET_VERSION (default: 1.5).
+# To test the full matrix, run cmake with different target versions:
+#   cmake -DJOPA_TARGET_VERSION=1.5 ..  # Java 5 bytecode (v49)
+#   cmake -DJOPA_TARGET_VERSION=1.6 ..  # Java 6 bytecode (v50)
+#   cmake -DJOPA_TARGET_VERSION=1.7 ..  # Java 7 bytecode (v51, needs StackMapTable)
 
 enable_testing()
 
@@ -14,6 +21,11 @@ option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java
 # Option to use -noverify flag for JVM tests
 # Required until StackMapTable generation is implemented for Java 7+ bytecode
 option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" ON)
+
+# Bytecode target version for tests (1.5, 1.6, or 1.7)
+# 1.5 and 1.6 work without StackMapTable, 1.7 requires it
+set(JOPA_TARGET_VERSION "1.5" CACHE STRING "Bytecode target version for tests (1.5, 1.6, 1.7)")
+set_property(CACHE JOPA_TARGET_VERSION PROPERTY STRINGS "1.5" "1.6" "1.7")
 
 # Set up JVM flags based on options
 if(JOPA_USE_NOVERIFY)
@@ -46,7 +58,7 @@ function(add_jopa_compile_test test_name source_file)
     file(MAKE_DIRECTORY "${TEST_OUTPUT_DIR}")
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${TEST_OUTPUT_DIR}"
@@ -66,7 +78,7 @@ function(add_jopa_run_test test_name source_file main_class)
     # Compilation test - compiles main source plus any extra sources
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.5
+        COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${TEST_OUTPUT_DIR}"
@@ -107,7 +119,7 @@ set(EnumMethodsTest_OUTPUT "${OUTPUT_DIR}/EnumMethodsTest")
 file(MAKE_DIRECTORY "${EnumMethodsTest_OUTPUT}")
 add_test(
     NAME "compile_EnumMethodsTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${EnumMethodsTest_OUTPUT}"
@@ -163,7 +175,7 @@ set(MathUtils_OUTPUT "${OUTPUT_DIR}/MathUtils")
 file(MAKE_DIRECTORY "${MathUtils_OUTPUT}")
 add_test(
     NAME "compile_MathUtils"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MathUtils_OUTPUT}"
@@ -181,12 +193,12 @@ add_jopa_run_test(MarkerAnnotationTest "${TEST_DIR}/annotations/MarkerAnnotation
 add_jopa_run_test(CustomAnnotationTest "${TEST_DIR}/annotations/CustomAnnotationTest.java" "CustomAnnotationTest")
 add_jopa_run_test(SuppressWarningsTest "${TEST_DIR}/annotations/SuppressWarningsTest.java" "SuppressWarningsTest")
 
-# Java 6 Tests (bytecode version 50.0 with parameter names)
+# Debug info tests (compiled with -g flag for parameter names)
 set(SimpleJava6Test_OUTPUT "${OUTPUT_DIR}/SimpleJava6Test")
 file(MAKE_DIRECTORY "${SimpleJava6Test_OUTPUT}")
 add_test(
     NAME "compile_SimpleJava6Test"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION} -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${SimpleJava6Test_OUTPUT}"
@@ -209,7 +221,7 @@ set(ReflectionBasicTest_OUTPUT "${OUTPUT_DIR}/ReflectionBasicTest")
 file(MAKE_DIRECTORY "${ReflectionBasicTest_OUTPUT}")
 add_test(
     NAME "compile_ReflectionBasicTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.5 -target 1.6 -g
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION} -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${ReflectionBasicTest_OUTPUT}"
@@ -227,16 +239,14 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
 endif()
 
-# Java 7 Tests
-# Note: Using -target 1.6 to emit Java 6 bytecode (v50.0) which doesn't require StackMapTable.
-# This allows tests to run without -noverify until StackMapTable is implemented.
+# Java 7 Tests (diamond, multi-catch, try-with-resources, string switch)
 
 # Diamond Operator Test
 set(DiamondTest_OUTPUT "${OUTPUT_DIR}/DiamondTest")
 file(MAKE_DIRECTORY "${DiamondTest_OUTPUT}")
 add_test(
     NAME "compile_DiamondTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DiamondTest_OUTPUT}"
@@ -267,7 +277,7 @@ set(MultiCatchTest_OUTPUT "${OUTPUT_DIR}/MultiCatchTest")
 file(MAKE_DIRECTORY "${MultiCatchTest_OUTPUT}")
 add_test(
     NAME "compile_MultiCatchTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MultiCatchTest_OUTPUT}"
@@ -298,7 +308,7 @@ set(TryWithResourcesTest_OUTPUT "${OUTPUT_DIR}/TryWithResourcesTest")
 file(MAKE_DIRECTORY "${TryWithResourcesTest_OUTPUT}")
 add_test(
     NAME "compile_TryWithResourcesTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${TryWithResourcesTest_OUTPUT}"
@@ -329,7 +339,7 @@ set(StringSwitchTest_OUTPUT "${OUTPUT_DIR}/StringSwitchTest")
 file(MAKE_DIRECTORY "${StringSwitchTest_OUTPUT}")
 add_test(
     NAME "compile_StringSwitchTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target 1.6
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${StringSwitchTest_OUTPUT}"
@@ -362,7 +372,7 @@ set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.6
+    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DefaultMethodTest_OUTPUT}"

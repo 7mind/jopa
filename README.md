@@ -85,6 +85,7 @@ Java 7 language features are fully supported for parsing and semantic analysis. 
   - `-DJIKES_ENABLE_ENCODING=OFF` — Skip iconv/ICU; otherwise CMake fails if neither is present
   - `-DJOPA_ENABLE_JVM_TESTS=OFF` — Disable runtime validation tests (javap/JVM execution)
   - `-DJOPA_USE_NOVERIFY=OFF` — Disable `-noverify` flag for JVM tests (requires StackMapTable)
+  - `-DJOPA_TARGET_VERSION=1.5` — Bytecode target version for tests (1.5, 1.6, or 1.7; default: 1.5)
 
 jikes
 =====
