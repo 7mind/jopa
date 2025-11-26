@@ -1,0 +1,2 @@
+SUBDIRS = bnf expr
+
