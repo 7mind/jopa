@@ -479,13 +479,27 @@ ContinueStatement ::= 'continue' Identifieropt ';'
 ReturnStatement ::= 'return' Expressionopt ';'
 ThrowStatement ::= 'throw' Expression ';'
 SynchronizedStatement ::= 'synchronized' '(' Expression ')' Block
+-- Java 7: Try-with-resources
 TryStatement ::= 'try' Block Catches Marker
 TryStatement ::= 'try' Block Catchesopt Finally
+TryStatement ::= 'try' ResourceSpecification Block Catchesopt Marker
+TryStatement ::= 'try' ResourceSpecification Block Catchesopt Finally
+ResourceSpecification ::= '(' Resources Marker ')'
+ResourceSpecification ::= '(' Resources ';' ')'
+Resources ::= Resource
+Resources ::= Resources ';' Resource
+Resource ::= Type VariableDeclaratorId '=' Expression
+Resource ::= Modifiers Type VariableDeclaratorId '=' Expression
 Catches ::= CatchClause
 Catches ::= Catches CatchClause
 Catchesopt ::= %empty
 Catchesopt ::= Catches
-CatchClause ::= 'catch' '(' FormalParameter ')' Block
+-- Java 7: Multi-catch
+CatchClause ::= 'catch' '(' CatchFormalParameter ')' Block
+CatchFormalParameter ::= CatchType VariableDeclaratorId
+CatchFormalParameter ::= Modifiers CatchType VariableDeclaratorId
+CatchType ::= ClassOrInterfaceType
+CatchType ::= CatchType '|' ClassOrInterfaceType
 Finally ::= 'finally' Block
 Primary ::= PrimaryNoNewArray
 Primary ::= ArrayCreationUninitialized
@@ -505,8 +519,15 @@ PrimaryNoNewArray ::= MethodInvocation
 PrimaryNoNewArray ::= ArrayAccess
 ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType Arguments ClassBodyopt
+-- Java 7: Diamond operator
+ClassInstanceCreationExpression ::= 'new' ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
+ClassInstanceCreationExpression ::= 'new' TypeArguments ClassOrInterfaceType DiamondMarker Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' TypeArgumentsopt Arguments ClassBodyopt
 ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' TypeArgumentsopt Arguments ClassBodyopt
+-- Java 7: Diamond in qualified new
+ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' DiamondMarker Arguments ClassBodyopt
+DiamondMarker ::= '<' '>'
 ArgumentList ::= Expression
 ArgumentList ::= ArgumentList ',' Expression
 ArgumentListopt ::= %empty
