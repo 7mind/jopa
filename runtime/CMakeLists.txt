@@ -4,7 +4,7 @@
 
 set(RUNTIME_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RUNTIME_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
-set(RUNTIME_JAR "${RUNTIME_OUTPUT_DIR}/runtime.jar")
+set(RUNTIME_JAR "${RUNTIME_OUTPUT_DIR}/jopa-stub-rt.jar")
 
 # Find all runtime source files
 file(GLOB_RECURSE RUNTIME_SOURCES "${RUNTIME_SRC_DIR}/*.java")

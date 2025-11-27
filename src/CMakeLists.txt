@@ -1,5 +1,5 @@
 # Grammar generation
-add_subdirectory(grammar2)
+add_subdirectory(grammar)
 
 set(JOPA_SOURCES
     ast.cpp
