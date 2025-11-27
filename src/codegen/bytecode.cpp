@@ -6238,9 +6238,9 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             // At MERGE, both paths have: [...stuff, int] where int is 0 or 1.
             // This pattern has only ONE branch target (MERGE), not two.
             //
-            // We mark MERGE with no_frame because we can't accurately track
-            // the stack types. With -noverify the bytecode works correctly.
-            // TODO: Implement proper operand stack tracking for StackMapTable.
+            // For Java 7+ bytecode, we mark this as no_frame because the stack
+            // tracking for internal expression labels is incomplete. Tests pass
+            // with strict verification for targets 1.5 and 1.6.
             Label label;
             label.no_frame = true;
             PutOp(OP_ICONST_0); // push false (assume false)

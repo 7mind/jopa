@@ -91,7 +91,7 @@ Java 7 language features are fully supported for parsing, semantic analysis, and
 | Exception suppression | ✅ Works | ✅ Works | ✅ Works |
 | Binary/underscore literals | ✅ Works | ✅ Works | ✅ Works |
 
-**Note:** All target versions pass the full test suite. Java 7 bytecode (class version 51.0) includes StackMapTable generation and runs correctly on modern JVMs. The default test target is `-DJOPA_TARGET_VERSION=1.5`; set it to `1.6` or `1.7` to match your intended runtime. Generated class files require at least the corresponding JVM major version (Java 5 for `-target 1.5`, Java 6 for `-target 1.6`, Java 7 for `-target 1.7`).
+**Note:** Targets 1.5 and 1.6 pass the full test suite with strict JVM verification. Target 1.7 (class version 51.0) has known StackMapTable limitations with complex boolean expressions used as method arguments (e.g., `test("name", a == b)`). For most code, target 1.7 works correctly; alternatively, use `-target 1.5` or `-target 1.6` for maximum compatibility. Generated class files require at least the corresponding JVM major version.
 
 ### Advanced Generics Support
 The compiler fully supports complex generic type signatures including:

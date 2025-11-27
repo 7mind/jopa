@@ -37,7 +37,7 @@ jobs:
         run: |
           echo '## Release Build Test Results' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6, 1.7' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
@@ -79,7 +79,7 @@ jobs:
         run: |
           echo '## Debug Build Test Results (with Sanitizers)' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6, 1.7' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6' >> $GITHUB_STEP_SUMMARY
           echo '' >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true

@@ -281,6 +281,11 @@ add_jopa_run_test(AnonymousClassTest "${TEST_DIR}/anonymous/AnonymousClassTest.j
 add_jopa_run_test(AnonymousGenericTest "${TEST_DIR}/anonymous/AnonymousGenericTest.java" "AnonymousGenericTest")
 add_jopa_run_test(TypeTokenTest "${TEST_DIR}/anonymous/TypeTokenTest.java" "TypeTokenTest")
 
+# StackMapTable Verification Tests
+# These tests exercise control flow patterns that require proper StackMapTable
+# generation for Java 7+ bytecode (class version 51.0+).
+add_jopa_run_test(StackMapTableTest "${TEST_DIR}/stackmap/StackMapTableTest.java" "StackMapTableTest")
+
 # Java 7 Tests (diamond, multi-catch, try-with-resources, string switch)
 
 # Diamond Operator Test
