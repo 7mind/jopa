@@ -1,28 +1,77 @@
 package java.lang;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.annotation.Annotation;
 
 public final class Class {
     private Class() {}
 
     public String toString() {
-        return "";
+        return (isInterface() ? "interface " : "class ") + getName();
     }
 
     public native String getName();
+    public native String getSimpleName();
+    public native String getCanonicalName();
 
     public static native Class forName(String className);
 
+    // Methods
     public native Method[] getDeclaredMethods();
     public native Method[] getMethods();
-
-    public native Field[] getDeclaredFields();
-    public native Field[] getFields();
-
     public native Method getMethod(String name, Class[] parameterTypes);
     public native Method getDeclaredMethod(String name, Class[] parameterTypes);
 
+    // Fields
+    public native Field[] getDeclaredFields();
+    public native Field[] getFields();
     public native Field getField(String name);
     public native Field getDeclaredField(String name);
+
+    // Constructors
+    public native Constructor[] getDeclaredConstructors();
+    public native Constructor[] getConstructors();
+    public native Constructor getConstructor(Class[] parameterTypes);
+    public native Constructor getDeclaredConstructor(Class[] parameterTypes);
+
+    // Class information
+    public native Class getSuperclass();
+    public native Class[] getInterfaces();
+    public native int getModifiers();
+    public native boolean isInterface();
+    public native boolean isArray();
+    public native boolean isPrimitive();
+    public native boolean isEnum();
+    public native boolean isAnnotation();
+    public native boolean isSynthetic();
+    public native boolean isAnonymousClass();
+    public native boolean isLocalClass();
+    public native boolean isMemberClass();
+
+    // Component type for arrays
+    public native Class getComponentType();
+
+    // Package
+    public native Package getPackage();
+
+    // Annotations
+    public native Annotation[] getDeclaredAnnotations();
+    public native Annotation[] getAnnotations();
+    public native Annotation getAnnotation(Class annotationType);
+    public native boolean isAnnotationPresent(Class annotationType);
+
+    // Declaring class for inner classes
+    public native Class getDeclaringClass();
+    public native Class getEnclosingClass();
+
+    // Instance creation
+    public native Object newInstance() throws InstantiationException, IllegalAccessException;
+
+    // Type hierarchy
+    public native boolean isAssignableFrom(Class cls);
+    public native boolean isInstance(Object obj);
+    public native Class[] getDeclaredClasses();
+    public native Class[] getClasses();
 }

@@ -143,6 +143,7 @@ add_jopa_run_test(TypeSubstitutionTest "${TEST_DIR}/generics/TypeSubstitutionTes
 add_jopa_run_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java" "FieldAccessTest")
 add_jopa_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
 add_jopa_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
+add_jopa_run_test(GenericsComprehensiveTest "${TEST_DIR}/generics/GenericsComprehensiveTest.java" "GenericsComprehensiveTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
@@ -217,6 +218,42 @@ if(JOPA_ENABLE_JVM_TESTS)
     set_tests_properties("run_ReflectionBasicTest" PROPERTIES
         LABELS "run"
         DEPENDS "compile_ReflectionBasicTest"
+    )
+endif()
+
+# Comprehensive Reflection Test
+add_jopa_run_test(ReflectionComprehensiveTest "${TEST_DIR}/reflection/ReflectionComprehensiveTest.java" "ReflectionComprehensiveTest")
+
+# Multi-File Compilation Tests
+set(MultiFileTest_OUTPUT "${OUTPUT_DIR}/MultiFileTest")
+file(MAKE_DIRECTORY "${MultiFileTest_OUTPUT}")
+add_test(
+    NAME "compile_MultiFileTest"
+    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+            -sourcepath "${TEST_DIR}"
+            -classpath "${RUNTIME_JAR}"
+            -d "${MultiFileTest_OUTPUT}"
+            "${TEST_DIR}/multifile/MultiFileTest.java"
+            "${TEST_DIR}/multifile/Service.java"
+            "${TEST_DIR}/multifile/ServiceImpl.java"
+)
+set_tests_properties("compile_MultiFileTest" PROPERTIES LABELS "compile;multifile")
+if(JOPA_ENABLE_JVM_TESTS)
+    add_test(
+        NAME "validate_MultiFileTest"
+        COMMAND ${Java_JAVAP_EXECUTABLE} -constants "${MultiFileTest_OUTPUT}/MultiFileTest.class"
+    )
+    set_tests_properties("validate_MultiFileTest" PROPERTIES
+        LABELS "validate;multifile"
+        DEPENDS "compile_MultiFileTest"
+    )
+    add_test(
+        NAME "run_MultiFileTest"
+        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${MultiFileTest_OUTPUT}:${RUNTIME_JAR}" "MultiFileTest"
+    )
+    set_tests_properties("run_MultiFileTest" PROPERTIES
+        LABELS "run;multifile"
+        DEPENDS "validate_MultiFileTest"
     )
 endif()
 

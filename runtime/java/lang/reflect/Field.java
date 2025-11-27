@@ -1,19 +1,14 @@
 package java.lang.reflect;
 
-/**
- * Minimal Field class for reflection support
- */
 public class Field {
-    private String name;
+    private Field() {}
 
-    public Field(String name) {
-        this.name = name;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public native Object get(Object obj);
-    public native void set(Object obj, Object value);
+    public native String getName();
+    public native int getModifiers();
+    public native Class getType();
+    public native Class getDeclaringClass();
+    public native Object get(Object obj) throws IllegalAccessException;
+    public native void set(Object obj, Object value) throws IllegalAccessException;
+    public native boolean isAccessible();
+    public native void setAccessible(boolean flag);
 }

@@ -1,18 +1,20 @@
 package java.lang.reflect;
 
-/**
- * Minimal Method class for reflection support
- */
+import java.lang.annotation.Annotation;
+
 public class Method {
-    private String name;
+    private Method() {}
 
-    public Method(String name) {
-        this.name = name;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public native Object invoke(Object obj, Object[] args);
+    public native String getName();
+    public native int getModifiers();
+    public native Class getReturnType();
+    public native Class[] getParameterTypes();
+    public native Class[] getExceptionTypes();
+    public native Class getDeclaringClass();
+    public native Object invoke(Object obj, Object[] args) throws IllegalAccessException;
+    public native boolean isAccessible();
+    public native void setAccessible(boolean flag);
+    public native Annotation[] getDeclaredAnnotations();
+    public native Annotation[] getAnnotations();
+    public native Annotation getAnnotation(Class annotationType);
 }

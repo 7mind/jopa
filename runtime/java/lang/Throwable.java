@@ -1,18 +1,41 @@
 package java.lang;
 
 public class Throwable {
+    private String detailMessage;
+    private Throwable cause;
     private Throwable[] suppressedExceptions;
 
-    public Throwable() {}
+    public Throwable() {
+        this.cause = this;
+    }
 
-    public Throwable(String message) {}
+    public Throwable(String message) {
+        this.detailMessage = message;
+        this.cause = this;
+    }
+
+    public Throwable(String message, Throwable cause) {
+        this.detailMessage = message;
+        this.cause = cause;
+    }
+
+    public Throwable(Throwable cause) {
+        this.detailMessage = (cause == null) ? null : cause.toString();
+        this.cause = cause;
+    }
 
     public String getMessage() {
-        return "";
+        return detailMessage;
+    }
+
+    public Throwable getCause() {
+        return (cause == this) ? null : cause;
     }
 
     public String toString() {
-        return "";
+        String message = getMessage();
+        String className = getClass().getName();
+        return (message != null) ? (className + ": " + message) : className;
     }
 
     public void printStackTrace() {}
