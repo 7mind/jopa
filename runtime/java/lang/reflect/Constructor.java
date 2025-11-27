@@ -8,7 +8,7 @@ public final class Constructor {
     public native Class[] getParameterTypes();
     public native Class[] getExceptionTypes();
     public native Class getDeclaringClass();
-    public native Object newInstance(Object[] args) throws InstantiationException, IllegalAccessException;
+    public native Object newInstance(Object... args) throws InstantiationException, IllegalAccessException;
     public native boolean isAccessible();
     public native void setAccessible(boolean flag);
 }

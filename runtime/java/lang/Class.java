@@ -21,8 +21,8 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Methods
     public native Method[] getDeclaredMethods();
     public native Method[] getMethods();
-    public native Method getMethod(String name, Class[] parameterTypes);
-    public native Method getDeclaredMethod(String name, Class[] parameterTypes);
+    public native Method getMethod(String name, Class... parameterTypes);
+    public native Method getDeclaredMethod(String name, Class... parameterTypes);
 
     // Fields
     public native Field[] getDeclaredFields();
@@ -33,8 +33,8 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Constructors
     public native Constructor[] getDeclaredConstructors();
     public native Constructor[] getConstructors();
-    public native Constructor getConstructor(Class[] parameterTypes);
-    public native Constructor getDeclaredConstructor(Class[] parameterTypes);
+    public native Constructor getConstructor(Class... parameterTypes);
+    public native Constructor getDeclaredConstructor(Class... parameterTypes);
 
     // Class information
     public native Class getSuperclass();

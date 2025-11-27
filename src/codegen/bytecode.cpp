@@ -6856,11 +6856,26 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             TypeSymbol* component_type = varargs_type -> ArraySubtype();
             assert(component_type && "component_type is null for varargs array");
 
-            // Generate: anewarray <component_type> with count 0
+            // Generate: newarray/anewarray <component_type> with count 0
             PutOp(OP_ICONST_0);
-            PutOp(OP_ANEWARRAY);
-            PutU2(RegisterClass(component_type));
-            ChangeStack(0); // iconst_0 (+1), anewarray uses it and produces array (+0 net)
+            if (control.IsPrimitive(component_type))
+            {
+                PutOp(OP_NEWARRAY);
+                PutU1(component_type == control.boolean_type ? 4
+                      : component_type == control.char_type ? 5
+                      : component_type == control.float_type ? 6
+                      : component_type == control.double_type ? 7
+                      : component_type == control.byte_type ? 8
+                      : component_type == control.short_type ? 9
+                      : component_type == control.int_type ? 10
+                      : 11); // control.long_type
+            }
+            else
+            {
+                PutOp(OP_ANEWARRAY);
+                PutU2(RegisterClass(component_type));
+            }
+            ChangeStack(0); // iconst_0 (+1), newarray/anewarray uses it and produces array (+0 net)
             stack_words++;
         }
     }

@@ -1,7 +1,0 @@
-bnf ::= %empty
-      | bnf rules
-rules ::= rule
-        | rules '|' symbol_list
-rule ::= symbol '::=' symbol_list
-symbol_list ::= %empty
-              | symbol_list symbol

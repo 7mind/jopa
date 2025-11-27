@@ -3,7 +3,7 @@
 # All generated files go to the build directory only.
 # The source directory contains only java.g and supporting scripts.
 
-set(JIKESPG_EXECUTABLE "${CMAKE_SOURCE_DIR}/tools/jikespg/src/jikespg")
+set(JIKESPG_EXECUTABLE "${CMAKE_SOURCE_DIR}/vendor/jikespg/src/jikespg")
 set(GRAMMAR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/java.g")
 set(GRAMMAR_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(GRAMMAR_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}")
@@ -29,7 +29,7 @@ set(GRAMMAR_PROCESSED_OUTPUTS
 # Check if jikespg exists
 if(NOT EXISTS ${JIKESPG_EXECUTABLE})
     message(WARNING "jikespg not found at ${JIKESPG_EXECUTABLE}. Grammar will not be regenerated.")
-    message(WARNING "Build jikespg first: cd tools/jikespg/src && make")
+    message(WARNING "Build jikespg first: cd vendor/jikespg/src && make")
 else()
     # Custom command to run jikespg (outputs to build directory)
     # We copy java.g to the build directory first since jikespg outputs to its working directory

@@ -1007,13 +1007,26 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
                 }
             }
 
-            // Check varargs parameters against component type
+            // Check varargs parameters against component type (or array type)
             if (i == num_fixed && is_varargs && num_formals > 0)
             {
                 TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
                 TypeSymbol* component_type = varargs_type -> IsArray() ?
                     varargs_type -> ArraySubtype() : varargs_type;
 
+                // Special case: when num_args == num_formals, the last argument
+                // can also be assignable to the varargs array type itself
+                // (JLS 15.12.2.4 - no wrapping needed in that case)
+                if (num_args == num_formals && i == num_fixed)
+                {
+                    AstExpression* last_arg = method_call -> arguments -> Argument(i);
+                    if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
+                    {
+                        i++; // Accept this argument as array
+                    }
+                }
+
+                // Check remaining varargs arguments against component type
                 for ( ; i < num_args; i++)
                 {
                     AstExpression* expr = method_call -> arguments -> Argument(i);
@@ -1151,13 +1164,26 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
                         }
                     }
 
-                    // Check varargs parameters against component type
+                    // Check varargs parameters against component type (or array type)
                     if (i == num_fixed && is_varargs && num_formals > 0)
                     {
                         TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
                         TypeSymbol* component_type = varargs_type -> IsArray() ?
                             varargs_type -> ArraySubtype() : varargs_type;
 
+                        // Special case: when num_args == num_formals, the last argument
+                        // can also be assignable to the varargs array type itself
+                        // (JLS 15.12.2.4 - no wrapping needed in that case)
+                        if (num_args == num_formals && i == num_fixed)
+                        {
+                            AstExpression* last_arg = method_call -> arguments -> Argument(i);
+                            if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
+                            {
+                                i++; // Accept this argument as array
+                            }
+                        }
+
+                        // Check remaining varargs arguments against component type
                         for ( ; i < num_args; i++)
                         {
                             AstExpression* expr = method_call -> arguments -> Argument(i);
@@ -5861,9 +5887,10 @@ void Semantic::MethodInvocationConversion(AstArguments* args,
     {
         // Exact match - last argument might be an array or single element
         AstExpression* last_arg = args -> Argument(num_args - 1);
-        if (last_arg -> Type() == varargs_type)
+        if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
         {
-            // Already an array of correct type - no wrapping needed
+            // Already an array compatible type (same type or subtype like String[] -> Object[])
+            // No wrapping needed - pass array as-is
             return;
         }
         // Fall through to wrap single element in array

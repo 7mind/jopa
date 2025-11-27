@@ -11,7 +11,7 @@ public class Method {
     public native Class[] getParameterTypes();
     public native Class[] getExceptionTypes();
     public native Class getDeclaringClass();
-    public native Object invoke(Object obj, Object[] args) throws IllegalAccessException;
+    public native Object invoke(Object obj, Object... args) throws IllegalAccessException;
     public native boolean isAccessible();
     public native void setAccessible(boolean flag);
     public native Annotation[] getDeclaredAnnotations();

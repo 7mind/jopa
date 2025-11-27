@@ -60,18 +60,29 @@ endif()
 set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-build")
 set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
 
-# Get Java paths
+# Get Java paths - we use these explicitly and clear everything else
 get_filename_component(JAVA_BIN_DIR "${Java_JAVAC_EXECUTABLE}" DIRECTORY)
+
+# Create a script that clears Java environment and runs the build
+# This ensures no OpenJDK tools accidentally leak from PATH
+set(CLEAN_JAVA_ENV_VARS
+    "--unset=JAVA_HOME"
+    "--unset=JDK_HOME"
+    "--unset=CLASSPATH"
+)
 
 ExternalProject_Add(gnu_classpath
     SOURCE_DIR "${CLASSPATH_SOURCE_DIR}"
     BINARY_DIR "${CLASSPATH_BUILD_DIR}"
     INSTALL_DIR "${CLASSPATH_INSTALL_DIR}"
 
+    # Clean Java environment and explicitly set only what we need
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
         "JAVAC=${Java_JAVAC_EXECUTABLE}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
+        "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
             --disable-gtk-peer
@@ -81,8 +92,16 @@ ExternalProject_Add(gnu_classpath
             --disable-Werror
             --disable-gjdoc
 
-    BUILD_COMMAND ${MAKE_COMMAND} -j${NPROC}
-    INSTALL_COMMAND ${MAKE_COMMAND} install
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
+        "JAVAC=${Java_JAVAC_EXECUTABLE}"
+        "JAVA=${Java_JAVA_EXECUTABLE}"
+        "JAR=${JAVA_BIN_DIR}/jar"
+        ${MAKE_COMMAND} -j${NPROC}
+
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
+        ${MAKE_COMMAND} install
 
     BUILD_BYPRODUCTS "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
 )
@@ -102,14 +121,22 @@ ExternalProject_Add(jamvm
 
     DEPENDS gnu_classpath
 
-    CONFIGURE_COMMAND "${JAMVM_SOURCE_DIR}/configure"
-        --prefix=<INSTALL_DIR>
-        --with-java-runtime-library=gnuclasspath
-        --with-classpath-install-dir=${CLASSPATH_INSTALL_DIR}
-        --enable-int-inlining
+    # Clean Java environment - JamVM is a C project but might check for Java
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
+        "${JAMVM_SOURCE_DIR}/configure"
+            --prefix=<INSTALL_DIR>
+            --with-java-runtime-library=gnuclasspath
+            --with-classpath-install-dir=${CLASSPATH_INSTALL_DIR}
+            --enable-int-inlining
 
-    BUILD_COMMAND ${MAKE_COMMAND} -j${NPROC}
-    INSTALL_COMMAND ${MAKE_COMMAND} install
+    BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
+        ${MAKE_COMMAND} -j${NPROC}
+
+    INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+        ${CLEAN_JAVA_ENV_VARS}
+        ${MAKE_COMMAND} install
 
     BUILD_BYPRODUCTS "${JAMVM_INSTALL_DIR}/bin/jamvm"
 )

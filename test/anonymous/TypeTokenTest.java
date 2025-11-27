@@ -210,9 +210,9 @@ public class TypeTokenTest {
     static Type getGenericComponentType(Type t) {
         // Use reflection to call getGenericComponentType() on GenericArrayType
         try {
-            java.lang.reflect.Method m = t.getClass().getMethod("getGenericComponentType", new Class[0]);
+            java.lang.reflect.Method m = t.getClass().getMethod("getGenericComponentType");
             m.setAccessible(true);
-            return (Type) m.invoke(t, new Object[0]);
+            return (Type) m.invoke(t);
         } catch (Exception e) {
             return null;
         }
