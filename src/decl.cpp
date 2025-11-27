@@ -1281,10 +1281,12 @@ static void CheckAndCreateBridge(
     bridge -> SetFlags((method -> Flags() & ~AccessFlags::ACCESS_ABSTRACT) |
                        AccessFlags::ACCESS_SYNTHETIC | AccessFlags::ACCESS_BRIDGE);
     bridge -> SetBridgeTarget(method);
-    bridge -> SetBlockSymbol(new BlockSymbol(1));
+    unsigned num_params = inherited_method -> NumFormalParameters();
+    BlockSymbol* block_symbol = new BlockSymbol(num_params);
+    bridge -> SetBlockSymbol(block_symbol);
 
     // Copy parameter types from inherited_method (erased signature)
-    for (unsigned k = 0; k < inherited_method -> NumFormalParameters(); k++)
+    for (unsigned k = 0; k < num_params; k++)
     {
         VariableSymbol* param = inherited_method -> FormalParameter(k);
         VariableSymbol* new_param = new VariableSymbol(param -> Identity());
@@ -1292,6 +1294,7 @@ static void CheckAndCreateBridge(
         new_param -> SetFlags(param -> Flags());
         new_param -> SetOwner(bridge);
         bridge -> AddFormalParameter(new_param);
+        block_symbol -> InsertVariableSymbol(new_param);
     }
 
     bridge -> SetSignature(control);

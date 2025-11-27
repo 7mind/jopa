@@ -727,8 +727,20 @@ TypeSymbol* TypeSymbol::Erasure()
 TypeSymbol::~TypeSymbol()
 {
     unsigned i;
-    delete read_methods;
-    delete write_methods;
+
+    // Clean up read_methods - it's a nested Map, so we need to delete inner maps first
+    if (read_methods)
+    {
+        read_methods -> DeleteValues();
+        delete read_methods;
+    }
+
+    // Clean up write_methods - also a nested Map
+    if (write_methods)
+    {
+        write_methods -> DeleteValues();
+        delete write_methods;
+    }
     delete semantic_environment;
     delete local;
     delete non_local;

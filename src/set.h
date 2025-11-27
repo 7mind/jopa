@@ -397,6 +397,16 @@ public:
     //
     void Add(Key*, Value*);
 
+    //
+    // Delete all values in the map. Use this before destroying a Map
+    // when the values are heap-allocated objects that need cleanup.
+    //
+    void DeleteValues()
+    {
+        for (unsigned i = 0; i < symbol_pool.Length(); i++)
+            delete symbol_pool[i] -> value;
+    }
+
 private:
     struct Element
     {
