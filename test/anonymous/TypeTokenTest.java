@@ -4,6 +4,35 @@
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 
+// Helper generic classes for complex nested type tests
+class Pair<A, B> {
+    public A first;
+    public B second;
+    public Pair(A a, B b) { first = a; second = b; }
+}
+
+class Triple<A, B, C> {
+    public A first;
+    public B second;
+    public C third;
+    public Triple(A a, B b, C c) { first = a; second = b; third = c; }
+}
+
+class MyObj {
+    public String value;
+    public MyObj(String v) { value = v; }
+}
+
+class MyGeneric<T> {
+    public T item;
+    public MyGeneric(T t) { item = t; }
+}
+
+class Container<T> {
+    public java.util.List<T> items;
+    public Container() { items = null; }
+}
+
 abstract class TypeToken<T> {
     private final Type type;
 
@@ -237,6 +266,242 @@ public class TypeTokenTest {
         }
     }
 
+    static void testComplexNestedGenerics() {
+        System.out.println("\n--- Complex Nested Generics ---");
+
+        // Test 1: Pair<List<String>, List<Integer>>
+        TypeToken<Pair<java.util.List<String>, java.util.List<Integer>>> pairListsToken =
+            new TypeToken<Pair<java.util.List<String>, java.util.List<Integer>>>() {};
+        Type pairListsType = pairListsToken.getType();
+
+        test("8.1 Pair<List<String>, List<Integer>> is ParameterizedType",
+             pairListsType instanceof ParameterizedType);
+
+        if (pairListsType instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) pairListsType;
+            test("8.2 Raw type is Pair",
+                 pt.getRawType() == Pair.class);
+
+            Type[] args = pt.getActualTypeArguments();
+            test("8.3 Pair has 2 type arguments", args.length == 2);
+
+            // Check first arg: List<String>
+            test("8.4 First arg is ParameterizedType",
+                 args[0] instanceof ParameterizedType);
+            if (args[0] instanceof ParameterizedType) {
+                ParameterizedType listString = (ParameterizedType) args[0];
+                test("8.5 First arg raw type is List",
+                     listString.getRawType() == java.util.List.class);
+                test("8.6 First arg type param is String",
+                     listString.getActualTypeArguments()[0] == String.class);
+            }
+
+            // Check second arg: List<Integer>
+            test("8.7 Second arg is ParameterizedType",
+                 args[1] instanceof ParameterizedType);
+            if (args[1] instanceof ParameterizedType) {
+                ParameterizedType listInt = (ParameterizedType) args[1];
+                test("8.8 Second arg raw type is List",
+                     listInt.getRawType() == java.util.List.class);
+                test("8.9 Second arg type param is Integer",
+                     listInt.getActualTypeArguments()[0] == Integer.class);
+            }
+        }
+
+        // Test 2: Pair<Pair<List<MyObj>, List<Integer>>, MyGeneric<MyObj>>
+        TypeToken<Pair<Pair<java.util.List<MyObj>, java.util.List<Integer>>, MyGeneric<MyObj>>> complexToken =
+            new TypeToken<Pair<Pair<java.util.List<MyObj>, java.util.List<Integer>>, MyGeneric<MyObj>>>() {};
+        Type complexType = complexToken.getType();
+
+        test("8.10 Complex nested type is ParameterizedType",
+             complexType instanceof ParameterizedType);
+
+        if (complexType instanceof ParameterizedType) {
+            ParameterizedType outerPair = (ParameterizedType) complexType;
+            test("8.11 Outer raw type is Pair",
+                 outerPair.getRawType() == Pair.class);
+
+            Type[] outerArgs = outerPair.getActualTypeArguments();
+            test("8.12 Outer Pair has 2 args", outerArgs.length == 2);
+
+            // First arg: Pair<List<MyObj>, List<Integer>>
+            test("8.13 First outer arg is ParameterizedType",
+                 outerArgs[0] instanceof ParameterizedType);
+            if (outerArgs[0] instanceof ParameterizedType) {
+                ParameterizedType innerPair = (ParameterizedType) outerArgs[0];
+                test("8.14 Inner pair raw type is Pair",
+                     innerPair.getRawType() == Pair.class);
+
+                Type[] innerArgs = innerPair.getActualTypeArguments();
+                test("8.15 Inner Pair has 2 args", innerArgs.length == 2);
+
+                // List<MyObj>
+                if (innerArgs[0] instanceof ParameterizedType) {
+                    ParameterizedType listMyObj = (ParameterizedType) innerArgs[0];
+                    test("8.16 List<MyObj> raw type is List",
+                         listMyObj.getRawType() == java.util.List.class);
+                    test("8.17 List<MyObj> type param is MyObj",
+                         listMyObj.getActualTypeArguments()[0] == MyObj.class);
+                }
+
+                // List<Integer>
+                if (innerArgs[1] instanceof ParameterizedType) {
+                    ParameterizedType listInt = (ParameterizedType) innerArgs[1];
+                    test("8.18 List<Integer> raw type is List",
+                         listInt.getRawType() == java.util.List.class);
+                    test("8.19 List<Integer> type param is Integer",
+                         listInt.getActualTypeArguments()[0] == Integer.class);
+                }
+            }
+
+            // Second arg: MyGeneric<MyObj>
+            test("8.20 Second outer arg is ParameterizedType",
+                 outerArgs[1] instanceof ParameterizedType);
+            if (outerArgs[1] instanceof ParameterizedType) {
+                ParameterizedType myGeneric = (ParameterizedType) outerArgs[1];
+                test("8.21 MyGeneric raw type is MyGeneric",
+                     myGeneric.getRawType() == MyGeneric.class);
+                test("8.22 MyGeneric type param is MyObj",
+                     myGeneric.getActualTypeArguments()[0] == MyObj.class);
+            }
+        }
+    }
+
+    static void testTripleNestedGenerics() {
+        System.out.println("\n--- Triple Nested Generics ---");
+
+        // Test: Triple<Map<String, List<Integer>>, Set<MyObj>, Container<Pair<String, Integer>>>
+        TypeToken<Triple<java.util.Map<String, java.util.List<Integer>>,
+                         java.util.Set<MyObj>,
+                         Container<Pair<String, Integer>>>> tripleToken =
+            new TypeToken<Triple<java.util.Map<String, java.util.List<Integer>>,
+                                 java.util.Set<MyObj>,
+                                 Container<Pair<String, Integer>>>>() {};
+        Type tripleType = tripleToken.getType();
+
+        test("9.1 Triple type is ParameterizedType",
+             tripleType instanceof ParameterizedType);
+
+        if (tripleType instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) tripleType;
+            test("9.2 Raw type is Triple",
+                 pt.getRawType() == Triple.class);
+
+            Type[] args = pt.getActualTypeArguments();
+            test("9.3 Triple has 3 type arguments", args.length == 3);
+
+            // First arg: Map<String, List<Integer>>
+            if (args[0] instanceof ParameterizedType) {
+                ParameterizedType mapType = (ParameterizedType) args[0];
+                test("9.4 First arg raw type is Map",
+                     mapType.getRawType() == java.util.Map.class);
+
+                Type[] mapArgs = mapType.getActualTypeArguments();
+                test("9.5 Map first arg is String",
+                     mapArgs[0] == String.class);
+
+                if (mapArgs[1] instanceof ParameterizedType) {
+                    ParameterizedType listInt = (ParameterizedType) mapArgs[1];
+                    test("9.6 Map second arg is List<Integer>",
+                         listInt.getRawType() == java.util.List.class &&
+                         listInt.getActualTypeArguments()[0] == Integer.class);
+                }
+            }
+
+            // Second arg: Set<MyObj>
+            if (args[1] instanceof ParameterizedType) {
+                ParameterizedType setType = (ParameterizedType) args[1];
+                test("9.7 Second arg raw type is Set",
+                     setType.getRawType() == java.util.Set.class);
+                test("9.8 Set type param is MyObj",
+                     setType.getActualTypeArguments()[0] == MyObj.class);
+            }
+
+            // Third arg: Container<Pair<String, Integer>>
+            if (args[2] instanceof ParameterizedType) {
+                ParameterizedType containerType = (ParameterizedType) args[2];
+                test("9.9 Third arg raw type is Container",
+                     containerType.getRawType() == Container.class);
+
+                Type containerArg = containerType.getActualTypeArguments()[0];
+                if (containerArg instanceof ParameterizedType) {
+                    ParameterizedType pairType = (ParameterizedType) containerArg;
+                    test("9.10 Container arg is Pair<String, Integer>",
+                         pairType.getRawType() == Pair.class &&
+                         pairType.getActualTypeArguments()[0] == String.class &&
+                         pairType.getActualTypeArguments()[1] == Integer.class);
+                }
+            }
+        }
+    }
+
+    static void testDeeplyNestedGenerics() {
+        System.out.println("\n--- Deeply Nested Generics (4 levels) ---");
+
+        // Test: List<Map<String, Pair<Set<Integer>, MyGeneric<List<MyObj>>>>>
+        TypeToken<java.util.List<java.util.Map<String,
+                    Pair<java.util.Set<Integer>,
+                         MyGeneric<java.util.List<MyObj>>>>>> deepToken =
+            new TypeToken<java.util.List<java.util.Map<String,
+                            Pair<java.util.Set<Integer>,
+                                 MyGeneric<java.util.List<MyObj>>>>>>() {};
+        Type deepType = deepToken.getType();
+
+        test("10.1 Deeply nested type is ParameterizedType",
+             deepType instanceof ParameterizedType);
+
+        if (deepType instanceof ParameterizedType) {
+            // Level 1: List<...>
+            ParameterizedType level1 = (ParameterizedType) deepType;
+            test("10.2 Level 1 is List",
+                 level1.getRawType() == java.util.List.class);
+
+            Type level1Arg = level1.getActualTypeArguments()[0];
+            if (level1Arg instanceof ParameterizedType) {
+                // Level 2: Map<String, ...>
+                ParameterizedType level2 = (ParameterizedType) level1Arg;
+                test("10.3 Level 2 is Map",
+                     level2.getRawType() == java.util.Map.class);
+                test("10.4 Map key is String",
+                     level2.getActualTypeArguments()[0] == String.class);
+
+                Type level2Val = level2.getActualTypeArguments()[1];
+                if (level2Val instanceof ParameterizedType) {
+                    // Level 3: Pair<Set<Integer>, MyGeneric<List<MyObj>>>
+                    ParameterizedType level3 = (ParameterizedType) level2Val;
+                    test("10.5 Level 3 is Pair",
+                         level3.getRawType() == Pair.class);
+
+                    Type[] level3Args = level3.getActualTypeArguments();
+
+                    // Pair first: Set<Integer>
+                    if (level3Args[0] instanceof ParameterizedType) {
+                        ParameterizedType setInt = (ParameterizedType) level3Args[0];
+                        test("10.6 Pair first is Set<Integer>",
+                             setInt.getRawType() == java.util.Set.class &&
+                             setInt.getActualTypeArguments()[0] == Integer.class);
+                    }
+
+                    // Pair second: MyGeneric<List<MyObj>>
+                    if (level3Args[1] instanceof ParameterizedType) {
+                        ParameterizedType myGeneric = (ParameterizedType) level3Args[1];
+                        test("10.7 Pair second is MyGeneric",
+                             myGeneric.getRawType() == MyGeneric.class);
+
+                        Type myGenericArg = myGeneric.getActualTypeArguments()[0];
+                        if (myGenericArg instanceof ParameterizedType) {
+                            // Level 4: List<MyObj>
+                            ParameterizedType listMyObj = (ParameterizedType) myGenericArg;
+                            test("10.8 MyGeneric contains List<MyObj>",
+                                 listMyObj.getRawType() == java.util.List.class &&
+                                 listMyObj.getActualTypeArguments()[0] == MyObj.class);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) {
         System.out.println("=== Type Token Test (Gafter's Pattern) ===");
 
@@ -247,6 +512,9 @@ public class TypeTokenTest {
         testArrayTypeToken();
         testMultipleInstances();
         testGenericSuperclassChain();
+        testComplexNestedGenerics();
+        testTripleNestedGenerics();
+        testDeeplyNestedGenerics();
 
         System.out.println("\n=== RESULTS ===");
         System.out.println("Passed: " + passed);

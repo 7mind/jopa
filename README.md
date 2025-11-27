@@ -38,17 +38,25 @@ This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language f
 - ✅ **Underscores in Numeric Literals** - Improved readability (`1_000_000`)
 
 ### Java 7 Bytecode Status
-Java 7 language features are fully supported for parsing and semantic analysis. However, bytecode generation has limitations:
+Java 7 language features are fully supported for parsing, semantic analysis, and bytecode generation:
 
-| Feature | `-target 1.6` | `-target 1.7` |
-|---------|---------------|---------------|
-| Diamond operator | ✅ Works | ⚠️ Needs StackMapTable |
-| Multi-catch | ✅ Works | ⚠️ Needs StackMapTable |
-| Try-with-resources | ✅ Works | ⚠️ Needs StackMapTable |
-| String switch | ✅ Works | ⚠️ Needs StackMapTable |
-| Exception suppression (`addSuppressed`) | ✅ Works | ⚠️ Needs StackMapTable |
+| Feature | `-target 1.5` | `-target 1.6` | `-target 1.7` |
+|---------|---------------|---------------|---------------|
+| Diamond operator | ✅ Works | ✅ Works | ✅ Works |
+| Multi-catch | ✅ Works | ✅ Works | ✅ Works |
+| Try-with-resources | ✅ Works | ✅ Works | ✅ Works |
+| String switch | ✅ Works | ✅ Works | ✅ Works |
+| Exception suppression | ✅ Works | ✅ Works | ✅ Works |
+| Binary/underscore literals | ✅ Works | ✅ Works | ✅ Works |
 
-**Note:** Use `-source 1.7 -target 1.6` to compile Java 7 code to Java 6 bytecode, which runs on any JVM without verification issues. Full `-target 1.7` support requires StackMapTable generation (not yet implemented).
+**Note:** All target versions pass the full test suite. Java 7 bytecode (class version 51.0) includes StackMapTable generation and runs correctly on modern JVMs.
+
+### Advanced Generics Support
+The compiler fully supports complex generic type signatures including:
+- ✅ **Type Token Pattern** - Gafter's pattern for capturing generic types at runtime
+- ✅ **Nested Parameterized Types** - `List<Map<String, List<Integer>>>`
+- ✅ **Bridge Methods** - Automatic generation for covariant returns and generic overrides
+- ✅ **Signature Attributes** - Full JVM signature generation for reflection support
 
 ### Java 8 Features (Partial)
 - ✅ **Default Methods** - Interface methods with default implementations
