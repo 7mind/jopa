@@ -1720,6 +1720,461 @@ public:
 
 
 //
+// StackMapTable attribute (JSR 202, Java SE 6+).
+// Uses compressed frame encoding with delta offsets.
+// Required for class file version 51+ (Java 7+) for verification.
+// JVMS 4.7.4
+//
+class StackMapTableAttribute : public AttributeInfo
+{
+public:
+    //
+    // Verification type info - same encoding as StackMap but used in compressed frames
+    //
+    class VerificationTypeInfo
+    {
+    public:
+        enum VerificationTypeInfoTag
+        {
+            TYPE_Top = 0,
+            TYPE_Integer = 1,
+            TYPE_Float = 2,
+            TYPE_Double = 3,
+            TYPE_Long = 4,
+            TYPE_Null = 5,
+            TYPE_UninitializedThis = 6,
+            TYPE_Object = 7,
+            TYPE_Uninitialized = 8
+        };
+
+    private:
+        VerificationTypeInfoTag tag;
+        u2 info; // cpool_index for Object, offset for Uninitialized
+
+    public:
+        VerificationTypeInfo()
+            : tag(TYPE_Top)
+            , info(0)
+        {}
+
+        VerificationTypeInfo(VerificationTypeInfoTag _tag, u2 _info = 0)
+            : tag(_tag)
+            , info(_info)
+        {}
+
+        VerificationTypeInfoTag Tag() const { return tag; }
+        u2 Info() const { return info; }
+
+        u2 Size() const { return tag >= TYPE_Object ? 3 : 1; }
+
+        bool operator==(const VerificationTypeInfo& other) const
+        {
+            return tag == other.tag && info == other.info;
+        }
+
+        bool operator!=(const VerificationTypeInfo& other) const
+        {
+            return !(*this == other);
+        }
+
+        void Put(OutputBuffer& out) const
+        {
+            out.PutU1((u1) tag);
+            if (tag >= TYPE_Object)
+                out.PutU2(info);
+        }
+
+#ifdef JOPA_DEBUG
+        void Print(const ConstantPool& constant_pool) const
+        {
+            switch (tag)
+            {
+            case TYPE_Top: Coutput << "top"; break;
+            case TYPE_Integer: Coutput << "int"; break;
+            case TYPE_Float: Coutput << "float"; break;
+            case TYPE_Double: Coutput << "double"; break;
+            case TYPE_Long: Coutput << "long"; break;
+            case TYPE_Null: Coutput << "null"; break;
+            case TYPE_UninitializedThis: Coutput << "uninitializedThis"; break;
+            case TYPE_Object:
+                Coutput << "Object[#" << info << "]";
+                break;
+            case TYPE_Uninitialized:
+                Coutput << "uninitialized[@" << info << "]";
+                break;
+            }
+        }
+#endif // JOPA_DEBUG
+    };
+
+    //
+    // StackMapFrame - compressed frame format
+    //
+    class StackMapFrame
+    {
+    public:
+        // Frame type determines encoding
+        enum FrameType
+        {
+            SAME_FRAME_MIN = 0,          // 0-63: same locals, empty stack
+            SAME_FRAME_MAX = 63,
+            SAME_LOCALS_1_STACK_MIN = 64, // 64-127: same locals, 1 stack item
+            SAME_LOCALS_1_STACK_MAX = 127,
+            // 128-246: reserved
+            SAME_LOCALS_1_STACK_EXTENDED = 247, // same locals, 1 stack, explicit offset
+            CHOP_FRAME_MIN = 248,         // 248-250: remove 1-3 locals
+            CHOP_FRAME_MAX = 250,
+            SAME_FRAME_EXTENDED = 251,    // same locals, empty stack, explicit offset
+            APPEND_FRAME_MIN = 252,       // 252-254: add 1-3 locals
+            APPEND_FRAME_MAX = 254,
+            FULL_FRAME = 255              // explicit everything
+        };
+
+    private:
+        u2 offset_delta;
+        Tuple<VerificationTypeInfo> locals;
+        Tuple<VerificationTypeInfo> stack;
+        bool use_full_frame; // force full frame encoding
+
+    public:
+        StackMapFrame(u2 _offset_delta)
+            : offset_delta(_offset_delta)
+            , locals(6, 16)
+            , stack(6, 16)
+            , use_full_frame(false)
+        {}
+
+        u2 OffsetDelta() const { return offset_delta; }
+        void SetOffsetDelta(u2 delta) { offset_delta = delta; }
+
+        u2 LocalsCount() const { return locals.Length(); }
+        u2 StackCount() const { return stack.Length(); }
+
+        const VerificationTypeInfo& Local(unsigned i) const { return locals[i]; }
+        const VerificationTypeInfo& Stack(unsigned i) const { return stack[i]; }
+
+        void AddLocal(const VerificationTypeInfo& entry)
+        {
+            locals.Next() = entry;
+        }
+
+        void AddStack(const VerificationTypeInfo& entry)
+        {
+            stack.Next() = entry;
+        }
+
+        void SetLocals(const Tuple<VerificationTypeInfo>& new_locals)
+        {
+            locals.Reset();
+            for (unsigned i = 0; i < new_locals.Length(); i++)
+                locals.Next() = new_locals[i];
+        }
+
+        void SetStack(const Tuple<VerificationTypeInfo>& new_stack)
+        {
+            stack.Reset();
+            for (unsigned i = 0; i < new_stack.Length(); i++)
+                stack.Next() = new_stack[i];
+        }
+
+        void ForceFullFrame() { use_full_frame = true; }
+
+        //
+        // Determine the frame type to use based on comparison with previous frame
+        // Returns the frame_type byte and computes the actual bytes needed
+        //
+        u1 ComputeFrameType(const StackMapFrame* prev_frame, bool /*is_first*/) const
+        {
+            if (use_full_frame)
+                return FULL_FRAME;
+
+            unsigned prev_locals = prev_frame ? prev_frame->LocalsCount() : 0;
+            unsigned curr_locals = locals.Length();
+            unsigned curr_stack = stack.Length();
+
+            // Check if locals are identical to previous frame
+            bool same_locals = (curr_locals == prev_locals);
+            if (same_locals && prev_frame)
+            {
+                for (unsigned i = 0; i < curr_locals; i++)
+                {
+                    if (locals[i] != prev_frame->Local(i))
+                    {
+                        same_locals = false;
+                        break;
+                    }
+                }
+            }
+
+            if (same_locals && curr_stack == 0)
+            {
+                // same_frame or same_frame_extended
+                if (offset_delta <= 63)
+                    return (u1) offset_delta; // same_frame
+                return SAME_FRAME_EXTENDED;
+            }
+
+            if (same_locals && curr_stack == 1)
+            {
+                // same_locals_1_stack_item or same_locals_1_stack_item_extended
+                if (offset_delta <= 63)
+                    return (u1)(64 + offset_delta); // same_locals_1_stack_item
+                return SAME_LOCALS_1_STACK_EXTENDED;
+            }
+
+            if (curr_stack == 0)
+            {
+                // Check for append_frame (1-3 new locals)
+                if (curr_locals > prev_locals &&
+                    curr_locals <= prev_locals + 3 &&
+                    prev_frame)
+                {
+                    bool can_append = true;
+                    for (unsigned i = 0; i < prev_locals && can_append; i++)
+                    {
+                        if (locals[i] != prev_frame->Local(i))
+                            can_append = false;
+                    }
+                    if (can_append)
+                        return (u1)(251 + (curr_locals - prev_locals)); // append_frame
+                }
+
+                // Check for chop_frame (remove 1-3 locals)
+                if (prev_locals > curr_locals &&
+                    prev_locals <= curr_locals + 3 &&
+                    prev_frame)
+                {
+                    bool can_chop = true;
+                    for (unsigned i = 0; i < curr_locals && can_chop; i++)
+                    {
+                        if (locals[i] != prev_frame->Local(i))
+                            can_chop = false;
+                    }
+                    if (can_chop)
+                        return (u1)(251 - (prev_locals - curr_locals)); // chop_frame
+                }
+            }
+
+            // Fall back to full_frame
+            return FULL_FRAME;
+        }
+
+        //
+        // Calculate the byte size of this frame
+        //
+        u2 FrameSize(const StackMapFrame* prev_frame, bool is_first) const
+        {
+            u1 frame_type = ComputeFrameType(prev_frame, is_first);
+
+            if (frame_type <= SAME_FRAME_MAX)
+            {
+                return 1; // just frame_type
+            }
+            else if (frame_type <= SAME_LOCALS_1_STACK_MAX)
+            {
+                return 1 + stack[0].Size(); // frame_type + 1 stack item
+            }
+            else if (frame_type == SAME_LOCALS_1_STACK_EXTENDED)
+            {
+                return 1 + 2 + stack[0].Size(); // frame_type + offset_delta + 1 stack item
+            }
+            else if (frame_type >= CHOP_FRAME_MIN && frame_type <= CHOP_FRAME_MAX)
+            {
+                return 1 + 2; // frame_type + offset_delta
+            }
+            else if (frame_type == SAME_FRAME_EXTENDED)
+            {
+                return 1 + 2; // frame_type + offset_delta
+            }
+            else if (frame_type >= APPEND_FRAME_MIN && frame_type <= APPEND_FRAME_MAX)
+            {
+                unsigned prev_count = prev_frame ? prev_frame->LocalsCount() : 0;
+                u2 size = 1 + 2; // frame_type + offset_delta
+                for (unsigned i = prev_count; i < locals.Length(); i++)
+                    size += locals[i].Size();
+                return size;
+            }
+            else // FULL_FRAME
+            {
+                u2 size = 1 + 2 + 2 + 2; // frame_type + offset_delta + num_locals + num_stack
+                for (unsigned i = 0; i < locals.Length(); i++)
+                    size += locals[i].Size();
+                for (unsigned j = 0; j < stack.Length(); j++)
+                    size += stack[j].Size();
+                return size;
+            }
+        }
+
+        //
+        // Write the frame to output buffer
+        //
+        void Put(OutputBuffer& out, const StackMapFrame* prev_frame, bool is_first) const
+        {
+            u1 frame_type = ComputeFrameType(prev_frame, is_first);
+            out.PutU1(frame_type);
+
+            if (frame_type <= SAME_FRAME_MAX)
+            {
+                // same_frame: nothing more
+            }
+            else if (frame_type <= SAME_LOCALS_1_STACK_MAX)
+            {
+                // same_locals_1_stack_item_frame: 1 stack verification type
+                stack[0].Put(out);
+            }
+            else if (frame_type == SAME_LOCALS_1_STACK_EXTENDED)
+            {
+                // same_locals_1_stack_item_frame_extended
+                out.PutU2(offset_delta);
+                stack[0].Put(out);
+            }
+            else if (frame_type >= CHOP_FRAME_MIN && frame_type <= CHOP_FRAME_MAX)
+            {
+                // chop_frame
+                out.PutU2(offset_delta);
+            }
+            else if (frame_type == SAME_FRAME_EXTENDED)
+            {
+                // same_frame_extended
+                out.PutU2(offset_delta);
+            }
+            else if (frame_type >= APPEND_FRAME_MIN && frame_type <= APPEND_FRAME_MAX)
+            {
+                // append_frame
+                out.PutU2(offset_delta);
+                unsigned prev_count = prev_frame ? prev_frame->LocalsCount() : 0;
+                for (unsigned i = prev_count; i < locals.Length(); i++)
+                    locals[i].Put(out);
+            }
+            else // FULL_FRAME
+            {
+                // full_frame
+                out.PutU2(offset_delta);
+                out.PutU2(locals.Length());
+                for (unsigned i = 0; i < locals.Length(); i++)
+                    locals[i].Put(out);
+                out.PutU2(stack.Length());
+                for (unsigned j = 0; j < stack.Length(); j++)
+                    stack[j].Put(out);
+            }
+        }
+
+#ifdef JOPA_DEBUG
+        void Print(const ConstantPool& constant_pool,
+                   const StackMapFrame* prev_frame, bool is_first) const
+        {
+            u1 frame_type = ComputeFrameType(prev_frame, is_first);
+            Coutput << "    frame_type=" << (unsigned)frame_type
+                    << " offset_delta=" << offset_delta;
+
+            if (frame_type <= SAME_FRAME_MAX)
+            {
+                Coutput << " [same_frame]";
+            }
+            else if (frame_type <= SAME_LOCALS_1_STACK_MAX)
+            {
+                Coutput << " [same_locals_1_stack_item], stack: ";
+                stack[0].Print(constant_pool);
+            }
+            else if (frame_type == SAME_LOCALS_1_STACK_EXTENDED)
+            {
+                Coutput << " [same_locals_1_stack_item_extended], stack: ";
+                stack[0].Print(constant_pool);
+            }
+            else if (frame_type >= CHOP_FRAME_MIN && frame_type <= CHOP_FRAME_MAX)
+            {
+                Coutput << " [chop_frame k=" << (251 - frame_type) << "]";
+            }
+            else if (frame_type == SAME_FRAME_EXTENDED)
+            {
+                Coutput << " [same_frame_extended]";
+            }
+            else if (frame_type >= APPEND_FRAME_MIN && frame_type <= APPEND_FRAME_MAX)
+            {
+                unsigned k = frame_type - 251;
+                Coutput << " [append_frame k=" << k << "], new locals: ";
+                unsigned prev_count = prev_frame ? prev_frame->LocalsCount() : 0;
+                for (unsigned i = prev_count; i < locals.Length(); i++)
+                {
+                    if (i > prev_count) Coutput << ", ";
+                    locals[i].Print(constant_pool);
+                }
+            }
+            else // FULL_FRAME
+            {
+                Coutput << " [full_frame]" << endl;
+                Coutput << "      locals[" << locals.Length() << "]: ";
+                for (unsigned i = 0; i < locals.Length(); i++)
+                {
+                    if (i > 0) Coutput << ", ";
+                    locals[i].Print(constant_pool);
+                }
+                Coutput << endl << "      stack[" << stack.Length() << "]: ";
+                for (unsigned j = 0; j < stack.Length(); j++)
+                {
+                    if (j > 0) Coutput << ", ";
+                    stack[j].Print(constant_pool);
+                }
+            }
+            Coutput << endl;
+        }
+#endif // JOPA_DEBUG
+    };
+
+private:
+    Tuple<StackMapFrame*> frames;
+
+public:
+    StackMapTableAttribute(u2 name)
+        : AttributeInfo(ATTRIBUTE_StackMapTable, name, 2) // +2 for number_of_entries
+        , frames(6, 16)
+    {}
+
+    virtual ~StackMapTableAttribute()
+    {
+        for (unsigned i = 0; i < frames.Length(); i++)
+            delete frames[i];
+    }
+
+    u2 FrameCount() const { return frames.Length(); }
+
+    void AddFrame(StackMapFrame* frame)
+    {
+        // Calculate frame size based on previous frame
+        StackMapFrame* prev = frames.Length() > 0 ? frames[frames.Length() - 1] : NULL;
+        bool is_first = (frames.Length() == 0);
+        attribute_length += frame->FrameSize(prev, is_first);
+        frames.Next() = frame;
+    }
+
+    virtual void Put(OutputBuffer& out) const
+    {
+        AttributeInfo::Put(out);
+        out.PutU2(frames.Length());
+        for (unsigned i = 0; i < frames.Length(); i++)
+        {
+            StackMapFrame* prev = i > 0 ? frames[i - 1] : NULL;
+            frames[i]->Put(out, prev, i == 0);
+        }
+    }
+
+#ifdef JOPA_DEBUG
+    virtual void Print(const ConstantPool& constant_pool, int fill = 2) const
+    {
+        assert(fill == 2);
+        PrintPrefix("StackMapTable", constant_pool, 2);
+        Coutput << ", frames: " << (unsigned) frames.Length() << endl;
+        for (unsigned i = 0; i < frames.Length(); i++)
+        {
+            StackMapFrame* prev = i > 0 ? frames[i - 1] : NULL;
+            frames[i]->Print(constant_pool, prev, i == 0);
+        }
+    }
+#endif // JOPA_DEBUG
+};
+
+
+//
 // Valid only on non-abstract non-native methods, this is the method
 // implementation. JVMS 4.7.3.
 //
@@ -1749,6 +2204,7 @@ class CodeAttribute : public AttributeInfo
     LocalVariableTableAttribute* attr_locals;
     LocalVariableTableAttribute* attr_local_types;
     StackMapAttribute* attr_stackmap;
+    StackMapTableAttribute* attr_stackmaptable;
 
 public:
     CodeAttribute(u2 _name_index, u2 _max_locals)
@@ -1763,6 +2219,7 @@ public:
         , attr_linenumbers(NULL)
         , attr_locals(NULL)
         , attr_stackmap(NULL)
+        , attr_stackmaptable(NULL)
     {}
     CodeAttribute(ClassFile&);
     virtual ~CodeAttribute()
@@ -1846,6 +2303,10 @@ public:
         case AttributeInfo::ATTRIBUTE_StackMap:
             assert(! attr_stackmap);
             attr_stackmap = (StackMapAttribute*) attribute;
+            break;
+        case AttributeInfo::ATTRIBUTE_StackMapTable:
+            assert(! attr_stackmaptable);
+            attr_stackmaptable = (StackMapTableAttribute*) attribute;
             break;
         default:
             assert(false && "adding unexpected code attribute");

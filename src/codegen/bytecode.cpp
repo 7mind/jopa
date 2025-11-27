@@ -946,6 +946,17 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
             ? (new LocalVariableTableAttribute
                (RegisterUtf8(control.LocalVariableTable_literal)))
             : (LocalVariableTableAttribute*) NULL;
+
+        // Initialize StackMapGenerator for Java 7+ bytecode
+        if (control.option.target >= JopaOption::SDK1_7)
+        {
+            stack_map_generator = new StackMapGenerator(control, *this);
+            stack_map_generator->InitializeMethod(msym, unit_type);
+        }
+        else
+        {
+            stack_map_generator = NULL;
+        }
     }
 
     if (msym -> Type() -> num_dimensions > 255)
@@ -1093,6 +1104,22 @@ void ByteCode::EndMethod(int method_index, MethodSymbol* msym)
                 delete local_variable_table_attribute;
         }
         else delete local_variable_table_attribute;
+
+        //
+        // Generate StackMapTable for Java 7+ bytecode
+        //
+        if (stack_map_generator)
+        {
+            StackMapTableAttribute* stack_map_attr =
+                stack_map_generator->GenerateAttribute(
+                    RegisterUtf8(control.StackMapTable_literal));
+            if (stack_map_attr)
+            {
+                code_attribute->AddAttribute(stack_map_attr);
+            }
+            delete stack_map_generator;
+            stack_map_generator = NULL;
+        }
 
         methods[method_index] -> AddAttribute(code_attribute);
 
@@ -2091,6 +2118,12 @@ bool ByteCode::EmitStringSwitchStatement(AstSwitchStatement* switch_statement)
 
     u2 string_var = switch_block -> block_symbol -> helper_variable_index;
 
+    // Track local variable for StackMapTable
+    if (stack_map_generator)
+    {
+        stack_map_generator->SetLocal(string_var, control.String());
+    }
+
     if (string_var <= 3)
         PutOp((Opcode) (OP_ASTORE_0 + string_var));
     else
@@ -2408,6 +2441,16 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // Exception handler for close(): catches any Throwable
             u2 catch_handler_pc = code_attribute -> CodeLength();
+
+            // Record StackMapTable frame for exception handler entry
+            if (stack_map_generator)
+            {
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(control.Throwable());
+                stack_map_generator->RecordFrame(catch_handler_pc);
+                stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
+            }
+
             stack_depth = 1;  // caught exception is on stack
 
             // Logic:
@@ -2440,6 +2483,13 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // check_close_exception:
             stack_depth = 2;  // [caught, null]
+            // Synchronize stack_map_generator with expected stack state
+            if (stack_map_generator)
+            {
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(control.Throwable());  // caught
+                stack_map_generator->PushType(control.Throwable());  // null (primary)
+            }
             DefineLabel(check_close_exception);
             CompleteLabel(check_close_exception);
             PutOp(OP_POP);  // pop null (was primary)
@@ -2463,6 +2513,13 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // first_close_exception: no previous exception, store caught as close_exception
             stack_depth = 2;  // [caught, null]
+            // Synchronize stack_map_generator with expected stack state
+            if (stack_map_generator)
+            {
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(control.Throwable());  // caught
+                stack_map_generator->PushType(control.Throwable());  // null (close)
+            }
             DefineLabel(first_close_exception);
             CompleteLabel(first_close_exception);
             PutOp(OP_POP);  // pop null (was close)
@@ -2473,6 +2530,12 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // Null path: resource was null, just pop it
             stack_depth = stack_at_branch - 1;  // IFNULL pops 1
+            // Synchronize stack_map_generator with expected stack state
+            if (stack_map_generator)
+            {
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(var->Type());  // one ref left after IFNULL consumes top
+            }
             DefineLabel(skip_close);
             CompleteLabel(skip_close);
             PutOp(OP_POP);  // pop the null reference
@@ -2480,6 +2543,11 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // After all paths converge
             stack_depth = 0;
+            // Synchronize stack_map_generator
+            if (stack_map_generator)
+            {
+                stack_map_generator->ClearStack();
+            }
             DefineLabel(after_catch);
             CompleteLabel(after_catch);
 
@@ -2513,6 +2581,11 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
     // done_cleanup: both paths arrive with stack = 0
     stack_depth = 0;
+    // Synchronize stack_map_generator
+    if (stack_map_generator)
+    {
+        stack_map_generator->ClearStack();
+    }
     DefineLabel(done_cleanup);
     CompleteLabel(done_cleanup);
 }
@@ -2565,6 +2638,13 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
     assert(method_stack -> TopHandlerRangeStart().Length() == 0 &&
            method_stack -> TopHandlerRangeEnd().Length() == 0);
     method_stack -> TopHandlerRangeStart().Push(start_try_block_pc);
+
+    // Save local state at try block start for exception handler frames
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_locals = NULL;
+    if (stack_map_generator)
+    {
+        saved_locals = stack_map_generator->SaveLocals();
+    }
 
     // Java 7: Try-with-resources creates a synthetic finally for close() calls
     bool emit_explicit_finally = statement -> finally_clause_opt &&
@@ -2626,6 +2706,14 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         Label& finally_label = method_stack -> TopFinallyLabel();
         Label end_label;
 
+        // Java 7+: Store try statement for inlined finally support in ProcessAbruptExit
+        // For Java 7+, we inline finally code instead of using JSR/RET
+        bool inline_finally = control.option.target >= JopaOption::SDK1_7 && emit_finally_clause;
+        if (inline_finally)
+        {
+            method_stack -> SetTryStatement(method_stack -> TopNestingLevel(), statement);
+        }
+
         //
         // If try block completes normally, skip code for catch blocks.
         //
@@ -2642,6 +2730,22 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             AstCatchClause* catch_clause = statement -> CatchClause(i);
             VariableSymbol* parameter_symbol =
                 catch_clause -> parameter_symbol;
+
+            //
+            // Record StackMapTable frame for exception handler entry point.
+            // At this point, stack has exactly one item: the caught exception.
+            // Use saved locals from try block start for consistent frame.
+            //
+            if (stack_map_generator && saved_locals)
+            {
+                // Restore locals to try block start state
+                stack_map_generator->RestoreLocals(saved_locals);
+                // Clear stack and push the exception type
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(parameter_symbol->Type());
+                stack_map_generator->RecordFrame(handler_pc);
+                stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
+            }
 
             assert(stack_depth == 0);
             stack_depth = 1; // account for the exception already on the stack
@@ -2699,6 +2803,17 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             }
 
             //
+            // Reset the catch variable in StackMapGenerator after catch block scope ends.
+            // This prevents the catch variable from polluting frames at merge points.
+            //
+            if (stack_map_generator)
+            {
+                stack_map_generator->SetLocal(parameter_symbol->LocalVariableIndex(),
+                    StackMapTableAttribute::VerificationTypeInfo(
+                        StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+            }
+
+            //
             // If catch block completes normally, skip further catch blocks.
             //
             if (! abrupt && (emit_finally_clause ||
@@ -2717,6 +2832,17 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             u2 finally_start_pc = code_attribute -> CodeLength();
             u2 special_end_pc = finally_start_pc;
 
+            // Record StackMapTable frame for finally exception handler entry
+            // Use saved locals from try block start for consistent frame
+            if (stack_map_generator && saved_locals)
+            {
+                stack_map_generator->RestoreLocals(saved_locals);
+                stack_map_generator->ClearStack();
+                stack_map_generator->PushType(control.Throwable());
+                stack_map_generator->RecordFrame(finally_start_pc);
+                stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
+            }
+
             // For try-with-resources, the synthetic finally can always complete normally
             // (it just calls close() on resources)
             bool finally_can_complete = has_resources ||
@@ -2727,93 +2853,178 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
             // Emit code for "special" handler to make sure finally clause is
             // invoked in case an otherwise uncaught exception is thrown in the
             // try block, or an exception is thrown from within a catch block.
-            // This must cover all instructions through the jsr, in case of
-            // asynchronous exceptions.
             //
             assert(stack_depth == 0);
             stack_depth = 1; // account for the exception already on stack
-            if (finally_can_complete)
+
+            if (inline_finally)
             {
-                StoreLocal(variable_index, control.Throwable()); // Save,
-                EmitBranch(OP_JSR, finally_label, statement);
-                special_end_pc = code_attribute -> CodeLength();
-                LoadLocal(variable_index, control.Throwable()); // reload, and
-                PutOp(OP_ATHROW); // rethrow exception.
+                // Java 7+: Inline the finally code instead of using JSR/RET
+                if (finally_can_complete)
+                {
+                    StoreLocal(variable_index, control.Throwable()); // Save exception
+                    // Emit inlined finally code
+                    if (has_resources)
+                    {
+                        EmitResourceCleanup(statement, variable_index);
+                    }
+                    if (emit_explicit_finally)
+                    {
+                        EmitBlockStatement(statement -> finally_clause_opt -> block);
+                    }
+                    special_end_pc = code_attribute -> CodeLength();
+                    LoadLocal(variable_index, control.Throwable()); // reload, and
+                    PutOp(OP_ATHROW); // rethrow exception
+                }
+                else
+                {
+                    // Finally cannot complete normally, just pop exception
+                    PutOp(OP_POP);
+                    if (has_resources)
+                    {
+                        EmitResourceCleanup(statement, variable_index);
+                    }
+                    if (emit_explicit_finally)
+                    {
+                        EmitBlockStatement(statement -> finally_clause_opt -> block);
+                    }
+                }
+
+                method_stack -> TopHandlerRangeEnd().Push(special_end_pc);
+                unsigned count = method_stack -> TopHandlerRangeStart().Length();
+                assert(count == method_stack -> TopHandlerRangeEnd().Length());
+                while (count--)
+                {
+                    code_attribute ->
+                        AddException(method_stack -> TopHandlerRangeStart().Pop(),
+                                     method_stack -> TopHandlerRangeEnd().Pop(),
+                                     finally_start_pc, 0);
+                }
+
+                // For normal completion path, emit inlined finally code
+                if (IsLabelUsed(end_label))
+                {
+                    // Reset stack_map_generator's local state for normal path
+                    // The exception handler set variable_index to Throwable,
+                    // but the normal path (GOTO from try body) doesn't have it set
+                    if (stack_map_generator)
+                    {
+                        // Reset exception-handler-specific locals to Top
+                        stack_map_generator->SetLocal(variable_index,
+                            StackMapTableAttribute::VerificationTypeInfo(
+                                StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                        // Also reset the return address slot if it was used
+                        stack_map_generator->SetLocal(variable_index + 1,
+                            StackMapTableAttribute::VerificationTypeInfo(
+                                StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                        if (has_resources)
+                        {
+                            // Reset close_exception slot too
+                            stack_map_generator->SetLocal(variable_index + 2,
+                                StackMapTableAttribute::VerificationTypeInfo(
+                                    StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                        }
+                        stack_map_generator->ClearStack();
+                    }
+                    DefineLabel(end_label);
+                    CompleteLabel(end_label);
+                    if (has_resources)
+                    {
+                        EmitResourceCleanup(statement, variable_index);
+                    }
+                    if (emit_explicit_finally)
+                    {
+                        EmitBlockStatement(statement -> finally_clause_opt -> block);
+                    }
+                }
+                // Don't use finally_label for Java 7+
             }
             else
             {
-                //
-                // Ignore the exception already on the stack, since we know
-                // the finally clause overrides it.
-                //
-                PutOp(OP_POP);
-            }
-            method_stack -> TopHandlerRangeEnd().Push(special_end_pc);
-            unsigned count = method_stack -> TopHandlerRangeStart().Length();
-            assert(count == method_stack -> TopHandlerRangeEnd().Length());
-            while (count--)
-            {
-                code_attribute ->
-                    AddException(method_stack -> TopHandlerRangeStart().Pop(),
-                                 method_stack -> TopHandlerRangeEnd().Pop(),
-                                 finally_start_pc, 0);
-            }
+                // Java 6 and earlier: Use JSR/RET for finally
+                if (finally_can_complete)
+                {
+                    StoreLocal(variable_index, control.Throwable()); // Save,
+                    EmitBranch(OP_JSR, finally_label, statement);
+                    special_end_pc = code_attribute -> CodeLength();
+                    LoadLocal(variable_index, control.Throwable()); // reload, and
+                    PutOp(OP_ATHROW); // rethrow exception.
+                }
+                else
+                {
+                    //
+                    // Ignore the exception already on the stack, since we know
+                    // the finally clause overrides it.
+                    //
+                    PutOp(OP_POP);
+                }
+                method_stack -> TopHandlerRangeEnd().Push(special_end_pc);
+                unsigned count = method_stack -> TopHandlerRangeStart().Length();
+                assert(count == method_stack -> TopHandlerRangeEnd().Length());
+                while (count--)
+                {
+                    code_attribute ->
+                        AddException(method_stack -> TopHandlerRangeStart().Pop(),
+                                     method_stack -> TopHandlerRangeEnd().Pop(),
+                                     finally_start_pc, 0);
+                }
 
-            //
-            // Generate code for finally clause. If the finally block can
-            // complete normally, this is reached from a JSR, so save the
-            // return address. Otherwise, this is reached from a GOTO.
-            //
-            DefineLabel(finally_label);
-            assert(stack_depth == 0);
-            if (finally_can_complete)
-            {
-                stack_depth = 1; // account for the return location on stack
-                StoreLocal(variable_index + 1, control.Object());
-            }
-            else if (IsLabelUsed(end_label))
-            {
-                DefineLabel(end_label);
-                CompleteLabel(end_label);
-            }
-
-            // Java 7: Emit close() calls for resources before explicit finally
-            if (has_resources)
-            {
-                EmitResourceCleanup(statement, variable_index);
-            }
-
-            // Emit explicit finally block if present
-            if (emit_explicit_finally)
-            {
-                EmitBlockStatement(statement -> finally_clause_opt -> block);
-            }
-
-            //
-            // If a finally block can complete normally, return to the saved
-            // address of the caller.
-            //
-            if (finally_can_complete)
-            {
-                PutOpWide(OP_RET, variable_index + 1);
                 //
-                // Now, if the try or catch blocks complete normally, execute
-                // the finally block before advancing to next statement. We
-                // need to trap one more possibility of an asynchronous
-                // exception before the jsr has started.
+                // Generate code for finally clause. If the finally block can
+                // complete normally, this is reached from a JSR, so save the
+                // return address. Otherwise, this is reached from a GOTO.
                 //
-                if (IsLabelUsed(end_label))
+                DefineLabel(finally_label);
+                assert(stack_depth == 0);
+                if (finally_can_complete)
+                {
+                    stack_depth = 1; // account for the return location on stack
+                    StoreLocal(variable_index + 1, control.Object());
+                }
+                else if (IsLabelUsed(end_label))
                 {
                     DefineLabel(end_label);
                     CompleteLabel(end_label);
-                    EmitBranch(OP_JSR, finally_label, statement);
-                    special_end_pc = code_attribute -> CodeLength();
-                    code_attribute -> AddException(special_end_pc - 3,
-                                                   special_end_pc,
-                                                   finally_start_pc, 0);
                 }
+
+                // Java 7: Emit close() calls for resources before explicit finally
+                if (has_resources)
+                {
+                    EmitResourceCleanup(statement, variable_index);
+                }
+
+                // Emit explicit finally block if present
+                if (emit_explicit_finally)
+                {
+                    EmitBlockStatement(statement -> finally_clause_opt -> block);
+                }
+
+                //
+                // If a finally block can complete normally, return to the saved
+                // address of the caller.
+                //
+                if (finally_can_complete)
+                {
+                    PutOpWide(OP_RET, variable_index + 1);
+                    //
+                    // Now, if the try or catch blocks complete normally, execute
+                    // the finally block before advancing to next statement. We
+                    // need to trap one more possibility of an asynchronous
+                    // exception before the jsr has started.
+                    //
+                    if (IsLabelUsed(end_label))
+                    {
+                        DefineLabel(end_label);
+                        CompleteLabel(end_label);
+                        EmitBranch(OP_JSR, finally_label, statement);
+                        special_end_pc = code_attribute -> CodeLength();
+                        code_attribute -> AddException(special_end_pc - 3,
+                                                       special_end_pc,
+                                                       finally_start_pc, 0);
+                    }
+                }
+                CompleteLabel(finally_label);
             }
-            CompleteLabel(finally_label);
         }
         else
         {
@@ -2844,6 +3055,10 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         if (emit_explicit_finally)
             EmitBlockStatement(statement -> finally_clause_opt -> block);
     }
+
+    // Clean up saved locals
+    if (saved_locals)
+        delete saved_locals;
 }
 
 
@@ -2894,8 +3109,31 @@ bool ByteCode::ProcessAbruptExit(unsigned level, u2 width,
         AstBlock* block = method_stack -> Block(nesting_level);
         if (block -> Tag() == AstBlock::TRY_CLAUSE_WITH_FINALLY)
         {
-            EmitBranch(OP_JSR, method_stack -> FinallyLabel(enclosing_level),
-                       method_stack -> Block(enclosing_level));
+            // Check if we should inline finally for Java 7+
+            AstTryStatement* try_stmt = method_stack -> TryStatement(enclosing_level);
+            if (try_stmt && control.option.target >= JopaOption::SDK1_7)
+            {
+                // Java 7+: Inline the finally code instead of using JSR
+                int var_index = method_stack -> Block(enclosing_level) ->
+                    block_symbol -> helper_variable_index;
+                bool has_resources = try_stmt -> NumResources() > 0;
+                bool emit_explicit_finally = try_stmt -> finally_clause_opt &&
+                    ! IsNop(try_stmt -> finally_clause_opt -> block);
+                if (has_resources)
+                {
+                    EmitResourceCleanup(try_stmt, var_index);
+                }
+                if (emit_explicit_finally)
+                {
+                    EmitBlockStatement(try_stmt -> finally_clause_opt -> block);
+                }
+            }
+            else
+            {
+                // Java 6 and earlier: Use JSR
+                EmitBranch(OP_JSR, method_stack -> FinallyLabel(enclosing_level),
+                           method_stack -> Block(enclosing_level));
+            }
             method_stack -> HandlerRangeEnd(enclosing_level).
                 Push(code_attribute -> CodeLength());
         }
@@ -2906,8 +3144,31 @@ bool ByteCode::ProcessAbruptExit(unsigned level, u2 width,
             // finally preempts it.
             //
             width = 0;
-            EmitBranch(OP_GOTO, method_stack -> FinallyLabel(enclosing_level),
-                       method_stack -> Block(enclosing_level));
+            // Check if we should inline finally for Java 7+
+            AstTryStatement* try_stmt = method_stack -> TryStatement(enclosing_level);
+            if (try_stmt && control.option.target >= JopaOption::SDK1_7)
+            {
+                // Java 7+: Inline the finally code instead of using GOTO to finally_label
+                int var_index = method_stack -> Block(enclosing_level) ->
+                    block_symbol -> helper_variable_index;
+                bool has_resources = try_stmt -> NumResources() > 0;
+                bool emit_explicit_finally = try_stmt -> finally_clause_opt &&
+                    ! IsNop(try_stmt -> finally_clause_opt -> block);
+                if (has_resources)
+                {
+                    EmitResourceCleanup(try_stmt, var_index);
+                }
+                if (emit_explicit_finally)
+                {
+                    EmitBlockStatement(try_stmt -> finally_clause_opt -> block);
+                }
+            }
+            else
+            {
+                // Java 6 and earlier: Use GOTO
+                EmitBranch(OP_GOTO, method_stack -> FinallyLabel(enclosing_level),
+                           method_stack -> Block(enclosing_level));
+            }
             method_stack -> HandlerRangeEnd(enclosing_level).
                 Push(code_attribute -> CodeLength());
             break;
@@ -3804,6 +4065,16 @@ bool ByteCode::EmitSynchronizedStatement(AstSynchronizedStatement* statement)
     //
     EmitBranch(OP_GOTO, start_label, NULL);
     u2 handler_pc = code_attribute -> CodeLength();
+
+    // Record StackMapTable frame for synchronized exception handler
+    if (stack_map_generator)
+    {
+        stack_map_generator->ClearStack();
+        stack_map_generator->PushType(control.Throwable());
+        stack_map_generator->RecordFrame(handler_pc);
+        stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
+    }
+
     assert(stack_depth == 0);
     stack_depth = 1; // account for the exception already on the stack
     LoadLocal(variable_index, control.Object()); // reload monitor
@@ -4425,6 +4696,15 @@ void ByteCode::GenerateClassAccessMethod()
     PutOp(OP_ARETURN);
     code_attribute ->
       AddException(0, 12, 12, RegisterClass(control.ClassNotFoundException()));
+
+    // Record StackMapTable frame for class$ exception handler (at offset 12)
+    if (stack_map_generator)
+    {
+        stack_map_generator->ClearStack();
+        stack_map_generator->PushType(control.ClassNotFoundException());
+        stack_map_generator->RecordFrame(12);
+        stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
+    }
 
     ChangeStack(1); // account for the exception on the stack
     if (control.option.target < JopaOption::SDK1_4)
@@ -7589,6 +7869,16 @@ void ByteCode::DefineLabel(Label& lab)
     lab.definition = code_attribute -> CodeLength();
     if (lab.uses.Length())
         last_label_pc = lab.definition;
+
+    //
+    // Record StackMapTable frame at branch targets (Java 7+)
+    // A label with forward references (uses) indicates a branch target that
+    // needs a stack map frame for verification.
+    //
+    if (stack_map_generator && lab.uses.Length() > 0)
+    {
+        stack_map_generator->RecordFrame(lab.definition);
+    }
 }
 
 
@@ -8043,6 +8333,19 @@ void ByteCode::StoreField(AstExpression* expression)
 
 void ByteCode::StoreLocal(int varno, const TypeSymbol* type)
 {
+    // Track local variable type for StackMapTable
+    if (stack_map_generator)
+    {
+        stack_map_generator->SetLocal(varno, const_cast<TypeSymbol*>(type));
+        // For long/double, set second slot to TOP
+        if (type == control.long_type || type == control.double_type)
+        {
+            stack_map_generator->SetLocal(varno + 1,
+                StackMapTableAttribute::VerificationTypeInfo(
+                    StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+        }
+    }
+
     if (control.IsSimpleIntegerValueType(type) || type == control.boolean_type)
     {
          if (varno <= 3)
@@ -8631,6 +8934,259 @@ void ByteCode::ChangeStack(int i)
 #endif // JOPA_DEBUG
 }
 
+
+//
+// StackMapGenerator implementation
+//
+
+void StackMapGenerator::InitializeMethod(MethodSymbol* method, TypeSymbol* type)
+{
+    Reset();
+    containing_type = type;
+    is_constructor = method->Identity() == control.init_name_symbol;
+    is_instance_method = !method->ACC_STATIC();
+    super_called = !is_constructor; // Non-constructors start with 'this' initialized
+
+    u2 local_index = 0;
+
+    // Instance methods have 'this' in slot 0
+    if (is_instance_method)
+    {
+        if (is_constructor && !super_called)
+        {
+            // In constructor before super(), 'this' is uninitialized
+            SetLocal(local_index, VerificationType(VerificationType::TYPE_UninitializedThis));
+        }
+        else
+        {
+            SetLocal(local_index, type);
+        }
+        local_index++;
+    }
+
+    // Add parameters
+    for (unsigned i = 0; i < method->NumFormalParameters(); i++)
+    {
+        VariableSymbol* param = method->FormalParameter(i);
+        TypeSymbol* param_type = param->Type();
+        SetLocal(local_index, param_type);
+        local_index++;
+
+        // Long and double take two slots
+        if (param_type == control.long_type || param_type == control.double_type)
+        {
+            SetLocal(local_index, VerificationType(VerificationType::TYPE_Top));
+            local_index++;
+        }
+    }
+
+    max_locals_tracked = local_index;
+}
+
+StackMapGenerator::VerificationType StackMapGenerator::TypeToVerificationType(TypeSymbol* type)
+{
+    if (!type)
+        return VerificationType(VerificationType::TYPE_Top);
+
+    if (type == control.int_type ||
+        type == control.short_type ||
+        type == control.byte_type ||
+        type == control.char_type ||
+        type == control.boolean_type)
+    {
+        return VerificationType(VerificationType::TYPE_Integer);
+    }
+    else if (type == control.float_type)
+    {
+        return VerificationType(VerificationType::TYPE_Float);
+    }
+    else if (type == control.double_type)
+    {
+        return VerificationType(VerificationType::TYPE_Double);
+    }
+    else if (type == control.long_type)
+    {
+        return VerificationType(VerificationType::TYPE_Long);
+    }
+    else if (type == control.null_type)
+    {
+        return VerificationType(VerificationType::TYPE_Null);
+    }
+    else if (type->Primitive())
+    {
+        // void or other - should not happen for verification types
+        return VerificationType(VerificationType::TYPE_Top);
+    }
+    else
+    {
+        // Reference type - need constant pool index
+        // We use RegisterClass from ByteCode, but we need to store just the index
+        // For now, use 0 as placeholder - will be resolved when generating attribute
+        u2 class_index = bytecode.RegisterClass(type);
+        return VerificationType(VerificationType::TYPE_Object, class_index);
+    }
+}
+
+void StackMapGenerator::PushType(const VerificationType& type)
+{
+    current_stack.Next() = type;
+}
+
+void StackMapGenerator::PushType(TypeSymbol* type)
+{
+    PushType(TypeToVerificationType(type));
+}
+
+void StackMapGenerator::PopType()
+{
+    if (current_stack.Length() > 0)
+        current_stack.Reset(current_stack.Length() - 1);
+}
+
+void StackMapGenerator::PopTypes(int count)
+{
+    for (int i = 0; i < count && current_stack.Length() > 0; i++)
+        current_stack.Reset(current_stack.Length() - 1);
+}
+
+void StackMapGenerator::ClearStack()
+{
+    current_stack.Reset();
+}
+
+void StackMapGenerator::SetLocal(u2 index, const VerificationType& type)
+{
+    // Extend locals array if needed
+    while (current_locals.Length() <= index)
+    {
+        current_locals.Next() = VerificationType(VerificationType::TYPE_Top);
+    }
+    current_locals[index] = type;
+
+    if (index >= max_locals_tracked)
+        max_locals_tracked = index + 1;
+}
+
+void StackMapGenerator::SetLocal(u2 index, TypeSymbol* type)
+{
+    SetLocal(index, TypeToVerificationType(type));
+}
+
+StackMapGenerator::VerificationType StackMapGenerator::GetLocal(u2 index) const
+{
+    if (index < current_locals.Length())
+        return current_locals[index];
+    return VerificationType(VerificationType::TYPE_Top);
+}
+
+void StackMapGenerator::RecordFrame(u2 pc)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy current locals
+    for (unsigned i = 0; i < current_locals.Length(); i++)
+        entry->locals.Next() = current_locals[i];
+
+    // Copy current stack
+    for (unsigned i = 0; i < current_stack.Length(); i++)
+        entry->stack.Next() = current_stack[i];
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+bool StackMapGenerator::HasFrameAt(u2 pc) const
+{
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc == pc)
+            return true;
+    }
+    return false;
+}
+
+StackMapTableAttribute* StackMapGenerator::GenerateAttribute(u2 name_index)
+{
+    if (recorded_frames.Length() == 0)
+        return NULL;
+
+    StackMapTableAttribute* attr = new StackMapTableAttribute(name_index);
+
+    u2 prev_pc = 0; // Previous frame's actual bytecode offset (not delta)
+
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        FrameEntry* entry = recorded_frames[i];
+
+        // Calculate offset_delta
+        // First frame: offset_delta = pc (offset from start)
+        // Subsequent frames: offset_delta = pc - prev_pc - 1
+        u2 offset_delta;
+        if (i == 0)
+        {
+            offset_delta = entry->pc;
+        }
+        else
+        {
+            offset_delta = entry->pc - prev_pc - 1;
+        }
+
+        StackMapFrame* frame = new StackMapFrame(offset_delta);
+
+        // Copy locals to frame
+        for (unsigned j = 0; j < entry->locals.Length(); j++)
+            frame->AddLocal(entry->locals[j]);
+
+        // Copy stack to frame
+        for (unsigned j = 0; j < entry->stack.Length(); j++)
+            frame->AddStack(entry->stack[j]);
+
+        attr->AddFrame(frame);
+        prev_pc = entry->pc;
+    }
+
+    return attr;
+}
+
+void StackMapGenerator::MarkSuperCalled()
+{
+    if (is_constructor && !super_called)
+    {
+        super_called = true;
+        // Replace UninitializedThis with actual type
+        if (current_locals.Length() > 0 &&
+            current_locals[0].Tag() == VerificationType::TYPE_UninitializedThis)
+        {
+            SetLocal(0, containing_type);
+        }
+    }
+}
 
 
 } // Close namespace Jopa block

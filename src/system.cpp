@@ -338,6 +338,9 @@ void Control::ProcessGlobals()
     RuntimeVisibleAnnotations_literal =
         Utf8_pool.FindOrInsert(U8S_RuntimeVisibleAnnotations,
                                strlen(U8S_RuntimeVisibleAnnotations));
+    StackMapTable_literal =
+        Utf8_pool.FindOrInsert(U8S_StackMapTable,
+                               strlen(U8S_StackMapTable));
 }
 
 

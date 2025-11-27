@@ -109,6 +109,7 @@ public:
     Utf8LiteralValue* EnclosingMethod_literal;
     Utf8LiteralValue* Signature_literal;
     Utf8LiteralValue* RuntimeVisibleAnnotations_literal;
+    Utf8LiteralValue* StackMapTable_literal;
 
     //
     // The primitive types.

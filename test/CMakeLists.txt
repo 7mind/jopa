@@ -259,6 +259,8 @@ endif()
 
 # Anonymous Class Tests
 add_jopa_run_test(AnonymousClassTest "${TEST_DIR}/anonymous/AnonymousClassTest.java" "AnonymousClassTest")
+add_jopa_run_test(AnonymousGenericTest "${TEST_DIR}/anonymous/AnonymousGenericTest.java" "AnonymousGenericTest")
+add_jopa_run_test(TypeTokenTest "${TEST_DIR}/anonymous/TypeTokenTest.java" "TypeTokenTest")
 
 # Java 7 Tests (diamond, multi-catch, try-with-resources, string switch)
 

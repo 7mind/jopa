@@ -13,6 +13,166 @@ namespace Jopa { // Open namespace Jopa block
 class TypeSymbol;
 class Control;
 class Semantic;
+class ByteCode;
+
+//
+// StackMapGenerator - tracks type state for StackMapTable generation
+// Required for class file version 51+ (Java 7+)
+//
+class StackMapGenerator
+{
+public:
+    typedef StackMapTableAttribute::VerificationTypeInfo VerificationType;
+    typedef StackMapTableAttribute::StackMapFrame StackMapFrame;
+
+    //
+    // A recorded frame at a specific bytecode offset
+    //
+    struct FrameEntry
+    {
+        u2 pc;
+        Tuple<VerificationType> locals;
+        Tuple<VerificationType> stack;
+
+        FrameEntry(u2 _pc)
+            : pc(_pc)
+            , locals(6, 16)
+            , stack(6, 16)
+        {}
+    };
+
+private:
+    Control& control;
+    ByteCode& bytecode;
+
+    // Current type state
+    Tuple<VerificationType> current_locals;
+    Tuple<VerificationType> current_stack;
+
+    // Recorded frames at branch targets (sorted by pc)
+    Tuple<FrameEntry*> recorded_frames;
+
+    // Maximum locals seen
+    u2 max_locals_tracked;
+
+    // Is this an instance method (has 'this' in slot 0)?
+    bool is_instance_method;
+
+    // The containing type (for 'this' reference)
+    TypeSymbol* containing_type;
+
+    // Is this a constructor (before super() call, 'this' is uninitialized)?
+    bool is_constructor;
+    bool super_called;
+
+public:
+    StackMapGenerator(Control& _control, ByteCode& _bytecode)
+        : control(_control)
+        , bytecode(_bytecode)
+        , current_locals(16, 16)
+        , current_stack(8, 16)
+        , recorded_frames(4, 8)
+        , max_locals_tracked(0)
+        , is_instance_method(false)
+        , containing_type(NULL)
+        , is_constructor(false)
+        , super_called(false)
+    {}
+
+    ~StackMapGenerator()
+    {
+        Reset();
+    }
+
+    void Reset()
+    {
+        current_locals.Reset();
+        current_stack.Reset();
+        for (unsigned i = 0; i < recorded_frames.Length(); i++)
+            delete recorded_frames[i];
+        recorded_frames.Reset();
+        max_locals_tracked = 0;
+        is_instance_method = false;
+        containing_type = NULL;
+        is_constructor = false;
+        super_called = false;
+    }
+
+    //
+    // Initialize at method start based on method signature
+    //
+    void InitializeMethod(MethodSymbol* method, TypeSymbol* type);
+
+    //
+    // Convert a TypeSymbol to VerificationType
+    //
+    VerificationType TypeToVerificationType(TypeSymbol* type);
+
+    //
+    // Stack operations - called when bytecode affects the stack
+    //
+    void PushType(const VerificationType& type);
+    void PushType(TypeSymbol* type);
+    void PopType();
+    void PopTypes(int count);
+    void ClearStack();
+
+    //
+    // Local operations
+    //
+    void SetLocal(u2 index, const VerificationType& type);
+    void SetLocal(u2 index, TypeSymbol* type);
+    VerificationType GetLocal(u2 index) const;
+
+    //
+    // Save/restore local state for exception handler frames
+    //
+    Tuple<VerificationType>* SaveLocals() const
+    {
+        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_locals.Length(), 8);
+        for (unsigned i = 0; i < current_locals.Length(); i++)
+            saved->Next() = current_locals[i];
+        return saved;
+    }
+
+    void RestoreLocals(Tuple<VerificationType>* saved)
+    {
+        current_locals.Reset();
+        for (unsigned i = 0; i < saved->Length(); i++)
+            current_locals.Next() = (*saved)[i];
+    }
+
+    //
+    // Record a frame at the given PC (called at branch targets)
+    //
+    void RecordFrame(u2 pc);
+
+    //
+    // Check if we already have a frame at this PC
+    //
+    bool HasFrameAt(u2 pc) const;
+
+    //
+    // Generate the StackMapTable attribute from recorded frames
+    //
+    StackMapTableAttribute* GenerateAttribute(u2 name_index);
+
+    //
+    // Mark that super() has been called in constructor
+    //
+    void MarkSuperCalled();
+
+    //
+    // Get/Set whether this is an instance method
+    //
+    bool IsInstanceMethod() const { return is_instance_method; }
+
+    //
+    // Debug: Get current stack depth
+    //
+    unsigned CurrentStackDepth() const { return current_stack.Length(); }
+};
+
 
 class Label
 {
@@ -169,6 +329,9 @@ public:
     AstBlock* TopBlock() { return blocks[TopNestingLevel()]; }
     AstBlock* Block(unsigned i) { AssertIndex(i); return blocks[i]; }
 
+    AstTryStatement* TryStatement(unsigned i) { AssertIndex(i); return try_statements[i]; }
+    void SetTryStatement(unsigned i, AstTryStatement* stmt) { AssertIndex(i); try_statements[i] = stmt; }
+
     u2* TopLocalVariablesStartPc()
     {
         return (u2*) local_variables_start_pc[TopNestingLevel()];
@@ -192,6 +355,9 @@ public:
         handler_range_start = new Tuple<u2>[stack_size];
         handler_range_end = new Tuple<u2>[stack_size];
         blocks = new AstBlock*[stack_size];
+        try_statements = new AstTryStatement*[stack_size];
+        for (unsigned i = 0; i < stack_size; i++)
+            try_statements[i] = NULL;
 
         local_variables_start_pc = new u2*[stack_size];
         for (unsigned i = 0; i < stack_size; i++)
@@ -206,6 +372,7 @@ public:
         delete [] handler_range_start;
         delete [] handler_range_end;
         delete [] blocks;
+        delete [] try_statements;
 
         for (unsigned i = 0; i < stack_size; i++)
             delete [] local_variables_start_pc[i];
@@ -222,6 +389,7 @@ private:
     Tuple<u2>* handler_range_end;
 
     AstBlock** blocks; // block symbols for current block
+    AstTryStatement** try_statements; // for inlined finally in Java 7+
 
     u2** local_variables_start_pc;
     unsigned stack_size;
@@ -232,6 +400,8 @@ private:
 
 class ByteCode : public ClassFile, public StringConstant, public Operators
 {
+    friend class StackMapGenerator;
+
     //
     // A heuristic level for generating code to handle conditional branches
     // crossing more than 32767 bytes of code. In one test case, 54616 was
@@ -264,6 +434,7 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
     LineNumberTableAttribute* line_number_table_attribute;
     LocalVariableTableAttribute* local_variable_table_attribute;
     InnerClassesAttribute* inner_classes_attribute;
+    StackMapGenerator* stack_map_generator; // for Java 7+ StackMapTable
 
     void MethodInitialization()
     {
