@@ -5344,7 +5344,8 @@ void Semantic::ProcessType(AstType* type_expr)
         {
             name -> parameterized_type = ProcessTypeArguments(type, name -> type_arguments_opt);
         }
-        else if (type -> IsGeneric() && control.option.source >= JopaOption::SDK1_5)
+        else if (type -> IsGeneric() && control.option.source >= JopaOption::SDK1_5 &&
+                 ! control.option.nowarn_unchecked)
         {
             // Raw type usage: generic type used without type arguments
             // This is legal but generates unchecked warnings

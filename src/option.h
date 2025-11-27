@@ -109,7 +109,8 @@ public:
          errors,
          pedantic,
          noassert,
-         nosuppressed;  // Disable addSuppressed() calls for older class libraries
+         nosuppressed,  // Disable addSuppressed() calls for older class libraries
+         nowarn_unchecked;  // Suppress unchecked type conversion warnings
 
     char *dependence_report_name;
 

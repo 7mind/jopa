@@ -5651,7 +5651,8 @@ void Semantic::ProcessCastExpression(Ast* expr)
         {
             // Casting to a parameterized type - this is unchecked
             // Example: (List<String>) obj
-            if (control.option.source >= JopaOption::SDK1_5)
+            if (control.option.source >= JopaOption::SDK1_5 &&
+                ! control.option.nowarn_unchecked)
             {
                 ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
                               cast_expression,
@@ -5665,7 +5666,8 @@ void Semantic::ProcessCastExpression(Ast* expr)
         {
             // Casting to raw generic type from non-generic source
             // Example: (List) obj where List is generic
-            if (control.option.source >= JopaOption::SDK1_5)
+            if (control.option.source >= JopaOption::SDK1_5 &&
+                ! control.option.nowarn_unchecked)
             {
                 ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
                               cast_expression,
