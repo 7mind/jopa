@@ -450,13 +450,20 @@ void TypeSymbol::SetSignature(Control& control)
 
 
 //
-// Generate the generic signature for a generic class (Signature attribute)
+// Generate the generic signature for a class (Signature attribute)
 // Format: TypeParameters? SuperclassSignature SuperinterfaceSignature*
+//
+// This is needed for:
+// 1. Generic types (those with type parameters)
+// 2. Types extending parameterized types (e.g., anonymous classes
+//    created with "new TypeToken<String>() {}")
 //
 void TypeSymbol::SetGenericSignature(Control& control)
 {
-    // Only generic types need a signature attribute
-    if (! IsGeneric())
+    // Check if we need a signature attribute
+    bool needs_signature = IsGeneric() || HasParameterizedSuper();
+
+    if (! needs_signature)
         return;
 
     // Estimate size: type parameters + super + interfaces
@@ -481,7 +488,12 @@ void TypeSymbol::SetGenericSignature(Control& control)
     }
 
     // Add superclass signature
-    if (super)
+    // If we have a parameterized superclass, use its full signature
+    if (parameterized_super)
+    {
+        parameterized_super -> GenerateSignature(buffer, length);
+    }
+    else if (super)
     {
         const char* super_sig = super -> SignatureString();
         unsigned super_len = strlen(super_sig);
@@ -691,6 +703,7 @@ TypeSymbol::TypeSymbol(const NameSymbol* name_symbol_)
     array(NULL),
     type_parameters(NULL),
     parameterized_type(NULL),
+    parameterized_super(NULL),
     generic_signature(NULL),
     is_generic(false)
 {

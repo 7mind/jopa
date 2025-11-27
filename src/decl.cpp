@@ -1153,12 +1153,30 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     for (unsigned i = 0; i < num_args; i++)
     {
         AstType* type_arg_ast = type_arguments -> TypeArgument(i);
-        // For now, we just store the TypeSymbol as a Type*
-        // In full implementation, we'd convert wildcards, nested parameterized types, etc.
-        TypeSymbol* arg_sym = type_arg_ast -> symbol;
-        if (! arg_sym || arg_sym -> Bad())
-            arg_sym = control.no_type; // Use placeholder for bad types
-        type_arg_tuple -> Next() = new Type(arg_sym);
+
+        // Check if the type argument is itself a parameterized type
+        AstTypeName* type_name = type_arg_ast -> TypeNameCast();
+        if (type_name && type_name -> parameterized_type)
+        {
+            // Clone the nested parameterized type (to avoid double-free)
+            // The original is owned by ast_pool, so we need our own copy
+            Type temp_wrapper(type_name -> parameterized_type);
+            // Prevent temp_wrapper's destructor from deleting the original
+            // by resetting it - we'll use the clone instead
+            Type* cloned = temp_wrapper.Clone();
+            // Reset temp_wrapper to avoid double-free
+            temp_wrapper.kind = Type::SIMPLE_TYPE;
+            temp_wrapper.simple_type = NULL;
+            type_arg_tuple -> Next() = cloned;
+        }
+        else
+        {
+            // Simple type - use the TypeSymbol
+            TypeSymbol* arg_sym = type_arg_ast -> symbol;
+            if (! arg_sym || arg_sym -> Bad())
+                arg_sym = control.no_type; // Use placeholder for bad types
+            type_arg_tuple -> Next() = new Type(arg_sym);
+        }
     }
 
     ParameterizedType* param_type = new ParameterizedType(base_type, type_arg_tuple);

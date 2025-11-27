@@ -1458,6 +1458,11 @@ private:
     // to the ParameterizedType representation. NULL for raw types.
     ParameterizedType* parameterized_type;
 
+    // For anonymous classes (or any class extending a parameterized type),
+    // this stores the superclass with type arguments.
+    // Example: for "new TypeToken<String>() {}", this would be TypeToken<String>
+    ParameterizedType* parameterized_super;
+
     // Generic signature for Signature attribute in class file
     // Example: <T:Ljava/lang/Object;>Ljava/lang/Object;
     Utf8LiteralValue* generic_signature;
@@ -1497,6 +1502,15 @@ public:
 
     // Check if this is a parameterized type (e.g., List<String>)
     bool IsParameterized() const { return parameterized_type != NULL; }
+
+    // Check if superclass is parameterized (for Signature attribute)
+    bool HasParameterizedSuper() const { return parameterized_super != NULL; }
+
+    // Set parameterized superclass (for anonymous classes)
+    void SetParameterizedSuper(ParameterizedType* ptype) { parameterized_super = ptype; }
+
+    // Get parameterized superclass
+    ParameterizedType* GetParameterizedSuper() const { return parameterized_super; }
 
     // Check if this is a raw type (generic type used without type arguments)
     bool IsRawType() const

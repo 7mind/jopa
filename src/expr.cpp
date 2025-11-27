@@ -4408,6 +4408,15 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
         control.Object() -> subtypes -> AddElement(anon_type);
     }
     else anon_type -> super = super_type;
+
+    // Store parameterized superclass for Signature attribute generation
+    // (needed for TypeToken pattern and similar reflection-based code)
+    AstTypeName* class_type_name = class_creation -> class_type;
+    if (class_type_name -> parameterized_type)
+    {
+        anon_type -> SetParameterizedSuper(class_type_name -> parameterized_type);
+    }
+
     AddDependence(anon_type, super_type);
     super_type -> subtypes -> AddElement(anon_type);
     if (super_type -> ACC_FINAL())

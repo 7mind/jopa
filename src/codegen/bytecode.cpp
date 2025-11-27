@@ -8644,8 +8644,9 @@ void ByteCode::FinishCode()
         AddAttribute(CreateEnclosingMethodAttribute(enclosing));
     }
 
-    // Add Signature attribute for generic classes
-    if (unit_type -> IsGeneric())
+    // Add Signature attribute for generic classes and classes with parameterized superclasses
+    // (the latter is needed for TypeToken pattern and similar reflection-based code)
+    if (unit_type -> IsGeneric() || unit_type -> HasParameterizedSuper())
     {
         unit_type -> SetGenericSignature(control);
         if (unit_type -> GenericSignature())

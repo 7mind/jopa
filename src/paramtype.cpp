@@ -28,16 +28,14 @@ void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
     // Format: L<classname><TypeArguments>;
     // Example: Ljava/util/List<Ljava/lang/String;>;
 
-    buffer[length++] = 'L';
+    // Get the fully qualified signature (e.g., "Ljava/util/List;")
+    const char* full_sig = generic_type -> SignatureString();
+    unsigned sig_len = strlen(full_sig);
 
-    // Add the class name with slashes
-    const char* class_name = generic_type -> Utf8Name();
-    unsigned class_name_len = generic_type -> Utf8NameLength();
-
-    for (unsigned i = 0; i < class_name_len; i++)
+    // Copy everything except the trailing ';'
+    for (unsigned i = 0; i < sig_len - 1; i++)
     {
-        char c = class_name[i];
-        buffer[length++] = (c == '.') ? '/' : c;
+        buffer[length++] = full_sig[i];
     }
 
     // Add type arguments if present
@@ -233,19 +231,15 @@ void Type::GenerateSignature(char* buffer, unsigned& length)
             }
             else
             {
-                // Reference type
-                buffer[length++] = 'L';
+                // Reference type - use the fully qualified signature
+                // SignatureString() returns "Ljava/lang/String;" format
+                const char* sig = simple_type -> SignatureString();
+                unsigned sig_len = strlen(sig);
 
-                const char* class_name = simple_type -> Utf8Name();
-                unsigned class_name_len = simple_type -> Utf8NameLength();
-
-                for (unsigned i = 0; i < class_name_len; i++)
+                for (unsigned i = 0; i < sig_len; i++)
                 {
-                    char c = class_name[i];
-                    buffer[length++] = (c == '.') ? '/' : c;
+                    buffer[length++] = sig[i];
                 }
-
-                buffer[length++] = ';';
             }
             break;
         }
