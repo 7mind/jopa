@@ -8370,7 +8370,7 @@ void ByteCode::LoadImmediateInteger(i4 val)
     else if (val >= -128 && val < 128)
     {
         PutOp(OP_BIPUSH);
-        PutU1(val);
+        PutU1(static_cast<u1>(val));  // BIPUSH interprets byte as signed
     }
     else if (val >= -32768 && val < 32768)
     {
@@ -8384,7 +8384,7 @@ void ByteCode::LoadImmediateInteger(i4 val)
         if (index == 0 || index > 255)
         {
             PutOp(OP_SIPUSH);
-            PutU2(val);
+            PutU2(static_cast<u2>(val));  // SIPUSH interprets short as signed
         }
         else LoadConstantAtIndex(index);
     }
