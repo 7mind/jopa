@@ -6,6 +6,7 @@
 #include "bytecode.h"
 #include "case.h"
 #include "option.h"
+#include "paramtype.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -680,6 +681,10 @@ Control::~Control()
     delete parser;
     delete system_semantic;
     delete system_table;
+
+    // Clean up globally-stored ParameterizedType objects
+    for (ParameterizedType* ptype : parameterized_types)
+        delete ptype;
 
 #ifdef JOPA_DEBUG
     if (option.debug_dump_lex || option.debug_dump_ast ||

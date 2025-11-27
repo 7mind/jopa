@@ -5,8 +5,10 @@
 #include "tuple.h"
 #include "set.h"
 
+#include <vector>
 
 namespace Jopa { // Open namespace Jopa block
+class ParameterizedType;
 class StoragePool;
 class Option;
 class Scanner;
@@ -358,6 +360,16 @@ public:                                                         \
     DoubleLiteralTable double_pool;
     Utf8LiteralTable Utf8_pool;
 
+    //
+    // Global storage for ParameterizedType objects.
+    // These are stored here instead of in per-file ast_pool because they
+    // can be referenced cross-file and must outlive individual file cleanup.
+    //
+    void RegisterParameterizedType(ParameterizedType* ptype)
+    {
+        parameterized_types.push_back(ptype);
+    }
+
     Control(char**, Option&);
     ~Control();
 
@@ -491,6 +503,11 @@ public:                                                         \
 
 private:
     LiteralValue bad_value;
+
+    //
+    // Storage for ParameterizedType objects that must outlive individual file cleanup.
+    //
+    std::vector<ParameterizedType*> parameterized_types;
 
     //
     // Cache of system packages. lang and unnamed are always valid, because of
