@@ -621,6 +621,18 @@ void Semantic::ProcessTypeHeader(AstClassDeclaration* declaration)
         {
             super_type -> subtypes -> AddElement(type);
             type -> super = super_type;
+
+            // If the superclass has type arguments, create a ParameterizedType
+            // This is needed for proper type substitution in generic methods
+            AstTypeName* super_type_name = declaration -> super_opt -> TypeNameCast();
+            if (super_type_name && super_type_name -> type_arguments_opt)
+            {
+                ParameterizedType* param_super = ProcessTypeArguments(
+                    super_type, super_type_name -> type_arguments_opt);
+                if (param_super)
+                    type -> SetParameterizedSuper(param_super);
+            }
+
             while (super_type)
             {
                 type -> supertypes_closure -> AddElement(super_type);
@@ -898,11 +910,21 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
             // Simple lookup in current package or java.lang
             TypeSymbol* bound_type = NULL;
 
-            // Try to find in the current package
-            PackageSymbol* package = type -> ContainingPackage();
-            if (package)
+            // For recursive bounds like T extends T<T>, check if the bound is the
+            // type itself (handles Enum<E extends Enum<E>> pattern)
+            if (bound_name == type -> Identity())
             {
-                bound_type = package -> FindTypeSymbol(bound_name);
+                bound_type = type;
+            }
+
+            // Try to find in the current package
+            if (!bound_type)
+            {
+                PackageSymbol* package = type -> ContainingPackage();
+                if (package)
+                {
+                    bound_type = package -> FindTypeSymbol(bound_name);
+                }
             }
 
             // If not found, try java.lang package
@@ -1124,6 +1146,16 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
         }
 
         // Check each bound of the type parameter
+        // Skip validation during header processing if the type argument is the type
+        // being processed (self-referential case like Concrete extends SelfBounded<Concrete>)
+        // because arg_type's super hasn't been set yet.
+        if (processing_type && (arg_type == processing_type ||
+            (arg_type -> ContainingType() && arg_type -> ContainingType() == processing_type -> ContainingType())))
+        {
+            // Defer validation for self-referential type arguments
+            continue;
+        }
+
         for (unsigned j = 0; j < type_param -> NumBounds(); j++)
         {
             TypeSymbol* bound = type_param -> Bound(j);
@@ -1917,10 +1949,12 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                         if (! method -> IsTyped())
                             method -> ProcessMethodSignature(this, identifier);
 
-                        // Check if there's an implementing method in this_type
+                        // Check if there's an implementing method in this_type or superclasses
                         // with the same erased signature (could be a bridge method
                         // generated for generic interface implementation).
                         bool has_implementation = false;
+
+                        // First check methods declared in this_type
                         for (unsigned j = 0; j < this_type -> NumMethodSymbols(); j++)
                         {
                             MethodSymbol* impl = this_type -> MethodSym(j);
@@ -1948,6 +1982,44 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                             {
                                 has_implementation = true;
                                 break;
+                            }
+                        }
+
+                        // Also check inherited methods from superclasses
+                        // This handles cases like enums inheriting bridge methods from Enum
+                        if (! has_implementation)
+                        {
+                            for (TypeSymbol* super = this_type -> super; super && !has_implementation; super = super -> super)
+                            {
+                                for (unsigned j = 0; j < super -> NumMethodSymbols(); j++)
+                                {
+                                    MethodSymbol* impl = super -> MethodSym(j);
+                                    if (impl -> ACC_ABSTRACT() || impl -> ACC_STATIC() || impl -> ACC_PRIVATE())
+                                        continue;
+                                    if (impl -> name_symbol != method -> name_symbol)
+                                        continue;
+                                    if (! impl -> IsTyped())
+                                        impl -> ProcessMethodSignature(this, identifier);
+                                    if (impl -> NumFormalParameters() != method -> NumFormalParameters())
+                                        continue;
+
+                                    // Check if all parameter types match
+                                    bool params_match = true;
+                                    for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
+                                    {
+                                        if (impl -> FormalParameter(p) -> Type() !=
+                                            method -> FormalParameter(p) -> Type())
+                                        {
+                                            params_match = false;
+                                            break;
+                                        }
+                                    }
+                                    if (params_match)
+                                    {
+                                        has_implementation = true;
+                                        break;
+                                    }
+                                }
                             }
                         }
 
@@ -4435,6 +4507,28 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     method -> SetType(method_type -> GetArrayType(this, dims));
 
     //
+    // Check if the return type is a type parameter of the containing class.
+    // This is needed for proper type substitution during method invocation.
+    //
+    AstTypeName* return_type_name = method_declaration -> type -> TypeNameCast();
+    if (return_type_name && return_type_name -> name && ! return_type_name -> base_opt &&
+        ! return_type_name -> type_arguments_opt && dims == 0)
+    {
+        // It's a simple name - check if it matches a class type parameter
+        const NameSymbol* type_name = lex_stream -> NameSymbol(
+            return_type_name -> name -> identifier_token);
+        for (unsigned i = 0; i < this_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = this_type -> TypeParameter(i);
+            if (type_param -> name_symbol == type_name)
+            {
+                method -> return_type_param_index = (int) i;
+                break;
+            }
+        }
+    }
+
+    //
     // if the method is not static, leave a slot for the "this" pointer.
     //
     method -> SetFlags(access_flags);
@@ -4840,6 +4934,25 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             if (type_param -> name_symbol == name_symbol)
             {
                 // Found a method type parameter - return its erased type
+                TypeSymbol* erased = type_param -> ErasedType();
+                // If unbounded, default to Object
+                return erased ? erased : control.Object();
+            }
+        }
+    }
+
+    // During header processing, processing_type is set to the type being processed.
+    // For nested classes, state_stack may contain the outer class, but we need to
+    // check the current type's parameters first. This handles recursive generics
+    // like Enum<E extends Enum<E>> where E must be found in the type being processed.
+    if (processing_type)
+    {
+        for (unsigned i = 0; i < processing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = processing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+            {
+                // Found a type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();

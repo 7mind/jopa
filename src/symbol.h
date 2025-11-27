@@ -462,6 +462,7 @@ public:
         , generic_signature(NULL)
         , bridge_target(NULL)
         , bridges_generated(NULL)
+        , return_type_param_index(-1)
     {
         Symbol::_kind = METHOD;
     }
@@ -626,6 +627,12 @@ private:
     Tuple<MethodSymbol*>* bridges_generated;
 
 public:
+    // Index of the type parameter (from containing_type) if return type is a type parameter.
+    // -1 means the return type is not a type parameter.
+    // For example, in class Box<T> { T get() {...} }, get()'s return_type_param_index is 0.
+    // This enables proper type substitution during method invocation.
+    int return_type_param_index;
+
     //
     // GENERICS SUPPORT - PUBLIC METHODS
     //
