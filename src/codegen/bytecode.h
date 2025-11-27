@@ -996,9 +996,22 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
 
     u2 RegisterClass(const TypeSymbol* type)
     {
+        if (! type)
+        {
+            Coutput << "ERROR: null type argument to RegisterClass" << endl;
+            abort();
+        }
         Utf8LiteralValue* lit = type -> num_dimensions
             ? type -> signature : type -> fully_qualified_name;
-        assert(type && lit && "null argument to RegisterClass");
+        if (! lit)
+        {
+            Coutput << "ERROR: null literal in RegisterClass - primitive type passed!" << endl;
+            if (type -> name_symbol)
+                Coutput << "  name_symbol: " << type -> name_symbol -> Name() << endl;
+            if (unit_type && unit_type -> fully_qualified_name)
+                Coutput << "  in class: " << unit_type -> fully_qualified_name -> value << endl;
+            abort();
+        }
         u2 index = class_constant_pool_index[lit -> index];
         if (index == 0)
         {

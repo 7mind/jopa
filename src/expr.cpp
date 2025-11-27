@@ -3696,10 +3696,24 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         if (param_type && param_index < param_type -> NumTypeArguments())
         {
             Type* type_arg = param_type -> TypeArgument(param_index);
-            TypeSymbol* substituted = type_arg -> Erasure();
-            if (! substituted)
-                substituted = control.Object();
-            method_call -> resolved_type = substituted;
+            if (type_arg)
+            {
+                TypeSymbol* substituted = type_arg -> Erasure();
+                // Make sure we have a valid reference type (not primitive)
+                // Primitives don't have fully_qualified_name and can't be type arguments
+                if (substituted &&
+                    substituted -> fully_qualified_name &&
+                    ! substituted -> Primitive())
+                {
+                    method_call -> resolved_type = substituted;
+                }
+                else if (! substituted)
+                {
+                    // Unbounded type parameter erases to Object
+                    method_call -> resolved_type = control.Object();
+                }
+                // If substituted is primitive or lacks fully_qualified_name, keep original resolved_type
+            }
         }
     }
 }
