@@ -50,6 +50,9 @@ set(PACKAGE_STRING "${PACKAGE_NAME} ${JOPA_VERSION}")
 include(GNUInstallDirs)
 include(CTest)
 
+# Build jikespg (parser generator) - needed for grammar generation
+add_subdirectory(vendor/jikespg)
+
 # Build JamVM + GNU Classpath if requested
 if(JOPA_BUILD_JAMVM)
     add_subdirectory(vendor)

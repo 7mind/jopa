@@ -1,0 +1,3 @@
+# Build artifacts - jikespg is built by CMake
+jikespg
+*.o

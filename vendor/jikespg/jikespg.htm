@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type"
+content="text/html; charset=iso-8859-1">
+<title>Frequently Asked Questions About Jikes Parser Generator (January 27, 1999)</title>
+</head>
+
+<body>
+
+<h2 align="center">The IBM Research Jikes Compiler Project</h2>
+<h2 align="center">http://www.ibm.com/research/jikes</h2>
+<h2 align="center">Frequently Asked Questions About Jikes Parser Generator</h2>
+<h2 align="center">January 27, 1999</h2>
+<p>
+<h3><a href="#what_is"><b>What is Jikes Parser Generator?</b></a> </h3>
+<h3><a href="#whyis"><b>Why is IBM Research making the source available?</b></a></h3>
+<h3><a href="#whatibm"><b>What does IBM Research plan to do with the source?</b></a></h3>
+<h3><a href="#whatcanido"><b>What can I do with the source?</b></a></h3>
+<h3><a href="#build"><b>How do I compile the source?</b></a></h3>
+<h3><a href="#test"><b>How do I test the parser generator?</b></a></h3>
+<h3><a href="#wheredoc"><b>Do you have any program documentation?</b></a></h3>
+<h3><a href="#bugs"><b>How do I report bugs?</b></a></h3>
+
+
+<h3><a name="what_is"><b>What is Jikes Parser Generator?</b></a></h3>
+
+<p>Jikes Parser Generator is the parser generator used by the Jikes
+Compiler. It takes as input an annotated version of the Java language
+grammar and produces as output program source and data that is part
+of the source for the Jikes compiler.
+
+<p>The current version is written in <code>C</code> and reflects its
+ancient origins; in
+particular, the parser generator was written at a time when memory
+was at a premium (work on it began over fifteen years ago), and was designed to be able to process a grammar
+for Ada in less that 300K running on an original model IBM PC.
+
+
+<h3><a name="whyis"><b>Why is IBM Research making the source available?</b></a></h3>
+
+<p>IBM Research is releasing the source for the parser generator as a
+companion effort to the release of the source for the Jikes Compiler.
+The parser generator is used to generate some of the files that
+comprise the Jikes parser, and so its release makes the full
+source of the Jikes compiler available in a form not dependent on
+machine-generated code.
+
+<p>The release of Jikes<sup><small>TM</small></sup> Parser Generator
+does not establish a policy for the rest of IBM outside of Research,
+nor does it define a standard Source License for Research. Other
+Source agreements from IBM, including IBM Research, if and when they
+do come, are likely to be more restrictive with respect to commercial
+use -- we are allowing almost any use for Jikes because we believe it
+benefits the Java community and doesn't give away any intellectual
+property.
+
+
+<h3><a name="whatibm"><b>What does IBM Research plan to do with the source?</b></a></h3>
+
+<p>We have no plans to actively work on the source right now, as we
+want to devote our efforts to improving the Jikes compiler.
+
+<p>If time permits, we would anticipate recoding the parser
+generator in a more modern language, most likely Java. 
+
+<h3><a name="whatcanido"><b>What can I do with the source?</b></a></h3>
+
+<p>Don't forget to read the license carefully. It explains in detail what you can and cannot do.
+
+<p>You can pretty much do whatever you want -- as long as we get some
+acknowledgment.  You can distribute it in binary or source form, take
+all or part of it and put it in something else, and then redistribute
+it.  It's all up to you.
+
+<p>However, IBM retains control of the names "IBM" and "Jikes<sup><small>TM</small></sup>". You
+can't use them without our permission.
+
+<p>You are under no obligation to tell us what you are doing with the
+source, or to inform us of any changes you make.
+
+<h3><a name="build"><b>How do I compile the source?</b></a></h3>
+
+<p>We provide a simple Makefile that  works for the IBM AIX system. You will
+need to adapt it as necessary for other systems. This shouldn't be hard, as the
+parser generator is just a medium-sized <code>c</code> program that makes few 
+demands on the standard libraries.
+<p>To build the source from scratch, do:
+<pre>
+    cd jikespg/src
+    make clean
+    make
+</pre>
+<h3><a name="test"><b>How do I test the parser generator?</b></a></h3>
+<p>Two small example programs are included with the parser generator source: <code>bnf</code>
+and <code>expr</code>.
+<p>To try <code>bnf</code>, a simple demonstration of a bnf parser, do:
+<pre>
+    cd jikespg/examples/bnf
+    make
+    java Main example1.bnf
+    java Main example2.bnf
+</pre>
+<p>To try <code>expr</code>, a simple Java expression evaluator, do:
+<pre>
+    cd jikespg/examples/bnf
+    make
+    java Main 
+
+</pre>
+and type in sample expressions, such as <code>2+4</code> when prompted.
+<p>You can also bootstrap the parser generator. First, note the size of the executable, then do:
+<pre>
+    jikespg jikespg.g
+    make
+</pre>
+and see if the size of the executable is the same (it should be).
+<p>You can try it with Jikes as follows:
+<pre>
+    cd jikes/src
+    touch java.g
+    jikespg java
+</pre>
+
+The files produced by running <code>jikespg</code> should agree with
+the versions that were present before running <code>jikespg</code>.
+
+
+<h3><a name="wheredoc"><b>Do you have any program documentation?</b></a></h3>
+
+<p>All that is availalble now is the source. As is common with many
+works in progress, we have only had time to comment the source as it
+has evolved.
+
+
+<h3><a name="bugs"><b>How do I report bugs?</b></a></h3>
+
+<p>Please send mail to the mail list
+<code>jikes-bugs@watson.ibm.com</code>. You need to subscribe to this
+list before you can post mail; instructions on how to subscribe can
+be found at 
+<a href="http://www.ibm.com/research/jikes/subscribe">http://www.ibm.com/research/jikes/subscribe</a>.
+Note that only minimal support, indeed possibly no support at all, is
+offered at the present time.
+
+
+
+</body>
+</html>
