@@ -8154,7 +8154,7 @@ void ByteCode::FinishCode()
     AstEnumDeclaration* enum_decl = NULL;
     AstAnnotationDeclaration* annotation_decl = NULL;
 
-    if (unit_type -> declaration)
+    if (unit_type -> declaration && unit_type -> declaration -> owner)
     {
         class_decl = unit_type -> declaration -> owner -> ClassDeclarationCast();
         if (!class_decl)

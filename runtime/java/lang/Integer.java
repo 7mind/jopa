@@ -2,6 +2,9 @@ package java.lang;
 
 // Stub Integer class for testing
 public final class Integer extends Number {
+    public static final Class TYPE = getPrimitiveClass("int");
+    private static native Class getPrimitiveClass(String name);
+
     private final int value;
 
     public Integer(int value) {

@@ -1,6 +1,9 @@
 package java.lang;
 
 public final class Long extends Number {
+    public static final Class TYPE = getPrimitiveClass("long");
+    private static native Class getPrimitiveClass(String name);
+
     private final long value;
 
     public Long(long value) {

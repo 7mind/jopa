@@ -1,6 +1,9 @@
 package java.lang;
 
 public final class Float extends Number {
+    public static final Class TYPE = getPrimitiveClass("float");
+    private static native Class getPrimitiveClass(String name);
+
     private final float value;
 
     public Float(float value) {

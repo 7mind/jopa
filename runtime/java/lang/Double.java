@@ -1,6 +1,9 @@
 package java.lang;
 
 public final class Double extends Number {
+    public static final Class TYPE = getPrimitiveClass("double");
+    private static native Class getPrimitiveClass(String name);
+
     private final double value;
 
     public Double(double value) {

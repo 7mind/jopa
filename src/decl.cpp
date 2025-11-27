@@ -5043,6 +5043,8 @@ void Semantic::ProcessType(AstType* type_expr)
             ReportSemError(SemanticError::UNCHECKED_TYPE_CONVERSION,
                           name,
                           type -> ContainingPackageName(),
+                          type -> ExternalName(),
+                          type -> ContainingPackageName(),
                           type -> ExternalName());
         }
     }

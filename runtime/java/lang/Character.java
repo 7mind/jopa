@@ -1,6 +1,9 @@
 package java.lang;
 
 public final class Character {
+    public static final Class TYPE = getPrimitiveClass("char");
+    private static native Class getPrimitiveClass(String name);
+
     private final char value;
 
     public Character(char value) {

@@ -1014,9 +1014,12 @@ VariableSymbol* Control::ProcessSystemField(TypeSymbol* type,
     if (! type -> Bad())
     {
         field = type -> FindVariableSymbol(name_symbol);
-        if (! field -> IsTyped())
-            field -> ProcessVariableSignature(system_semantic, BAD_TOKEN);
-        field -> MarkInitialized();
+        if (field)
+        {
+            if (! field -> IsTyped())
+                field -> ProcessVariableSignature(system_semantic, BAD_TOKEN);
+            field -> MarkInitialized();
+        }
     }
     if (! field)
     {

@@ -520,6 +520,7 @@ void SemanticError::StaticInitializer()
     warning[ASSIGNMENT_USED_AS_TRUTH_VALUE] = WEAK_WARNING;
     warning[NON_STATIC_FINAL_CONSTANT_FIELD] = WEAK_WARNING;
     warning[AMBIGUOUS_NULL_VARARG] = WEAK_WARNING;
+    warning[UNCHECKED_TYPE_CONVERSION] = WEAK_WARNING;
 
     //
     // Somewhat stronger warnings, but code will be generated anyway.

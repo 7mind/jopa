@@ -257,6 +257,9 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
 endif()
 
+# Anonymous Class Tests
+add_jopa_run_test(AnonymousClassTest "${TEST_DIR}/anonymous/AnonymousClassTest.java" "AnonymousClassTest")
+
 # Java 7 Tests (diamond, multi-catch, try-with-resources, string switch)
 
 # Diamond Operator Test

@@ -1,6 +1,9 @@
 package java.lang;
 
 public final class Boolean {
+    public static final Class TYPE = getPrimitiveClass("boolean");
+    private static native Class getPrimitiveClass(String name);
+
     public static final Boolean TRUE = new Boolean(true);
     public static final Boolean FALSE = new Boolean(false);
 
