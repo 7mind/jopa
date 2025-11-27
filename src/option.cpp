@@ -629,6 +629,11 @@ Option::Option(ArgumentExpander& arguments,
                 // Suppress unchecked type conversion warnings (raw type usage)
                 nowarn_unchecked = true;
             }
+            else if (strcmp(arguments.argv[i], "--nocleanup") == 0)
+            {
+                // Disable cleanup of AST/semantic data after compilation (for debugging)
+                nocleanup = true;
+            }
             else if (strcmp(arguments.argv[i], "+B") == 0 ||
                      strcmp(arguments.argv[i], "--nobytecode") == 0)
             {

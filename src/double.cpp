@@ -2735,7 +2735,7 @@ BigInt &BigInt::operator =(const BigInt &b)
         maxwds = b.maxwds;
         neg = b.neg;
         wds = b.wds;
-        delete data;
+        delete[] data;
         data = new u4[maxwds];
         memcpy(data, b.data, wds * sizeof(u4));
     }
@@ -2995,7 +2995,7 @@ BigInt BigInt::operator <<(unsigned op) const
     BigInt result(*this);
     result.maxwds = 1 << k1;
     result.k = k1;
-    delete result.data;
+    delete[] result.data;
     result.data = x1 = new u4[result.maxwds];
     for (i = 0; i < n; i++)
         *x1++ = 0;
@@ -3042,7 +3042,7 @@ BigInt &BigInt::multadd(unsigned m, unsigned a)
             maxwds = 1 << (++k);
             x = new u4[maxwds];
             memcpy(x, data, wds * sizeof(u4));
-            delete data;
+            delete[] data;
             data = x;
         }
         data[wds++] = carry;

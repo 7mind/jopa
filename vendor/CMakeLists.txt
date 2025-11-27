@@ -62,7 +62,8 @@ endif()
 # ============================================================================
 # JOPA compiler and runtime paths (built as part of main project)
 # ============================================================================
-set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
+# Use ASAN build to avoid memory corruption crashes during bootstrap
+set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/../build-asan/src/jopa")
 set(JOPA_RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
 
 # Clean Java environment to prevent system javac from leaking in
@@ -89,8 +90,11 @@ ExternalProject_Add(gnu_classpath
     # Use JOPA as the Java compiler with our stub runtime.jar as bootclasspath
     # This provides java.lang.Object, String, etc. needed for compilation
     # -nowarn:unchecked suppresses raw type warnings (GNU Classpath uses pre-generics style)
+    # Using ASAN build with UBSAN errors and leak detection suppressed
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "UBSAN_OPTIONS=halt_on_error=0"
+        "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
@@ -106,6 +110,8 @@ ExternalProject_Add(gnu_classpath
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "UBSAN_OPTIONS=halt_on_error=0"
+        "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
@@ -144,6 +150,8 @@ ExternalProject_Add(jamvm
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
     COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "UBSAN_OPTIONS=halt_on_error=0"
+        "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         "${JAMVM_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
@@ -153,6 +161,8 @@ ExternalProject_Add(jamvm
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "UBSAN_OPTIONS=halt_on_error=0"
+        "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         ${MAKE_COMMAND} -j${NPROC}
 

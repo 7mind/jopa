@@ -264,7 +264,7 @@ BaseLong::BaseLong(i4 a)
     //
     //        a >> 31;
     //
-    setHighAndLowWords(a < 0 ? 0xFFFFFFFF : 0x00000000, a);
+    setHighAndLowWords(a < 0 ? 0xFFFFFFFF : 0x00000000, static_cast<u4>(a));
 }
 
 
@@ -440,8 +440,8 @@ LongInt LongInt::operator/ (const LongInt op) const
     bool negative_dividend = (i8) value.words < 0,
          negative_divisor  = (i8) op.value.words < 0;
 
-    u8 a = negative_dividend ? -(i8) value.words : value.words,
-       b = negative_divisor  ? -(i8) op.value.words : op.value.words;
+    u8 a = negative_dividend ? static_cast<u8>(-(i8) value.words) : value.words,
+       b = negative_divisor  ? static_cast<u8>(-(i8) op.value.words) : op.value.words;
 
     return LongInt((negative_dividend ^ negative_divisor) ? -(a / b) : a / b);
 #else
@@ -470,8 +470,8 @@ LongInt LongInt::operator% (const LongInt op) const
     bool negative_dividend = (i8) value.words < 0,
          negative_divisor  = (i8) op.value.words < 0;
 
-    u8 a = negative_dividend ? -(i8) value.words : value.words,
-       b = negative_divisor  ? -(i8) op.value.words : op.value.words;
+    u8 a = negative_dividend ? static_cast<u8>(-(i8) value.words) : value.words,
+       b = negative_divisor  ? static_cast<u8>(-(i8) op.value.words) : op.value.words;
 
     return LongInt(negative_dividend ? -(a % b) : a % b);
 #else
