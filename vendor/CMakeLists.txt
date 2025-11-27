@@ -21,19 +21,19 @@ if(NPROC EQUAL 0)
 endif()
 
 # ============================================================================
-# Extract archives if needed
+# Extract archives to build directory (out-of-tree)
 # ============================================================================
 set(CLASSPATH_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/classpath-0.99.tar.gz")
 set(JAMVM_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/jamvm-2.0.0.tar.gz")
-set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/classpath-0.99")
-set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/jamvm-2.0.0")
+set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/classpath-0.99")
+set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
 
 # Extract GNU Classpath if not present
 if(NOT EXISTS "${CLASSPATH_SOURCE_DIR}/configure")
-    message(STATUS "Extracting GNU Classpath from ${CLASSPATH_ARCHIVE}")
+    message(STATUS "Extracting GNU Classpath to ${CLASSPATH_SOURCE_DIR}")
     execute_process(
         COMMAND ${TAR_COMMAND} -xzf "${CLASSPATH_ARCHIVE}"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
         RESULT_VARIABLE TAR_RESULT
     )
     if(NOT TAR_RESULT EQUAL 0)
@@ -43,10 +43,10 @@ endif()
 
 # Extract JamVM if not present
 if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
-    message(STATUS "Extracting JamVM from ${JAMVM_ARCHIVE}")
+    message(STATUS "Extracting JamVM to ${JAMVM_SOURCE_DIR}")
     execute_process(
         COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
         RESULT_VARIABLE TAR_RESULT
     )
     if(NOT TAR_RESULT EQUAL 0)
