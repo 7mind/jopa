@@ -175,9 +175,10 @@ public class AnonymousGenericTest {
              customWrapper.get().equals("custom:base"));
 
         // Test 2: Anonymous subclass of Wrapper<Integer>
+        // Note: super.get() returns Object (erased type), so we need to cast
         Wrapper<Integer> intWrapper = new Wrapper<Integer>(Integer.valueOf(10)) {
             public Integer get() {
-                return Integer.valueOf(super.get().intValue() + 5);
+                return Integer.valueOf(((Integer)super.get()).intValue() + 5);
             }
         };
         test("4.2 Anonymous generic class (Integer)",

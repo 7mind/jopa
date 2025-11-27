@@ -1,8 +1,8 @@
 // Minimal Iterator interface for Java 5 enhanced for-loop support
 package java.util;
 
-public interface Iterator {
+public interface Iterator<E> {
     boolean hasNext();
-    Object next();
+    E next();
     void remove();
 }

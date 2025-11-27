@@ -68,6 +68,7 @@ public:
         , position(pos)
         , lower_bound(NULL)
         , upper_bound(NULL)
+        , signature_string(NULL)
     {
     }
 

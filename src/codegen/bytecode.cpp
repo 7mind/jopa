@@ -3228,6 +3228,15 @@ void ByteCode::EmitBranch(Opcode opc, Label& lab, AstStatement* over)
     int sizeHeuristic = over ? over -> RightToken() - over -> LeftToken() : 0;
     if (sizeHeuristic < TOKEN_WIDTH_REQUIRING_GOTOW) {
         PutOp(opc);
+        // Update StackMapGenerator for branch operands consumed
+        // This must be done after PutOp but before UseLabel saves the stack state
+        if (stack_map_generator)
+        {
+            // Pop the appropriate number of values based on the branch opcode
+            int effect = stack_effect[opc];
+            for (int i = 0; i < -effect; i++)
+                stack_map_generator->PopType();
+        }
         UseLabel(lab, 2, 1);
         return;
     }
@@ -3247,6 +3256,13 @@ void ByteCode::EmitBranch(Opcode opc, Label& lab, AstStatement* over)
     // goto_w lab
     // label2:
     PutOp(InvertIfOpCode(opc));
+    // Update StackMapGenerator for branch operands consumed
+    if (stack_map_generator)
+    {
+        int effect = stack_effect[InvertIfOpCode(opc)];
+        for (int i = 0; i < -effect; i++)
+            stack_map_generator->PopType();
+    }
     Label label2;
     UseLabel(label2, 2, 1);
     PutOp(OP_GOTO_W);
@@ -4207,6 +4223,8 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
     VariableSymbol* var =
         foreach -> formal_parameter -> formal_declarator -> symbol;
     TypeSymbol* component_type = var -> Type();
+    // Saved locals state for the end label frame (captured before loop body)
+    Tuple<StackMapGenerator::VerificationType>* end_label_locals = NULL;
     if (expr_type -> IsArray())
     {
         //
@@ -4262,17 +4280,39 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         PutOp(OP_ARRAYLENGTH);
         PutOp(OP_DUP);
         StoreLocal(helper_index + 1, control.int_type);
-        EmitBranch(OP_IFEQ, end);
+        // Initialize loop counter before the branch so all paths have consistent locals
         PutOp(OP_ICONST_0);
         StoreLocal(helper_index + 2, control.int_type);
+        // Save state for the end label frame (before loop body modifies anything)
+        if (stack_map_generator)
+        {
+            end_label_locals = stack_map_generator->SaveLocals();
+        }
+        EmitBranch(OP_IFEQ, end);
         PutOp(OP_ICONST_0);
+        // Synchronize stack_map_generator for loop label - stack has [current_index]
+        // Explicitly record frame for loop header (backward branch target)
+        if (stack_map_generator)
+        {
+            stack_map_generator->ClearStack();
+            stack_map_generator->PushType(control.int_type);
+            // Set loop variable to TOP since it's not yet assigned at loop entry
+            stack_map_generator->SetLocal(var -> LocalVariableIndex(),
+                StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Top));
+            // Record frame at loop header for backward branch verification
+            stack_map_generator->RecordFrame(code_attribute -> CodeLength());
+        }
         DefineLabel(loop);
         LoadLocal(helper_index, expr_type);
         PutOp(OP_SWAP);
         LoadArrayElement(expr_type -> ArraySubtype());
         EmitCast(component_type, expr_type -> ArraySubtype());
-        u2 var_pc = code_attribute -> CodeLength();        
+        u2 var_pc = code_attribute -> CodeLength();
         StoreLocal(var -> LocalVariableIndex(), component_type);
+        // Clear stack state before loop body - it should be empty at this point
+        if (stack_map_generator)
+            stack_map_generator->ClearStack();
         abrupt = EmitStatement(foreach -> statement);
         if (control.option.g & JopaOption::VARS)
         {
@@ -4338,9 +4378,30 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         PutU1(1);
         PutU1(0);
         ChangeStack(1);
+        // Save locals state for the end label frame (before iterator and loop variable are assigned)
+        // At this point stack = [Iterator, boolean], IFEQ will pop the boolean
+        if (stack_map_generator && !end_label_locals)
+        {
+            end_label_locals = stack_map_generator->SaveLocals();
+        }
         EmitBranch(OP_IFEQ, cleanup);
+        // After IFEQ (not taken): Stack = [Iterator]
         PutOp(OP_DUP);
         StoreLocal(helper_index, control.Iterator());
+        // After StoreLocal: Stack = [Iterator]
+        // Record frame at loop header for backward branch verification
+        // Stack has [Iterator], iterator local is set
+        if (stack_map_generator)
+        {
+            // Explicitly set the correct stack state for the loop header frame
+            stack_map_generator->ClearStack();
+            stack_map_generator->PushType(control.Iterator());
+            // Set loop variable to TOP since it's not yet assigned at loop entry
+            stack_map_generator->SetLocal(var -> LocalVariableIndex(),
+                StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Top));
+            stack_map_generator->RecordFrame(code_attribute -> CodeLength());
+        }
         DefineLabel(loop);
         PutOp(OP_INVOKEINTERFACE);
         PutU2(RegisterLibraryMethodref(control.Iterator_nextMethod()));
@@ -4352,8 +4413,11 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
             PutOp(OP_CHECKCAST);
             PutU2(RegisterClass(component_type));
         }
-        u2 var_pc = code_attribute -> CodeLength();        
+        u2 var_pc = code_attribute -> CodeLength();
         StoreLocal(var -> LocalVariableIndex(), component_type);
+        // Clear stack state before loop body - it should be empty at this point
+        if (stack_map_generator)
+            stack_map_generator->ClearStack();
         abrupt = EmitStatement(foreach -> statement);
         if (control.option.g & JopaOption::VARS)
         {
@@ -4373,12 +4437,84 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
             PutU1(1);
             PutU1(0);
             ChangeStack(1);
+            // Stack: [Iterator, int]; IFNE will pop int, leaving [Iterator]
+            // At the backward branch target (loop), we need stack = [Iterator]
             EmitBranch(OP_IFNE, loop);
+            // After IFNE (not taken): Stack = [Iterator]
         }
         else ChangeStack(1);
+        // Record frame at cleanup label with saved locals (before loop body)
+        // This is critical because the early exit branch has only pre-loop-body locals
+        // At cleanup, stack has [Iterator] from both paths (early exit and normal exit)
+        if (stack_map_generator && end_label_locals)
+        {
+            // Create a copy of saved locals for the cleanup frame
+            Tuple<StackMapGenerator::VerificationType>* cleanup_locals =
+                new Tuple<StackMapGenerator::VerificationType>(end_label_locals->Length() + 2);
+            for (unsigned i = 0; i < end_label_locals->Length(); i++)
+                cleanup_locals->Next() = (*end_label_locals)[i];
+            // Stack has [Iterator] at cleanup
+            stack_map_generator->RecordFrameWithLocalsAndStack(
+                code_attribute->CodeLength(), cleanup_locals, control.Iterator());
+            delete cleanup_locals;
+        }
+        else if (stack_map_generator)
+        {
+            stack_map_generator->ClearStack();
+            stack_map_generator->PushType(control.Iterator());
+        }
         DefineLabel(cleanup);
         CompleteLabel(cleanup);
         PutOp(OP_POP);
+        // Clear stack after POP for the end label
+        if (stack_map_generator)
+        {
+            stack_map_generator->ClearStack();
+        }
+    }
+    // Record frame at end label with the saved locals (before loop body)
+    // This is critical for nested loops - the end label frame should not include
+    // variables created by inner loops
+    if (stack_map_generator && end_label_locals)
+    {
+        // Set loop variable to TOP in the saved locals since it's out of scope
+        while ((int)end_label_locals->Length() <= var->LocalVariableIndex())
+            end_label_locals->Next() = StackMapGenerator::VerificationType(
+                StackMapGenerator::VerificationType::TYPE_Top);
+        (*end_label_locals)[var->LocalVariableIndex()] =
+            StackMapGenerator::VerificationType(
+                StackMapGenerator::VerificationType::TYPE_Top);
+        // Record the frame with pre-loop-body locals
+        stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), end_label_locals);
+    }
+    // Clean up saved_locals
+    if (end_label_locals)
+        delete end_label_locals;
+    // Sync the StackMapGenerator's state after the foreach ends
+    // Set loop variable and helper variables to TOP
+    if (stack_map_generator)
+    {
+        // Set loop variable to TOP
+        stack_map_generator->SetLocal(var -> LocalVariableIndex(),
+            StackMapGenerator::VerificationType(
+                StackMapGenerator::VerificationType::TYPE_Top));
+        // Set helper variables to TOP
+        stack_map_generator->SetLocal(helper_index,
+            StackMapGenerator::VerificationType(
+                StackMapGenerator::VerificationType::TYPE_Top));
+        if (expr_type -> IsArray())
+        {
+            stack_map_generator->SetLocal(helper_index + 1,
+                StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Top));
+            stack_map_generator->SetLocal(helper_index + 2,
+                StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Top));
+        }
+        // Truncate any locals declared inside the loop body (after the loop variable)
+        // This ensures variables like "Integer i" are out of scope after the loop
+        stack_map_generator->TruncateLocals(var -> LocalVariableIndex() + 1);
+        stack_map_generator->ClearStack();
     }
     DefineLabel(end);
     CompleteLabel(loop);
@@ -4757,47 +4893,63 @@ void ByteCode::GenerateBridgeMethod(MethodSymbol* bridge)
     // Add minimal line number info for debuggers
     line_number_table_attribute -> AddLineNumber(0, 0);
 
+    // Track stack words for parameters (for ChangeStack adjustment after invoke)
+    int stack_words = 0;
+
     // Load 'this' if not static
     if (! bridge -> ACC_STATIC())
     {
         PutOp(OP_ALOAD_0);
+        stack_words++;
     }
 
-    // Load all parameters
+    // Load all parameters and cast if needed for generic bridge
     u2 local_index = bridge -> ACC_STATIC() ? 0 : 1;
     for (unsigned i = 0; i < bridge -> NumFormalParameters(); i++)
     {
-        VariableSymbol* param = bridge -> FormalParameter(i);
-        TypeSymbol* param_type = param -> Type();
+        VariableSymbol* bridge_param = bridge -> FormalParameter(i);
+        TypeSymbol* bridge_param_type = bridge_param -> Type();
+        TypeSymbol* target_param_type = target -> FormalParameter(i) -> Type();
 
-        if (control.IsSimpleIntegerValueType(param_type) ||
-            param_type == control.boolean_type)
+        if (control.IsSimpleIntegerValueType(bridge_param_type) ||
+            bridge_param_type == control.boolean_type)
         {
-            LoadLocal(local_index, param_type);
+            LoadLocal(local_index, bridge_param_type);
             local_index++;
+            stack_words++;
         }
-        else if (param_type == control.long_type)
+        else if (bridge_param_type == control.long_type)
         {
-            PutOp(OP_LLOAD);
-            PutU1(local_index);
+            LoadLocal(local_index, bridge_param_type);
             local_index += 2;
+            stack_words += 2;
         }
-        else if (param_type == control.float_type)
+        else if (bridge_param_type == control.float_type)
         {
-            PutOp(OP_FLOAD);
-            PutU1(local_index);
+            LoadLocal(local_index, bridge_param_type);
             local_index++;
+            stack_words++;
         }
-        else if (param_type == control.double_type)
+        else if (bridge_param_type == control.double_type)
         {
-            PutOp(OP_DLOAD);
-            PutU1(local_index);
+            LoadLocal(local_index, bridge_param_type);
             local_index += 2;
+            stack_words += 2;
         }
         else // reference type
         {
-            LoadLocal(local_index, param_type);
+            LoadLocal(local_index, bridge_param_type);
             local_index++;
+            stack_words++;
+
+            // If target expects a different type, add a cast
+            // This handles generic bridges like Object->String
+            if (target_param_type != bridge_param_type &&
+                ! bridge_param_type -> IsSubtype(target_param_type))
+            {
+                PutOp(OP_CHECKCAST);
+                PutU2(RegisterClass(target_param_type));
+            }
         }
     }
 
@@ -4811,7 +4963,7 @@ void ByteCode::GenerateBridgeMethod(MethodSymbol* bridge)
     {
         PutOp(OP_INVOKEINTERFACE);
         PutU2(RegisterMethodref(target -> containing_type, target));
-        PutU1(target -> NumFormalParameters() + 1); // +1 for 'this'
+        PutU1(stack_words); // count includes 'this' and all args
         PutU1(0);
     }
     else
@@ -4820,8 +4972,20 @@ void ByteCode::GenerateBridgeMethod(MethodSymbol* bridge)
         PutU2(RegisterMethodref(target -> containing_type, target));
     }
 
-    // Return the result
+    // Adjust stack: pop receiver + args, push return value
+    // The PutOp already applied a default stack effect (-1 for INVOKEVIRTUAL),
+    // so we need to adjust for the actual method signature
+    ChangeStack(-stack_words + 1); // +1 because INVOKEVIRTUAL already did -1
+
     TypeSymbol* return_type = bridge -> Type();
+    if (return_type != control.void_type)
+    {
+        // Push the return value
+        bool wide = control.IsDoubleWordType(target -> Type());
+        ChangeStack(wide ? 2 : 1);
+    }
+
+    // Return the result
     if (return_type == control.void_type)
     {
         PutOp(OP_RETURN);
@@ -6044,9 +6208,22 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
     case AstBinaryExpression::EQUAL_EQUAL:
     case AstBinaryExpression::NOT_EQUAL:
         {
-            // Assume false, and update if true.
+            // "Assume false, update if true" pattern:
+            //   iconst_0              ; push 0 (assume false)
+            //   emit_branch_if(expr, false, MERGE)  ; if expr is false, jump to MERGE
+            //   pop                   ; remove the 0
+            //   iconst_1              ; push 1 (true)
+            //   MERGE:                ; result on stack
+            //
+            // At MERGE, both paths have: [...stuff, int] where int is 0 or 1.
+            // This pattern has only ONE branch target (MERGE), not two.
+            //
+            // We mark MERGE with no_frame because we can't accurately track
+            // the stack types. With -noverify the bytecode works correctly.
+            // TODO: Implement proper operand stack tracking for StackMapTable.
             Label label;
-            PutOp(OP_ICONST_0); // push false
+            label.no_frame = true;
+            PutOp(OP_ICONST_0); // push false (assume false)
             EmitBranchIfExpression(expression, false, label);
             PutOp(OP_POP); // pop the false
             PutOp(OP_ICONST_1); // push true
@@ -7874,10 +8051,27 @@ void ByteCode::DefineLabel(Label& lab)
     // Record StackMapTable frame at branch targets (Java 7+)
     // A label with forward references (uses) indicates a branch target that
     // needs a stack map frame for verification.
+    // Skip if no_frame is set (internal expression labels like boolean-to-value pattern).
     //
-    if (stack_map_generator && lab.uses.Length() > 0)
+    if (stack_map_generator && lab.uses.Length() > 0 && !lab.no_frame)
     {
-        stack_map_generator->RecordFrame(lab.definition);
+        if (lab.stack_saved && lab.saved_stack_types)
+        {
+            // Use the saved stack types from the branch point
+            // This handles all cases: empty stack, non-empty stack with any types
+            stack_map_generator->RecordFrameWithSavedStack(lab.definition, lab.saved_stack_types);
+        }
+        else if (lab.stack_saved && lab.saved_stack_depth == 0)
+        {
+            // Most common case: stack is empty at branch target
+            stack_map_generator->ClearStack();
+            stack_map_generator->RecordFrame(lab.definition);
+        }
+        else
+        {
+            // Fallback: use current state (may need refinement for complex expressions)
+            stack_map_generator->RecordFrame(lab.definition);
+        }
     }
 }
 
@@ -7941,6 +8135,19 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
     lab.uses[lab_index].use_length = _length;
     lab.uses[lab_index].op_offset = _op_offset;
     lab.uses[lab_index].use_offset = code_attribute -> CodeLength();
+
+    //
+    // For forward branches (label not yet defined), save the current stack state.
+    // This is needed for StackMapTable generation - the frame at the branch target
+    // should reflect the stack types at the branch point (before the branch instruction
+    // pops its operands).
+    //
+    if (stack_map_generator && !lab.defined && !lab.stack_saved)
+    {
+        lab.saved_stack_depth = stack_depth;
+        lab.saved_stack_types = stack_map_generator->SaveStack();
+        lab.stack_saved = true;
+    }
 
     //
     // fill next length bytes with zero; will be filled in with proper value
@@ -9121,6 +9328,199 @@ void StackMapGenerator::RecordFrame(u2 pc)
     }
 }
 
+void StackMapGenerator::RecordFrameWithLocals(u2 pc, Tuple<VerificationType>* saved_locals)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy saved locals
+    for (unsigned i = 0; i < saved_locals->Length(); i++)
+        entry->locals.Next() = (*saved_locals)[i];
+
+    // Stack is empty for this frame type
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+void StackMapGenerator::RecordFrameWithLocalsAndStack(u2 pc, Tuple<VerificationType>* saved_locals,
+                                                      TypeSymbol* stack_type)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy saved locals
+    for (unsigned i = 0; i < saved_locals->Length(); i++)
+        entry->locals.Next() = (*saved_locals)[i];
+
+    // Add the stack type
+    entry->stack.Next() = TypeToVerificationType(stack_type);
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+void StackMapGenerator::TruncateLocals(unsigned from_index)
+{
+    // Set all locals from from_index onwards to TOP
+    // This effectively "truncates" the locals array for verification purposes
+    for (unsigned i = from_index; i < current_locals.Length(); i++)
+    {
+        current_locals[i] = VerificationType(VerificationType::TYPE_Top);
+    }
+}
+
+Tuple<StackMapGenerator::VerificationType>* StackMapGenerator::SaveStack()
+{
+    Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_stack.Length() + 2);
+    for (unsigned i = 0; i < current_stack.Length(); i++)
+        saved->Next() = current_stack[i];
+    return saved;
+}
+
+void StackMapGenerator::RecordFrameWithSavedStack(u2 pc, Tuple<VerificationType>* saved_stack)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy current locals
+    for (unsigned i = 0; i < current_locals.Length(); i++)
+        entry->locals.Next() = current_locals[i];
+
+    // Copy saved stack
+    if (saved_stack)
+    {
+        for (unsigned i = 0; i < saved_stack->Length(); i++)
+            entry->stack.Next() = (*saved_stack)[i];
+    }
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+void StackMapGenerator::RecordFrameWithSavedStackPlusInt(u2 pc, Tuple<VerificationType>* saved_stack)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy current locals
+    for (unsigned i = 0; i < current_locals.Length(); i++)
+        entry->locals.Next() = current_locals[i];
+
+    // Copy saved stack
+    if (saved_stack)
+    {
+        for (unsigned i = 0; i < saved_stack->Length(); i++)
+            entry->stack.Next() = (*saved_stack)[i];
+    }
+
+    // Add Integer type on top
+    entry->stack.Next() = VerificationType(VerificationType::TYPE_Integer);
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
 bool StackMapGenerator::HasFrameAt(u2 pc) const
 {
     for (unsigned i = 0; i < recorded_frames.Length(); i++)
@@ -9159,13 +9559,40 @@ StackMapTableAttribute* StackMapGenerator::GenerateAttribute(u2 name_index)
 
         StackMapFrame* frame = new StackMapFrame(offset_delta);
 
-        // Copy locals to frame
+        // Copy locals to frame, skipping implicit Top after Double/Long
+        // Per JVM spec 4.7.4, Double and Long verification types implicitly
+        // occupy two local variable slots, so we don't write explicit Top
+        // for the second slot.
         for (unsigned j = 0; j < entry->locals.Length(); j++)
+        {
+            // Skip Top entries that follow Double or Long (they are implicit)
+            if (j > 0 && entry->locals[j].Tag() == VerificationType::TYPE_Top)
+            {
+                VerificationType::VerificationTypeInfoTag prev_tag = entry->locals[j-1].Tag();
+                if (prev_tag == VerificationType::TYPE_Double ||
+                    prev_tag == VerificationType::TYPE_Long)
+                {
+                    continue; // Skip this implicit Top
+                }
+            }
             frame->AddLocal(entry->locals[j]);
+        }
 
-        // Copy stack to frame
+        // Copy stack to frame (same logic for stack)
         for (unsigned j = 0; j < entry->stack.Length(); j++)
+        {
+            // Skip Top entries that follow Double or Long
+            if (j > 0 && entry->stack[j].Tag() == VerificationType::TYPE_Top)
+            {
+                VerificationType::VerificationTypeInfoTag prev_tag = entry->stack[j-1].Tag();
+                if (prev_tag == VerificationType::TYPE_Double ||
+                    prev_tag == VerificationType::TYPE_Long)
+                {
+                    continue;
+                }
+            }
             frame->AddStack(entry->stack[j]);
+        }
 
         attr->AddFrame(frame);
         prev_pc = entry->pc;

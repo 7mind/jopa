@@ -1171,86 +1171,204 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
 // Generate bridge methods for generic method overrides
 //
 // Bridge methods are needed when a method in a subclass overrides a method
-// from a superclass, and the erased signatures differ. This happens with
-// covariant return types in generics.
+// from a superclass or interface, and the erased signatures differ. This happens with:
+// 1. Covariant return types in generics
+// 2. Generic interface implementations with specialized parameter types
 //
-// Example:
+// Example 1 (covariant return):
 //   class Box<T> { T get() {...} }
 //   class StringBox extends Box<String> { String get() {...} }
+//   Bridge: Object get() { return this.get(); }  // calls String version
 //
-// After erasure, Box.get() returns Object, but StringBox.get() returns String.
-// We generate a bridge: Object get() { return (Object)this.get(); }
+// Example 2 (generic interface):
+//   interface Processor<T> { T process(T input); }
+//   class StringProcessor implements Processor<String> { String process(String s) {...} }
+//   Bridge: Object process(Object o) { return this.process((String)o); }
 //
+// Helper to check if we need a bridge method and create it if so
+static void CheckAndCreateBridge(
+    MethodSymbol* method,           // The implementation method in the current type
+    MethodSymbol* inherited_method, // The inherited method with possibly different erased signature
+    TypeSymbol* type,               // The current type
+    Control& control,
+    Semantic* sem,
+    TokenIndex tok)
+{
+    if (inherited_method == method ||
+        inherited_method -> containing_type == type ||
+        inherited_method -> NumFormalParameters() != method -> NumFormalParameters())
+    {
+        return;
+    }
+
+    if (! inherited_method -> IsTyped())
+        inherited_method -> ProcessMethodSignature(sem, tok);
+
+    bool signature_differs = false;
+
+    // Check return type
+    if (inherited_method -> Type() != method -> Type())
+        signature_differs = true;
+
+    // Check parameter types
+    for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
+    {
+        if (inherited_method -> FormalParameter(p) -> Type() !=
+            method -> FormalParameter(p) -> Type())
+        {
+            signature_differs = true;
+            break;
+        }
+    }
+
+    if (! signature_differs)
+        return;
+
+    // Check if inherited_method is from superclass or interface
+    bool need_bridge = false;
+    if (type -> super && type -> IsSubclass(inherited_method -> containing_type))
+        need_bridge = true;
+    if (inherited_method -> containing_type -> ACC_INTERFACE())
+        need_bridge = true;
+
+    if (! need_bridge)
+        return;
+
+    // Check if we already have a bridge with this signature
+    for (unsigned b = 0; b < method -> NumGeneratedBridges(); b++)
+    {
+        MethodSymbol* existing = method -> GeneratedBridge(b);
+        if (existing -> Type() == inherited_method -> Type())
+        {
+            // Check parameter types
+            bool same_params = true;
+            for (unsigned p = 0; p < inherited_method -> NumFormalParameters(); p++)
+            {
+                if (existing -> FormalParameter(p) -> Type() !=
+                    inherited_method -> FormalParameter(p) -> Type())
+                {
+                    same_params = false;
+                    break;
+                }
+            }
+            if (same_params)
+                return; // Already have this bridge
+        }
+    }
+
+    // Create bridge method with inherited_method's signature
+    MethodSymbol* bridge = new MethodSymbol(method -> Identity());
+    bridge -> SetContainingType(type);
+    bridge -> SetType(inherited_method -> Type());
+    bridge -> SetFlags((method -> Flags() & ~AccessFlags::ACCESS_ABSTRACT) |
+                       AccessFlags::ACCESS_SYNTHETIC | AccessFlags::ACCESS_BRIDGE);
+    bridge -> SetBridgeTarget(method);
+    bridge -> SetBlockSymbol(new BlockSymbol(1));
+
+    // Copy parameter types from inherited_method (erased signature)
+    for (unsigned k = 0; k < inherited_method -> NumFormalParameters(); k++)
+    {
+        VariableSymbol* param = inherited_method -> FormalParameter(k);
+        VariableSymbol* new_param = new VariableSymbol(param -> Identity());
+        new_param -> SetType(param -> Type());
+        new_param -> SetFlags(param -> Flags());
+        new_param -> SetOwner(bridge);
+        bridge -> AddFormalParameter(new_param);
+    }
+
+    bridge -> SetSignature(control);
+    type -> InsertMethodSymbol(bridge);
+    method -> AddGeneratedBridge(bridge);
+}
+
 void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 {
     if (! type -> expanded_method_table)
         return;
 
-    // Iterate through all methods in this type
+    TokenIndex tok = type -> declaration ? type -> declaration -> identifier_token : 0;
+
+    // Iterate through all methods declared in this type
     for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
     {
         MethodSymbol* method = type -> MethodSym(i);
 
-        // Skip constructors, static methods, and private methods
+        // Skip constructors, static methods, private methods, and already-bridge methods
         if (method -> Identity() == control.init_name_symbol ||
             method -> ACC_STATIC() ||
-            method -> ACC_PRIVATE())
+            method -> ACC_PRIVATE() ||
+            method -> IsBridge())
         {
             continue;
         }
 
-        // Look for overridden methods in superclasses
-        if (! type -> super)
-            continue;
+        if (! method -> IsTyped())
+            method -> ProcessMethodSignature(this, tok);
 
-        // Search for method with same name in superclass
+        // Check against methods in THIS type's expanded_method_table
+        // This catches methods already added from superclasses/interfaces
         MethodShadowSymbol* shadow = type -> expanded_method_table ->
-            FindOverloadMethodShadow(method, this, type -> declaration -> identifier_token);
+            FindMethodShadowSymbol(method -> name_symbol);
 
-        if (! shadow)
-            continue;
-
-        // Check all overridden methods for signature mismatches
-        for (unsigned j = 0; j < shadow -> NumConflicts(); j++)
+        while (shadow)
         {
-            MethodSymbol* super_method = shadow -> Conflict(j);
+            CheckAndCreateBridge(method, shadow -> method_symbol, type, control, this, tok);
 
-            // Skip if same method or not from superclass
-            if (super_method == method ||
-                ! method -> containing_type -> IsSubclass(super_method -> containing_type))
+            // Also check conflicts
+            for (unsigned c = 0; c < shadow -> NumConflicts(); c++)
             {
-                continue;
+                CheckAndCreateBridge(method, shadow -> Conflict(c), type, control, this, tok);
             }
 
-            // Check if erased signatures differ (covariant return type case)
-            if (method -> Type() != super_method -> Type())
-            {
-                // Need bridge method: super_method signature -> method
-                // Create bridge method with super_method's signature
-                MethodSymbol* bridge = new MethodSymbol(method -> Identity());
-                bridge -> SetContainingType(type);
-                bridge -> SetType(super_method -> Type());
-                bridge -> SetFlags(method -> Flags() | AccessFlags::ACCESS_SYNTHETIC | AccessFlags::ACCESS_BRIDGE);
-                bridge -> SetBridgeTarget(method);
-                bridge -> SetBlockSymbol(new BlockSymbol(1)); // Minimal block for bytecode generation
+            shadow = shadow -> next_method;
+        }
 
-                // Copy parameter types from super_method
-                for (unsigned k = 0; k < super_method -> NumFormalParameters(); k++)
+        // ALSO check superclass methods directly, because they might not be in
+        // expanded_method_table if there was a same-name method in the current type
+        // (FindOverloadMethodShadow finds by param types, so methods with same
+        // params but different return types are considered same overload and
+        // the superclass method isn't added separately)
+        for (TypeSymbol* super = type -> super; super; super = super -> super)
+        {
+            if (! super -> expanded_method_table)
+                continue;
+
+            MethodShadowSymbol* super_shadow = super -> expanded_method_table ->
+                FindMethodShadowSymbol(method -> name_symbol);
+
+            while (super_shadow)
+            {
+                CheckAndCreateBridge(method, super_shadow -> method_symbol, type, control, this, tok);
+
+                for (unsigned c = 0; c < super_shadow -> NumConflicts(); c++)
                 {
-                    VariableSymbol* param = super_method -> FormalParameter(k);
-                    VariableSymbol* new_param = new VariableSymbol(param -> Identity());
-                    new_param -> SetType(param -> Type());
-                    new_param -> SetFlags(param -> Flags());
-                    new_param -> SetOwner(bridge);
-                    bridge -> AddFormalParameter(new_param);
+                    CheckAndCreateBridge(method, super_shadow -> Conflict(c), type, control, this, tok);
                 }
 
-                // Set signature (erased signature from super_method)
-                bridge -> SetSignature(control);
+                super_shadow = super_shadow -> next_method;
+            }
+        }
 
-                // Add bridge to method table
-                type -> InsertMethodSymbol(bridge);
-                method -> AddGeneratedBridge(bridge);
+        // Also check interfaces
+        for (unsigned j = 0; j < type -> NumInterfaces(); j++)
+        {
+            TypeSymbol* interf = type -> Interface(j);
+            if (! interf -> expanded_method_table)
+                continue;
+
+            MethodShadowSymbol* interf_shadow = interf -> expanded_method_table ->
+                FindMethodShadowSymbol(method -> name_symbol);
+
+            while (interf_shadow)
+            {
+                CheckAndCreateBridge(method, interf_shadow -> method_symbol, type, control, this, tok);
+
+                for (unsigned c = 0; c < interf_shadow -> NumConflicts(); c++)
+                {
+                    CheckAndCreateBridge(method, interf_shadow -> Conflict(c), type, control, this, tok);
+                }
+
+                interf_shadow = interf_shadow -> next_method;
             }
         }
     }
@@ -1744,6 +1862,12 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
     if (! this_type -> expanded_method_table)
         ComputeMethodsClosure(this_type, identifier);
 
+    // Generate bridge methods BEFORE checking for abstract methods.
+    // Bridge methods are needed when implementing generic interfaces with
+    // specialized type parameters (e.g., Processor<String> with String process(String)).
+    // The bridge (Object process(Object)) implements the erased interface method.
+    GenerateBridgeMethods(this_type);
+
     if (this_type -> super && ! this_type -> Bad())
     {
         if (! this_type -> ACC_ABSTRACT())
@@ -1772,12 +1896,49 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                         if (! method -> IsTyped())
                             method -> ProcessMethodSignature(this, identifier);
 
-                        ReportSemError(SemanticError::NON_ABSTRACT_TYPE_INHERITS_ABSTRACT_METHOD,
-                                       identifier, method -> Header(),
-                                       containing_type -> ContainingPackageName(),
-                                       containing_type -> ExternalName(),
-                                       this_type -> ContainingPackageName(),
-                                       this_type -> ExternalName());
+                        // Check if there's an implementing method in this_type
+                        // with the same erased signature (could be a bridge method
+                        // generated for generic interface implementation).
+                        bool has_implementation = false;
+                        for (unsigned j = 0; j < this_type -> NumMethodSymbols(); j++)
+                        {
+                            MethodSymbol* impl = this_type -> MethodSym(j);
+                            if (impl -> ACC_ABSTRACT() || impl -> ACC_STATIC())
+                                continue;
+                            if (impl -> name_symbol != method -> name_symbol)
+                                continue;
+                            if (! impl -> IsTyped())
+                                impl -> ProcessMethodSignature(this, identifier);
+                            if (impl -> NumFormalParameters() != method -> NumFormalParameters())
+                                continue;
+
+                            // Check if all parameter types match
+                            bool params_match = true;
+                            for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
+                            {
+                                if (impl -> FormalParameter(p) -> Type() !=
+                                    method -> FormalParameter(p) -> Type())
+                                {
+                                    params_match = false;
+                                    break;
+                                }
+                            }
+                            if (params_match)
+                            {
+                                has_implementation = true;
+                                break;
+                            }
+                        }
+
+                        if (! has_implementation)
+                        {
+                            ReportSemError(SemanticError::NON_ABSTRACT_TYPE_INHERITS_ABSTRACT_METHOD,
+                                           identifier, method -> Header(),
+                                           containing_type -> ContainingPackageName(),
+                                           containing_type -> ExternalName(),
+                                           this_type -> ContainingPackageName(),
+                                           this_type -> ExternalName());
+                        }
                     }
                 }
             }
@@ -1912,11 +2073,6 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
     //
     ThisVariable() = NULL;
     ThisMethod() = NULL;
-
-    //
-    // Generate bridge methods for generic covariant overrides
-    //
-    GenerateBridgeMethods(this_type);
 
     //
     // Recursively process all inner types

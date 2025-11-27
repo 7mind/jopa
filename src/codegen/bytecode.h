@@ -148,6 +148,45 @@ public:
     void RecordFrame(u2 pc);
 
     //
+    // Record a frame at the given PC with the specified locals (empty stack)
+    // Does not modify the current state - only records the frame.
+    //
+    void RecordFrameWithLocals(u2 pc, Tuple<VerificationType>* saved_locals);
+
+    //
+    // Record a frame at the given PC with the specified locals and one stack item
+    // Does not modify the current state - only records the frame.
+    //
+    void RecordFrameWithLocalsAndStack(u2 pc, Tuple<VerificationType>* saved_locals,
+                                       TypeSymbol* stack_type);
+
+    //
+    // Truncate locals array - set all locals from index onwards to TOP
+    // This is used when exiting a scope (like a loop) that created local variables
+    //
+    void TruncateLocals(unsigned from_index);
+
+    //
+    // Save the current stack state for later use (e.g., for forward branches)
+    // Returns a new Tuple that must be deleted by the caller
+    //
+    Tuple<VerificationType>* SaveStack();
+
+    //
+    // Record a frame at the given PC with the current locals and saved stack
+    // Does not modify the current state - only records the frame.
+    //
+    void RecordFrameWithSavedStack(u2 pc, Tuple<VerificationType>* saved_stack);
+
+    //
+    // Record a frame at the given PC with the current locals, saved stack,
+    // plus an additional Integer type on top of the saved stack.
+    // This is used for boolean-to-value patterns where the merge point
+    // has the original stack + the int result.
+    //
+    void RecordFrameWithSavedStackPlusInt(u2 pc, Tuple<VerificationType>* saved_stack);
+
+    //
     // Check if we already have a frame at this PC
     //
     bool HasFrameAt(u2 pc) const;
@@ -198,19 +237,39 @@ public:
     u2 definition; // offset of definition point of label
     Tuple<LabelUse> uses;
 
-    Label() : defined(false), definition(0) {}
+    // Saved stack types for forward branches (for StackMapTable generation)
+    // This captures the actual stack types at the first forward reference to this label
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_stack_types;
+    int saved_stack_depth;
+    bool stack_saved;
+
+    // If true, don't record a StackMapTable frame at this label.
+    // Used for internal labels within expressions (like boolean-to-value pattern)
+    // where the verifier can infer the stack state from fallthrough.
+    bool no_frame;
+
+    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false) {}
 
     //
     // All used labels should have been completed and reset, otherwise a goto
     // will cause an infinite loop because it was emitted with an offset of 0.
     //
-    ~Label() { assert(! uses.Length()); }
+    ~Label()
+    {
+        assert(! uses.Length());
+        delete saved_stack_types;
+    }
 
     void Reset()
     {
        uses.Reset();
        defined = false;
        definition = 0;
+       delete saved_stack_types;
+       saved_stack_types = NULL;
+       saved_stack_depth = 0;
+       stack_saved = false;
+       no_frame = false;
     }
 };
 

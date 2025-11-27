@@ -5,7 +5,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.annotation.Annotation;
 
-public final class Class {
+public final class Class<T> implements java.lang.reflect.Type {
     private Class() {}
 
     public String toString() {
@@ -74,4 +74,8 @@ public final class Class {
     public native boolean isInstance(Object obj);
     public native Class[] getDeclaredClasses();
     public native Class[] getClasses();
+
+    // Generic type information
+    public native java.lang.reflect.Type getGenericSuperclass();
+    public native java.lang.reflect.Type[] getGenericInterfaces();
 }

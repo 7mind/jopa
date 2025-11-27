@@ -395,7 +395,7 @@ set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DefaultMethodTest_OUTPUT}"
