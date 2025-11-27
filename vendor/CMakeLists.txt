@@ -91,7 +91,7 @@ ExternalProject_Add(gnu_classpath
     # -nowarn:unchecked suppresses raw type warnings (GNU Classpath uses pre-generics style)
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
         "ECJ="
@@ -106,7 +106,7 @@ ExternalProject_Add(gnu_classpath
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
         ${MAKE_COMMAND} -j${NPROC}
@@ -144,7 +144,7 @@ ExternalProject_Add(jamvm
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
     COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         "${JAMVM_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
             --with-java-runtime-library=gnuclasspath
@@ -153,7 +153,7 @@ ExternalProject_Add(jamvm
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         ${MAKE_COMMAND} -j${NPROC}
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env

@@ -1,5 +1,7 @@
 .direnv/
 
+vgcore.*
+
 # Compiled Object files
 *.slo
 *.lo
@@ -15,6 +17,7 @@
 
 # Build artifacts
 /build/
+/build-*/
 /cmake-build-*/
 /CMakeFiles/
 /CMakeCache.txt

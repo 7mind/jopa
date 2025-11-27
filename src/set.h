@@ -216,7 +216,9 @@ public:
     //
     inline void AddElement(Symbol* element)
     {
+        assert(element && "AddElement called with NULL element");
         const NameSymbol* name_symbol = element -> Identity();
+        assert(name_symbol && "element->Identity() returned NULL");
         unsigned i = name_symbol -> index % hash_size;
 
         ShadowSymbol* shadow;
