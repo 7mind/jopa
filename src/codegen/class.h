@@ -3269,6 +3269,7 @@ public:
     bool Bridge() const { return attr_bridge != NULL; }
     const CodeAttribute* Code() const { return attr_code; }
     const ExceptionsAttribute* Exceptions() const { return attr_exceptions; }
+    const SignatureAttribute* GenericSignature() const { return attr_signature; }
 
     inline void Put(OutputBuffer& out) const
     {

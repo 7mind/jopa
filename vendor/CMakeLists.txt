@@ -1,14 +1,19 @@
 # Vendor dependencies: JamVM + GNU Classpath
 #
-# Bootstrap chain:
-# 1. Build GNU Classpath (with system javac) -> glibj.zip
-# 2. Build JamVM (C code) -> jamvm binary
-# 3. Later: rebuild glibj.zip with JOPA for full bootstrap
+# Full no-blob bootstrap chain - ALL Java bytecode compiled by JOPA:
+# 1. Build JOPA (C++ compiler)
+# 2. Build GNU Classpath with JOPA -> glibj.zip (compiled by JOPA)
+# 3. Build JamVM (C code + classes.zip compiled by JOPA)
+#
+# Result: Complete Java toolchain with no prebuilt Java bytecode blobs
 
 include(ExternalProject)
 
 find_program(MAKE_COMMAND make REQUIRED)
 find_program(TAR_COMMAND tar REQUIRED)
+
+# We still need system Java for the 'jar' tool (JOPA doesn't provide one)
+# and potentially for runtime operations during build
 find_package(Java COMPONENTS Development REQUIRED)
 
 set(VENDOR_PREFIX "${CMAKE_BINARY_DIR}/vendor-install")
@@ -55,31 +60,37 @@ if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
 endif()
 
 # ============================================================================
-# GNU Classpath Build
+# JOPA compiler and runtime paths (built as part of main project)
 # ============================================================================
-set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-build")
-set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
+set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
+set(JOPA_RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
 
-# Get Java paths - we use these explicitly and clear everything else
-get_filename_component(JAVA_BIN_DIR "${Java_JAVAC_EXECUTABLE}" DIRECTORY)
-
-# Create a script that clears Java environment and runs the build
-# This ensures no OpenJDK tools accidentally leak from PATH
+# Clean Java environment to prevent system javac from leaking in
 set(CLEAN_JAVA_ENV_VARS
     "--unset=JAVA_HOME"
     "--unset=JDK_HOME"
     "--unset=CLASSPATH"
 )
 
+# Get path to system jar tool (still needed for packaging)
+get_filename_component(JAVA_BIN_DIR "${Java_JAVAC_EXECUTABLE}" DIRECTORY)
+
+# ============================================================================
+# GNU Classpath Build - compiled with JOPA
+# ============================================================================
+set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-build")
+set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
+
 ExternalProject_Add(gnu_classpath
     SOURCE_DIR "${CLASSPATH_SOURCE_DIR}"
     BINARY_DIR "${CLASSPATH_BUILD_DIR}"
     INSTALL_DIR "${CLASSPATH_INSTALL_DIR}"
 
-    # Clean Java environment and explicitly set only what we need
+    # Use JOPA as the Java compiler with our stub runtime.jar as bootclasspath
+    # This provides java.lang.Object, String, etc. needed for compilation
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${Java_JAVAC_EXECUTABLE}"
+        "JAVAC=${JOPA_EXECUTABLE} -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
         "ECJ="
@@ -94,7 +105,7 @@ ExternalProject_Add(gnu_classpath
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${Java_JAVAC_EXECUTABLE}"
+        "JAVAC=${JOPA_EXECUTABLE} -bootclasspath ${JOPA_RUNTIME_JAR}"
         "JAVA=${Java_JAVA_EXECUTABLE}"
         "JAR=${JAVA_BIN_DIR}/jar"
         ${MAKE_COMMAND} -j${NPROC}
@@ -106,17 +117,16 @@ ExternalProject_Add(gnu_classpath
     BUILD_BYPRODUCTS "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
 )
 
+# GNU Classpath depends on JOPA and runtime.jar being built first
+ExternalProject_Add_StepDependencies(gnu_classpath configure jopa runtime)
+
 set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PARENT_SCOPE)
 
 # ============================================================================
-# JamVM Build
+# JamVM Build - classes.zip compiled with JOPA
 # ============================================================================
 set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-build")
 set(JAMVM_INSTALL_DIR "${VENDOR_PREFIX}/jamvm")
-
-# Use JOPA to rebuild JamVM's classes.zip from source for a fair no-blob bootstrap
-# The JAVAC variable is used by JamVM's Makefile to compile Java sources
-set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
 
 # Delete prebuilt classes.zip to force rebuild from source using JOPA
 set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
@@ -129,11 +139,11 @@ ExternalProject_Add(jamvm
     DEPENDS gnu_classpath
 
     # Delete prebuilt classes.zip, then configure with JOPA as compiler
-    # This forces JamVM's Makefile to rebuild classes.zip from source
+    # Use GNU Classpath's glibj.zip as bootclasspath for JamVM classes
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
     COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -source 1.5 -target 1.5"
+        "JAVAC=${JOPA_EXECUTABLE} -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         "${JAMVM_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
             --with-java-runtime-library=gnuclasspath
@@ -142,7 +152,7 @@ ExternalProject_Add(jamvm
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
-        "JAVAC=${JOPA_EXECUTABLE} -source 1.5 -target 1.5"
+        "JAVAC=${JOPA_EXECUTABLE} -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
         ${MAKE_COMMAND} -j${NPROC}
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
@@ -155,13 +165,12 @@ ExternalProject_Add(jamvm
 set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
 set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
 
-# vendor_jvm depends on both jamvm and jopa (since jamvm uses JOPA to compile classes.zip)
+# vendor_jvm is the main target for building the complete JVM stack
 add_custom_target(vendor_jvm DEPENDS jamvm)
 
-# Ensure jamvm waits for jopa to be built before starting its build
-# (ExternalProject can't directly depend on regular targets, so we add a step)
-ExternalProject_Add_StepDependencies(jamvm configure jopa)
+# JamVM implicitly depends on jopa through gnu_classpath dependency chain
 
-message(STATUS "JamVM: ${JAMVM_SOURCE_DIR}")
-message(STATUS "GNU Classpath: ${CLASSPATH_SOURCE_DIR}")
+message(STATUS "Bootstrap: ALL Java bytecode will be compiled by JOPA")
+message(STATUS "JamVM sources: ${JAMVM_SOURCE_DIR}")
+message(STATUS "GNU Classpath sources: ${CLASSPATH_SOURCE_DIR}")
 message(STATUS "Install prefix: ${VENDOR_PREFIX}")

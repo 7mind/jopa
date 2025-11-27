@@ -1,7 +1,8 @@
 // Stub for java.lang.Enum (Java 5)
 package java.lang;
 
-public abstract class Enum implements Comparable {
+@SuppressWarnings({"unchecked", "rawtypes"})
+public abstract class Enum<E extends Enum<E>> implements Comparable<E> {
     private final String name;
     private final int ordinal;
 
@@ -30,12 +31,15 @@ public abstract class Enum implements Comparable {
         return ordinal;
     }
 
-    public final int compareTo(Object o) {
-        Enum other = (Enum) o;
-        return ordinal - other.ordinal;
+    public final int compareTo(E o) {
+        return ordinal - o.ordinal();
     }
 
-    public static Enum valueOf(Class enumType, String name) {
+    public final Class<E> getDeclaringClass() {
+        return null;
+    }
+
+    public static <T extends Enum<T>> T valueOf(Class<T> enumType, String name) {
         // Stub implementation
         return null;
     }

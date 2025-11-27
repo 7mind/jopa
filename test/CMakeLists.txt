@@ -163,6 +163,7 @@ add_jopa_run_test(FieldAccessTest "${TEST_DIR}/generics/FieldAccessTest.java" "F
 add_jopa_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.java" "ArrayCovarianceTest")
 add_jopa_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
 add_jopa_run_test(GenericsComprehensiveTest "${TEST_DIR}/generics/GenericsComprehensiveTest.java" "GenericsComprehensiveTest")
+add_jopa_run_test(RecursiveGenerics "${TEST_DIR}/generics/RecursiveGenerics.java" "RecursiveGenerics")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")

@@ -3657,52 +3657,49 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     }
 
     //
-    // Type substitution for generics: If the receiver has a parameterized type,
-    // and the method's return type is a type parameter, substitute it with the
-    // corresponding type argument.
+    // Type substitution for generics: If the method's return type is a type parameter
+    // of its containing class, substitute it with the corresponding type argument
+    // from the receiver's parameterized type.
     //
     MethodSymbol* method = method_call -> symbol -> MethodCast();
-    if (method && base)
+    if (method && method -> return_type_param_index >= 0)
     {
-        // Get the receiver's parameterized type (if any)
-        ParameterizedType* receiver_param_type = NULL;
-        VariableSymbol* var = base -> symbol -> VariableCast();
-        if (var && var -> parameterized_type)
+        unsigned param_index = (unsigned) method -> return_type_param_index;
+        ParameterizedType* param_type = NULL;
+
+        // Case 1: Check if the receiver variable has a parameterized type
+        if (base)
         {
-            receiver_param_type = var -> parameterized_type;
+            VariableSymbol* var = base -> symbol -> VariableCast();
+            if (var && var -> parameterized_type &&
+                var -> parameterized_type -> generic_type == method -> containing_type)
+            {
+                param_type = var -> parameterized_type;
+            }
         }
 
-        if (receiver_param_type && method -> declaration)
+        // Case 2: Walk up the inheritance hierarchy from base_type
+        if (! param_type && base_type)
         {
-            TypeSymbol* declaring_class = method -> containing_type;
-            AstMethodDeclaration* method_decl = method -> declaration -> MethodDeclarationCast();
-
-            if (method_decl && method_decl -> type)
+            for (TypeSymbol* current = base_type; current && ! param_type; current = current -> super)
             {
-                AstTypeName* return_type_name = method_decl -> type -> TypeNameCast();
-                if (return_type_name && return_type_name -> name && ! return_type_name -> base_opt)
+                if (current -> HasParameterizedSuper())
                 {
-                    // It's a simple name (not qualified), could be a type parameter
-                    // Match by name from the source code
-                    const wchar_t* return_type_text = lex_stream -> NameString(return_type_name -> name -> identifier_token);
-
-                    // Compare with class type parameter names
-                    for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
-                    {
-                        TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
-                        if (wcscmp(return_type_text, type_param -> Name()) == 0)
-                        {
-                            // Match! Substitute with the corresponding type argument
-                            if (i < receiver_param_type -> NumTypeArguments())
-                            {
-                                Type* type_arg = receiver_param_type -> TypeArgument(i);
-                                method_call -> resolved_type = type_arg -> Erasure();
-                            }
-                            break;
-                        }
-                    }
+                    ParameterizedType* param_super = current -> GetParameterizedSuper();
+                    if (param_super -> generic_type == method -> containing_type)
+                        param_type = param_super;
                 }
             }
+        }
+
+        // Substitute if we found the parameterized type and have the type argument
+        if (param_type && param_index < param_type -> NumTypeArguments())
+        {
+            Type* type_arg = param_type -> TypeArgument(param_index);
+            TypeSymbol* substituted = type_arg -> Erasure();
+            if (! substituted)
+                substituted = control.Object();
+            method_call -> resolved_type = substituted;
         }
     }
 }

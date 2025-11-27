@@ -1002,7 +1002,8 @@ AnnotationComponentConstant::AnnotationComponentConstant(ClassFile& buffer,
             buffer.MarkInvalid("bad double annotation constant");
         break;
     case COMPONENT_string:
-        if (buffer.Pool()[index] -> Tag() != CPInfo::CONSTANT_String)
+        // According to JVM spec, annotation string values point to CONSTANT_Utf8
+        if (buffer.Pool()[index] -> Tag() != CPInfo::CONSTANT_Utf8)
             buffer.MarkInvalid("bad string annotation constant");
         break;
     case COMPONENT_class:
@@ -2064,7 +2065,9 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         NameSymbol* name_symbol =
             control.ConvertUtf8ToUnicode(method -> Name(pool),
                                          method -> NameLength(pool));
-        if (method -> ACC_SYNTHETIC() ||
+        // Skip synthetic methods that aren't bridge methods.
+        // Bridge methods are synthetic but needed for interface implementation.
+        if ((method -> ACC_SYNTHETIC() && !method -> ACC_BRIDGE()) ||
             name_symbol == control.clinit_name_symbol)
         {
             continue; // No point reading these - the user can't access them.
@@ -2089,6 +2092,74 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                 symbol ->
                     AddThrowsSignature(exception -> TypeName(pool),
                                        exception -> TypeNameLength(pool));
+            }
+        }
+
+        //
+        // Parse generic signature to detect if return type is a type parameter
+        // Generic method signature format: [<TypeParams>](ParamTypes)ReturnType
+        // Type parameter reference format: TName;
+        //
+        const SignatureAttribute* gen_sig = method -> GenericSignature();
+        if (gen_sig && type -> NumTypeParameters() > 0)
+        {
+            const CPUtf8Info* sig_info = gen_sig -> Signature(pool);
+            const char* sig = sig_info -> Bytes();
+            if (sig)
+            {
+                // Find the return type - skip to after the closing ')'
+                // Need to handle nested signatures like (LBox<TT;>;)TT;
+                const char* p = sig;
+                int paren_depth = 0;
+                while (*p)
+                {
+                    if (*p == '(') paren_depth++;
+                    else if (*p == ')') {
+                        paren_depth--;
+                        if (paren_depth == 0)
+                        {
+                            p++; // skip ')'
+                            break;
+                        }
+                    }
+                    p++;
+                }
+
+                // p now points to return type
+                // Check if it's a type parameter: TName;
+                if (*p == 'T')
+                {
+                    const char* name_start = p + 1;
+                    const char* name_end = name_start;
+                    while (*name_end && *name_end != ';') name_end++;
+
+                    if (*name_end == ';')
+                    {
+                        int name_len = name_end - name_start;
+                        // Look up this name in the class type parameters
+                        for (unsigned i = 0; i < type -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = type -> TypeParameter(i);
+                            const wchar_t* param_name = type_param -> name_symbol -> Name();
+                            // Compare names (type_param name is wchar, sig name is char)
+                            bool match = true;
+                            int j = 0;
+                            for (; j < name_len && param_name[j]; j++)
+                            {
+                                if ((wchar_t)(unsigned char)name_start[j] != param_name[j])
+                                {
+                                    match = false;
+                                    break;
+                                }
+                            }
+                            if (match && j == name_len && param_name[j] == U_NULL)
+                            {
+                                symbol -> return_type_param_index = (int) i;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
         }
 
