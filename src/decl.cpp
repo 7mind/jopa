@@ -1255,21 +1255,38 @@ static void CheckAndCreateBridge(
         inherited_method -> ProcessMethodSignature(sem, tok);
 
     bool signature_differs = false;
+    bool params_compatible = true;
 
     // Check return type
     if (inherited_method -> Type() != method -> Type())
         signature_differs = true;
 
-    // Check parameter types
+    // Check parameter types - parameters must be compatible for this to be an override
+    // Compatible means: same type, OR inherited has broader type due to generic erasure
     for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
     {
-        if (inherited_method -> FormalParameter(p) -> Type() !=
-            method -> FormalParameter(p) -> Type())
+        TypeSymbol* inherited_param = inherited_method -> FormalParameter(p) -> Type();
+        TypeSymbol* method_param = method -> FormalParameter(p) -> Type();
+
+        if (inherited_param != method_param)
         {
             signature_differs = true;
-            break;
+            // For this to be a valid override with generic erasure,
+            // inherited_param should be Object (or other erased type param),
+            // and method_param should be a more specific type
+            if (! method_param -> IsSubtype(inherited_param))
+            {
+                // Not compatible - method_param is NOT a subtype of inherited_param
+                // This means they're completely different methods, not an override
+                params_compatible = false;
+                break;
+            }
         }
     }
+
+    // If parameters are not compatible, these are different methods - no bridge needed
+    if (! params_compatible)
+        return;
 
     if (! signature_differs)
         return;
