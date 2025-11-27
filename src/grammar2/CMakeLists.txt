@@ -1,7 +1,7 @@
 # Grammar generation using jikespg
 #
-# All generated files go to the build directory only.
-# The source directory contains only java.g and supporting scripts.
+# If jikespg is available, regenerate grammar files from java.g.
+# Otherwise, copy pre-generated headers from src/grammar/ as fallback.
 
 set(JIKESPG_EXECUTABLE "${CMAKE_SOURCE_DIR}/vendor/jikespg/src/jikespg")
 set(GRAMMAR_SOURCE "${CMAKE_CURRENT_SOURCE_DIR}/java.g")
@@ -9,6 +9,9 @@ set(GRAMMAR_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(GRAMMAR_BUILD_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 set(GRAMMAR_OUTPUT_DIR "${CMAKE_BINARY_DIR}/src/grammar")
 set(POSTPROCESS_SCRIPT "${CMAKE_CURRENT_SOURCE_DIR}/postprocess.py")
+
+# Pre-generated fallback files in source tree
+set(GRAMMAR_FALLBACK_DIR "${CMAKE_SOURCE_DIR}/src/grammar")
 
 # Raw output files from jikespg (in build directory)
 set(JIKESPG_RAW_OUTPUTS
@@ -28,8 +31,17 @@ set(GRAMMAR_PROCESSED_OUTPUTS
 
 # Check if jikespg exists
 if(NOT EXISTS ${JIKESPG_EXECUTABLE})
-    message(WARNING "jikespg not found at ${JIKESPG_EXECUTABLE}. Grammar will not be regenerated.")
-    message(WARNING "Build jikespg first: cd vendor/jikespg/src && make")
+    message(STATUS "jikespg not found - using pre-generated grammar headers from src/grammar/")
+
+    # Copy pre-generated headers to build directory at configure time
+    file(MAKE_DIRECTORY ${GRAMMAR_OUTPUT_DIR})
+    file(COPY
+        ${GRAMMAR_FALLBACK_DIR}/javadcl.h
+        ${GRAMMAR_FALLBACK_DIR}/javadef.h
+        ${GRAMMAR_FALLBACK_DIR}/javaprs.h
+        ${GRAMMAR_FALLBACK_DIR}/javasym.h
+        DESTINATION ${GRAMMAR_OUTPUT_DIR}
+    )
 else()
     # Custom command to run jikespg (outputs to build directory)
     # We copy java.g to the build directory first since jikespg outputs to its working directory
