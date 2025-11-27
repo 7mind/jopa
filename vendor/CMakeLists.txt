@@ -114,6 +114,13 @@ set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PAR
 set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-build")
 set(JAMVM_INSTALL_DIR "${VENDOR_PREFIX}/jamvm")
 
+# Use JOPA to rebuild JamVM's classes.zip from source for a fair no-blob bootstrap
+# The JAVAC variable is used by JamVM's Makefile to compile Java sources
+set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
+
+# Delete prebuilt classes.zip to force rebuild from source using JOPA
+set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
+
 ExternalProject_Add(jamvm
     SOURCE_DIR "${JAMVM_SOURCE_DIR}"
     BINARY_DIR "${JAMVM_BUILD_DIR}"
@@ -121,9 +128,12 @@ ExternalProject_Add(jamvm
 
     DEPENDS gnu_classpath
 
-    # Clean Java environment - JamVM is a C project but might check for Java
-    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
+    # Delete prebuilt classes.zip, then configure with JOPA as compiler
+    # This forces JamVM's Makefile to rebuild classes.zip from source
+    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
+    COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "JAVAC=${JOPA_EXECUTABLE} -source 1.5 -target 1.5"
         "${JAMVM_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
             --with-java-runtime-library=gnuclasspath
@@ -132,6 +142,7 @@ ExternalProject_Add(jamvm
 
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
+        "JAVAC=${JOPA_EXECUTABLE} -source 1.5 -target 1.5"
         ${MAKE_COMMAND} -j${NPROC}
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
@@ -144,7 +155,12 @@ ExternalProject_Add(jamvm
 set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
 set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
 
+# vendor_jvm depends on both jamvm and jopa (since jamvm uses JOPA to compile classes.zip)
 add_custom_target(vendor_jvm DEPENDS jamvm)
+
+# Ensure jamvm waits for jopa to be built before starting its build
+# (ExternalProject can't directly depend on regular targets, so we add a step)
+ExternalProject_Add_StepDependencies(jamvm configure jopa)
 
 message(STATUS "JamVM: ${JAMVM_SOURCE_DIR}")
 message(STATUS "GNU Classpath: ${CLASSPATH_SOURCE_DIR}")
