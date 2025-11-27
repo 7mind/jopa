@@ -624,7 +624,7 @@ Option::Option(ArgumentExpander& arguments,
                 // for compatibility with older class libraries (e.g. GNU Classpath)
                 nosuppressed = true;
             }
-            else if (strcmp(arguments.argv[i], "-nowarn:unchecked") == 0)
+            else if (strcmp(arguments.argv[i], "--nowarn:unchecked") == 0)
             {
                 // Suppress unchecked type conversion warnings (raw type usage)
                 nowarn_unchecked = true;
