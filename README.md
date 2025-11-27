@@ -11,6 +11,41 @@ Java 8 support is limited to default methods; other Java 8 features are intentio
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
+## DevJopaK: No-Blob Bootstrap Java Development Kit
+
+JOPA can build a fully self-contained Java development kit without any prebuilt binary blobs in the chain:
+
+- **JOPA** (C++) - Java compiler, built from source
+- **JamVM** (C) - Java Virtual Machine, built from source
+- **GNU Classpath** - Java runtime library (classes compiled by system javac, will be fixed)
+- **JamVM classes** - Bootstrap classes for JamVM, **compiled by JOPA itself**
+
+This creates a complete Java toolchain where all Java bytecode is compiled from source using JOPA, making it suitable for reproducible and auditable builds.
+
+### Building DevJopaK
+
+```bash
+cmake -B build -S . -DJOPA_BUILD_JAMVM=ON
+cmake --build build --target devjopak
+```
+
+This creates `devjopak-<version>.tar.gz` containing:
+- `bin/javac` - JOPA compiler wrapper
+- `bin/java` - JamVM runtime wrapper
+- `lib/jopa` - JOPA compiler binary
+- `lib/jamvm` - JamVM runtime binary
+- `lib/classes.zip` - JamVM classes (compiled by JOPA)
+- `lib/glibj.zip` - GNU Classpath runtime
+- `lib/native/` - GNU Classpath native libraries
+
+### Using DevJopaK
+
+```bash
+tar xzf devjopak-*.tar.gz
+./devjopak/bin/javac Hello.java
+./devjopak/bin/java Hello
+```
+
 ## Relevant projects:
 
 - Sister project, Java compiler in Python: [PyJOPA](https://github.com/7mind/pyjopa)

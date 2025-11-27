@@ -6891,7 +6891,31 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
           : (is_super || msym -> ACC_PRIVATE()) ? OP_INVOKESPECIAL
           : type -> ACC_INTERFACE() ? OP_INVOKEINTERFACE
           : OP_INVOKEVIRTUAL);
-    return CompleteCall(msym, stack_words, need_value, type);
+    int result = CompleteCall(msym, stack_words, need_value, type);
+
+    // Java 5+: For generic methods, emit checkcast if the method's erased return type
+    // (e.g., Object) differs from the expression's declared type (e.g., Integer).
+    // This is required for bytecode verification since the verifier only sees the
+    // erased signature but the calling code expects the parameterized type.
+    if (need_value && msym -> Type() != control.void_type)
+    {
+        TypeSymbol* erased_return_type = msym -> Type();
+        TypeSymbol* declared_type = expression -> Type();
+
+        // Check if cast is needed: erased type differs from declared type,
+        // and declared type is more specific (not Object itself)
+        if (erased_return_type != declared_type &&
+            ! control.IsPrimitive(declared_type) &&
+            declared_type != control.Object() &&
+            erased_return_type -> IsSubtype(control.Object()) &&
+            ! erased_return_type -> IsSubtype(declared_type))
+        {
+            PutOp(OP_CHECKCAST);
+            PutU2(RegisterClass(declared_type));
+        }
+    }
+
+    return result;
 }
 
 
@@ -8182,6 +8206,23 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
         lab.saved_stack_depth = stack_depth;
         lab.saved_stack_types = stack_map_generator->SaveStack();
         lab.stack_saved = true;
+    }
+
+    //
+    // For backward branches (label already defined), we need to record a frame
+    // at the target if one hasn't been recorded already. This is critical for
+    // loop back-edges where the target was defined before any branches to it.
+    //
+    if (stack_map_generator && lab.defined && !lab.no_frame)
+    {
+        // Record a frame at the backward branch target.
+        // Use the current locals state but with an empty stack (typical for loop back-edges).
+        // The frame recording function will handle duplicate detection.
+        if (!stack_map_generator->HasFrameAt(lab.definition))
+        {
+            stack_map_generator->ClearStack();
+            stack_map_generator->RecordFrame(lab.definition);
+        }
     }
 
     //

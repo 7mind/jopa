@@ -411,8 +411,11 @@ if(JOPA_ENABLE_JVM_TESTS)
 endif()
 
 # Java 8 Tests
-# Note: Using -target 1.6 to emit Java 6 bytecode (v50.0) which doesn't require StackMapTable.
-# This allows tests to run without -noverify until StackMapTable is implemented.
+# Tests default methods (partial Java 8 support).
+# Note: JOPA supports Java 7 bytecode (v51.0) with StackMapTable generation.
+# Tests pass with -target 1.5/1.6 (no StackMapTable required) and with
+# -target 1.7 (StackMapTable generation, though some complex control flow patterns
+# may have verification issues requiring -noverify).
 set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(

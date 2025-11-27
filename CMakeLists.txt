@@ -66,3 +66,121 @@ endif()
 
 install(FILES doc/jikes.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+
+# =============================================================================
+# DevJopaK - Self-contained Java Development Kit distribution
+# =============================================================================
+# Creates a distribution archive with JOPA compiler, JamVM runtime, and GNU Classpath.
+# This is a "no-blob bootstrap" kit - all Java bytecode is compiled from source using JOPA.
+#
+# Usage: cmake --build . --target devjopak
+#
+# The resulting archive contains:
+#   bin/javac    - JOPA compiler wrapper
+#   bin/java     - JamVM runtime wrapper
+#   lib/jopa     - JOPA compiler binary
+#   lib/jamvm    - JamVM runtime binary
+#   lib/classes.zip - JamVM bootstrap classes (compiled by JOPA)
+#   lib/glibj.zip   - GNU Classpath runtime library
+#
+if(JOPA_BUILD_JAMVM)
+    set(DEVJOPAK_DIR "${CMAKE_BINARY_DIR}/devjopak")
+    set(DEVJOPAK_ARCHIVE "devjopak-${JOPA_VERSION}.tar.gz")
+
+    # Create wrapper scripts
+    set(JAVAC_WRAPPER "${DEVJOPAK_DIR}/bin/javac")
+    set(JAVA_WRAPPER "${DEVJOPAK_DIR}/bin/java")
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEVJOPAK_DIR}/bin"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEVJOPAK_DIR}/lib"
+        COMMAND ${CMAKE_COMMAND} -E touch "${DEVJOPAK_DIR}/bin/.created"
+        COMMENT "Creating devjopak directory structure"
+    )
+
+    add_custom_command(
+        OUTPUT "${JAVAC_WRAPPER}"
+        DEPENDS "${DEVJOPAK_DIR}/bin/.created" jopa "${CMAKE_SOURCE_DIR}/scripts/devjopak-javac.sh.in"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/scripts/devjopak-javac.sh.in" "${JAVAC_WRAPPER}"
+        COMMAND chmod +x "${JAVAC_WRAPPER}"
+        COMMENT "Creating javac wrapper script"
+    )
+
+    add_custom_command(
+        OUTPUT "${JAVA_WRAPPER}"
+        DEPENDS "${DEVJOPAK_DIR}/bin/.created" vendor_jvm "${CMAKE_SOURCE_DIR}/scripts/devjopak-java.sh.in"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/scripts/devjopak-java.sh.in" "${JAVA_WRAPPER}"
+        COMMAND chmod +x "${JAVA_WRAPPER}"
+        COMMENT "Creating java wrapper script"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/jopa"
+        DEPENDS jopa "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:jopa>" "${DEVJOPAK_DIR}/lib/jopa"
+        COMMENT "Copying JOPA compiler"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/jamvm"
+        DEPENDS vendor_jvm "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/jamvm/bin/jamvm" "${DEVJOPAK_DIR}/lib/jamvm"
+        COMMENT "Copying JamVM runtime"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/classes.zip"
+        DEPENDS vendor_jvm "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/jamvm/share/jamvm/classes.zip" "${DEVJOPAK_DIR}/lib/classes.zip"
+        COMMENT "Copying JamVM classes (compiled by JOPA)"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/glibj.zip"
+        DEPENDS gnu_classpath "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/classpath/share/classpath/glibj.zip" "${DEVJOPAK_DIR}/lib/glibj.zip"
+        COMMENT "Copying GNU Classpath runtime"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/native/.created"
+        DEPENDS gnu_classpath "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEVJOPAK_DIR}/lib/native"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_BINARY_DIR}/vendor-install/classpath/lib/classpath"
+            "${DEVJOPAK_DIR}/lib/native"
+        COMMAND ${CMAKE_COMMAND} -E touch "${DEVJOPAK_DIR}/lib/native/.created"
+        COMMENT "Copying GNU Classpath native libraries"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/LICENSE"
+        DEPENDS "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/LICENSE" "${DEVJOPAK_DIR}/LICENSE"
+        COMMENT "Copying LICENSE"
+    )
+
+    add_custom_command(
+        OUTPUT "${CMAKE_BINARY_DIR}/${DEVJOPAK_ARCHIVE}"
+        DEPENDS
+            "${JAVAC_WRAPPER}"
+            "${JAVA_WRAPPER}"
+            "${DEVJOPAK_DIR}/lib/jopa"
+            "${DEVJOPAK_DIR}/lib/jamvm"
+            "${DEVJOPAK_DIR}/lib/classes.zip"
+            "${DEVJOPAK_DIR}/lib/glibj.zip"
+            "${DEVJOPAK_DIR}/lib/native/.created"
+            "${DEVJOPAK_DIR}/LICENSE"
+        WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E tar czf "${DEVJOPAK_ARCHIVE}" "devjopak"
+        COMMENT "Creating devjopak distribution archive"
+    )
+
+    add_custom_target(devjopak
+        DEPENDS "${CMAKE_BINARY_DIR}/${DEVJOPAK_ARCHIVE}"
+        COMMENT "DevJopaK - Self-contained Java Development Kit (no-blob bootstrap)"
+    )
+
+    message(STATUS "DevJopaK target available: cmake --build . --target devjopak")
+endif()

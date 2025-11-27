@@ -1,0 +1,4 @@
+#!/bin/sh
+# DevJopaK javac wrapper - invokes JOPA compiler with GNU Classpath
+DEVJOPAK_HOME="$(cd "$(dirname "$0")/../" && pwd)"
+exec "$DEVJOPAK_HOME/lib/jopa" -bootclasspath "$DEVJOPAK_HOME/lib/glibj.zip" "$@"

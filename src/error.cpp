@@ -1782,8 +1782,7 @@ void SemanticError::InitializeMessages()
         "for `-source 1.5' or greater.";
     messages[VARARGS_UNSUPPORTED] =
         "Variable-arity methods (also known as varargs) are only supported "
-        "for `-source 1.5' or greater."
-        "(not yet implemented)";
+        "for `-source 1.5' or greater.";
     messages[STATIC_IMPORT_UNSUPPORTED] =
         "Static imports are only supported for `-source 1.5' or greater.";
     messages[INVALID_STATIC_IMPORT] =
@@ -1793,19 +1792,16 @@ void SemanticError::InitializeMessages()
         "Static member \"%1\" not found in type \"%2.%3\".";
     messages[ANNOTATION_MODIFIER_UNSUPPORTED] =
         "Annotation modifiers are only supported for `-source 1.5' or "
-        "greater."
-        "(not yet implemented)";
+        "greater.";
     messages[RECOMMENDED_ANNOTATION_ORDER] =
         "It is recommended that the annotation modifier \"%1\" appear before "
         "all modifier keywords.";
     messages[DUPLICATE_ANNOTATION] =
         "Duplicate specification of the annotation modifier \"%1\".";
     messages[ANNOTATION_TYPE_UNSUPPORTED] =
-        "Annotation types are only supported for `-source 1.5' or greater."
-        "(not yet implemented)";
+        "Annotation types are only supported for `-source 1.5' or greater.";
     messages[ENUM_TYPE_UNSUPPORTED] =
-        "Enumeration types are only supported for `-source 1.5' or greater."
-        "(not yet implemented)";
+        "Enumeration types are only supported for `-source 1.5' or greater.";
     messages[SUPER_IS_ENUM] =
         "Enumeration type \"%T1\" cannot be used as a superclass. Instead, "
         "use the \"enum\" keyword added in `-source 1.5'.";
@@ -1814,22 +1810,18 @@ void SemanticError::InitializeMessages()
         "\"new\" expression.";
     messages[TYPE_ARGUMENTS_UNSUPPORTED] =
         "Using type arguments to access generic types requires the use of "
-        "\"-source 1.5\" or greater. Compilation will continue using the raw "
-        "type \"%T1\", but no class file will be emitted."
-        "(not yet implemented)";
+        "\"-source 1.5\" or greater.";
     messages[TYPE_PARAMETERS_UNSUPPORTED] =
         "Declaring type parameters for types or methods requires the use of "
-        "\"-source 1.5\" or greater. Compilation will continue, but will "
-        "treat the parameter names as invalid types."
-        "(not yet implemented)";
+        "\"-source 1.5\" or greater.";
     messages[COVARIANCE_UNSUPPORTED] =
         "Covariant return types require the use of \"-source 1.5\" or "
         "greater. Otherwise, the return type of method \"%1\" must match the "
         "return type of \"%2\" that it overrides.";
     messages[WILDCARD_UNSUPPORTED] =
-        "Wildcard type parameters are not yet supported in \"-source 1.5\".";
+        "Wildcard type parameters are only supported for \"-source 1.5\" or greater.";
     messages[EXPLICIT_TYPE_ARGUMENTS_UNSUPPORTED] =
-        "Explicit type arguments are not yet supported in \"-source 1.5\".";
+        "Explicit type arguments are only supported for \"-source 1.5\" or greater.";
     messages[UNCHECKED_TYPE_CONVERSION] =
         "Conversion of the expression from type \"%T1\" to type \"%T3\" "
         "bypasses type parameterization, and may cause runtime exceptions.";

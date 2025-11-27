@@ -1,0 +1,11 @@
+#!/bin/sh
+# DevJopaK java wrapper - invokes JamVM with GNU Classpath
+DEVJOPAK_HOME="$(cd "$(dirname "$0")/../" && pwd)"
+export LD_LIBRARY_PATH="$DEVJOPAK_HOME/lib/native:$LD_LIBRARY_PATH"
+# Clear external CLASSPATH to avoid interference
+unset CLASSPATH
+exec "$DEVJOPAK_HOME/lib/jamvm" \
+    -Xbootclasspath/v:"$DEVJOPAK_HOME/lib/classes.zip" \
+    -Xbootclasspath/c:"$DEVJOPAK_HOME/lib/glibj.zip" \
+    -Djava.library.path="$DEVJOPAK_HOME/lib/native" \
+    "$@"

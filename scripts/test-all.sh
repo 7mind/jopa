@@ -2,7 +2,10 @@
 set -euo pipefail
 
 # Complete test suite - runs primary tests and parser tests
-# Usage: test-all.sh
+# Usage: test-all.sh [--clean]
+#
+# Options:
+#   --clean  Remove build directory and do a full clean rebuild
 #
 # If GITHUB_STEP_SUMMARY is set, outputs markdown to it
 # Otherwise outputs to stdout
@@ -11,6 +14,30 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PROJECT_DIR}/build"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+
+# Parse arguments
+CLEAN_BUILD=false
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --clean)
+            CLEAN_BUILD=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Usage: $0 [--clean]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Clean build directory if requested
+if [[ "$CLEAN_BUILD" == "true" ]]; then
+    echo "=== Cleaning Build Directory ==="
+    rm -rf "${BUILD_DIR}"
+    echo "Removed: ${BUILD_DIR}"
+    echo ""
+fi
 
 # Output destination (GITHUB_STEP_SUMMARY or stdout)
 OUTPUT="${GITHUB_STEP_SUMMARY:-/dev/stdout}"

@@ -72,7 +72,7 @@ const wchar_t* StreamError::getErrorMessage()
             L"to make use of assertions.";
     case DEPRECATED_IDENTIFIER_ENUM:
         return L"The use of \"enum\" as an identifier is deprecated, "
-            L"as it will be a keyword once -source 1.5 is implemented.";
+            L"as it is a keyword in -source 1.5 and later.";
     case DOLLAR_IN_IDENTIFIER:
         return L"The use of \"$\" in an identifier, while legal, is strongly "
             L"discouraged, since it can conflict with compiler-generated "

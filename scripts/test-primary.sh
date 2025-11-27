@@ -5,6 +5,7 @@ set -euo pipefail
 # All tests use -source 1.7, targets: 1.5, 1.6, 1.7
 #
 # Usage: test-primary.sh [OPTIONS]
+#   --clean        Remove build directory and do a full clean rebuild
 #   --quick        Only run with default target (1.5), skip matrix
 #   --sanitizers   Enable AddressSanitizer and UBSan (Debug build)
 #   --release      Use Release build (default is Debug)
@@ -16,6 +17,7 @@ BUILD_DIR="${PROJECT_DIR}/build"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
 # Default options
+CLEAN_BUILD=false
 QUICK_MODE=false
 SANITIZERS=false
 BUILD_TYPE="Debug"
@@ -23,6 +25,10 @@ BUILD_TYPE="Debug"
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
+        --clean)
+            CLEAN_BUILD=true
+            shift
+            ;;
         --quick)
             QUICK_MODE=true
             shift
@@ -39,6 +45,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: test-primary.sh [OPTIONS]"
             echo ""
             echo "Options:"
+            echo "  --clean        Remove build directory and do a full clean rebuild"
             echo "  --quick        Only run with default target (1.5), skip matrix"
             echo "  --sanitizers   Enable AddressSanitizer and UBSan (Debug build)"
             echo "  --release      Use Release build (default is Debug)"
@@ -52,6 +59,14 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Clean build directory if requested
+if [[ "$CLEAN_BUILD" == "true" ]]; then
+    echo "=== Cleaning Build Directory ==="
+    rm -rf "${BUILD_DIR}"
+    echo "Removed: ${BUILD_DIR}"
+    echo ""
+fi
 
 echo "=== Jopa Primary Test Suite ==="
 echo "Project: ${PROJECT_DIR}"
