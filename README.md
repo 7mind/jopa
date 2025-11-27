@@ -6,15 +6,17 @@
 
 A totally Claude'd effort in modernizing `jikes`, the historical independent `javac` implementation in C++.
 
+Fully supports Java 5, 6 and 7 both in syntax and bytecode. Can emit older bytecode versions for newer syntax (e.g. Java 5 bytecode for Java 7 programs).
+
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
 Sister project: [PyJOPA](https://github.com/7mind/pyjopa)
 
 Note: I've made multiple attempts to replace the legacy parser with a more modern one but Claude failed to deliver due to extremely tight coupling.
 
-## Java 5 & 6 Support
+## Java 5, 6, 7 Support
 
-This fork adds comprehensive Java 5 (J2SE 5.0) and Java 6 (Java SE 6) language features:
+This fork adds comprehensive Java 5 (J2SE 5.0), Java 6 (Java SE 6), and Java 7 (Java SE 7) language features:
 
 ### Java 5 Features
 - ✅ **Generics** - Type erasure with generic classes, methods, and bounded type parameters
