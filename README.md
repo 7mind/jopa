@@ -11,7 +11,11 @@ Java 8 support is limited to default methods; other Java 8 features are intentio
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
-Sister project: [PyJOPA](https://github.com/7mind/pyjopa)
+## Relevant projects:
+
+- Sister project, Java compiler in Python: [PyJOPA](https://github.com/7mind/pyjopa)
+- JVM implementation in Python: [python-jvm-interpreter](https://github.com/gkbrk/python-jvm-interpreter)
+- JVM implementation in Common Lisp: [OpenLDK](https://github.com/atgreen/openldk)
 
 Note: I've made multiple attempts to replace the legacy parser with a more modern one but Claude failed to deliver due to extremely tight coupling.
 

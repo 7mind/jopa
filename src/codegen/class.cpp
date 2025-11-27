@@ -468,23 +468,22 @@ MethodInfo::MethodInfo(ClassFile& buffer)
 const char* MethodInfo::Signature(const ConstantPool& pool,
                                   const Control& control) const
 {
+    // Always return the erased (descriptor) signature, not the generic signature.
+    // The generic signature from Signature attribute (attr_signature) contains
+    // type parameters like "TT;" and "Ljava/util/Enumeration<TT;>;" which are not
+    // valid for method references in the constant pool. The JVM only understands
+    // erased types in descriptors.
+    (void)control; // unused now
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
-    const CPUtf8Info* sig =
-        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
-        ? attr_signature -> Signature(pool)
-        : (const CPUtf8Info*) pool[descriptor_index];
-    return sig -> Bytes();
+    return ((const CPUtf8Info*) pool[descriptor_index]) -> Bytes();
 }
 
 u2 MethodInfo::SignatureLength(const ConstantPool& pool,
                                const Control& control) const
 {
+    (void)control; // unused now
     assert(pool[descriptor_index] -> Tag() == CPInfo::CONSTANT_Utf8);
-    const CPUtf8Info* sig =
-        (control.option.source >= JopaOption::SDK1_5 && attr_signature)
-        ? attr_signature -> Signature(pool)
-        : (const CPUtf8Info*) pool[descriptor_index];
-    return sig -> Length();
+    return ((const CPUtf8Info*) pool[descriptor_index]) -> Length();
 }
 
 
@@ -1389,6 +1388,36 @@ TypeSymbol* Semantic::ProcessSignature(TypeSymbol* base_type,
     case U_L:
         {
             const char* str = signature;
+            int generic_depth = 0;
+            while (*str)
+            {
+                if (*str == U_LT)
+                    generic_depth++;
+                else if (*str == U_GT)
+                    generic_depth--;
+                else if (*str == U_SEMICOLON && generic_depth == 0)
+                    break;
+                str++;
+            }
+            if (! *str)
+            {
+                signature = str;
+                return control.no_type;
+            }
+            // Find just the class name (before any generic parameters)
+            const char* name_end = signature;
+            while (name_end < str && *name_end != U_LT)
+                name_end++;
+            type = ReadTypeFromSignature(base_type, signature,
+                                         name_end - signature, tok);
+            signature = str + 1;
+        }
+        break;
+    case U_T:
+        // Type variable like "TT;" means type parameter T
+        // For erasure purposes, treat as Object (the implicit bound)
+        {
+            const char* str = signature;
             while (*str && *str != U_SEMICOLON)
                 str++;
             if (! *str)
@@ -1396,13 +1425,10 @@ TypeSymbol* Semantic::ProcessSignature(TypeSymbol* base_type,
                 signature = str;
                 return control.no_type;
             }
-            type = ReadTypeFromSignature(base_type, signature,
-                                         str - signature, tok);
             signature = str + 1;
+            type = control.Object();
         }
         break;
-    case U_T:
-        assert(false && "generics not implemented yet");
     case U_NULL: // oops, already exceeded string
         signature--;
         // fallthrough

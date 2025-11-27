@@ -1382,6 +1382,25 @@ void MethodSymbol::ProcessMethodSignature(Semantic* sem,
 
         int num_parameters = 0;
         const char* signature = SignatureString();
+
+        // Generic methods have type parameters before the method parameters
+        // Signature format: <TypeParams>(Params)ReturnType
+        // We need to skip past the type parameters to get to the method params
+        if (*signature == U_LT)
+        {
+            // Skip over generic type parameters: <T:Ljava/lang/Object;U:...>
+            int depth = 1;
+            signature++;
+            while (*signature && depth > 0)
+            {
+                if (*signature == U_LT)
+                    depth++;
+                else if (*signature == U_GT)
+                    depth--;
+                signature++;
+            }
+        }
+
         assert(*signature == U_LEFT_PARENTHESIS);
         signature++; // +1 to skip initial '('
 
