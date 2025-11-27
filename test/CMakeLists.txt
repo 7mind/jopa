@@ -66,7 +66,7 @@ endif()
 
 set(TEST_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(RUNTIME_SRC_DIR "${CMAKE_SOURCE_DIR}/runtime")
-set(RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
+set(RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/jopa-stub-rt.jar")
 set(OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Helper function to add a compile+run test

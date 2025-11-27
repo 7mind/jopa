@@ -63,7 +63,7 @@ endif()
 # JOPA compiler and runtime paths (built as part of main project)
 # ============================================================================
 set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
-set(JOPA_RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/runtime.jar")
+set(JOPA_RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/jopa-stub-rt.jar")
 
 # Clean Java environment to prevent system javac from leaking in
 set(CLEAN_JAVA_ENV_VARS
