@@ -39,7 +39,7 @@ option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes"
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
 
 # JamVM bootstrap options
-option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" OFF)
+option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" ON)
 option(JOPA_USE_JAMVM_TESTS "Run tests with JamVM instead of system JVM" OFF)
 
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
