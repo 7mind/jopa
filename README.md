@@ -7,6 +7,7 @@
 A totally Claude'd effort in modernizing `jikes`, the historical independent `javac` implementation in C++.
 
 Fully supports Java 5, 6 and 7 both in syntax and bytecode. Can emit older bytecode versions for newer syntax (e.g. Java 5 bytecode for Java 7 programs).
+Java 8 support is limited to default methods; other Java 8 features are intentionally not implemented.
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
@@ -51,7 +52,7 @@ Java 7 language features are fully supported for parsing, semantic analysis, and
 | Exception suppression | ✅ Works | ✅ Works | ✅ Works |
 | Binary/underscore literals | ✅ Works | ✅ Works | ✅ Works |
 
-**Note:** All target versions pass the full test suite. Java 7 bytecode (class version 51.0) includes StackMapTable generation and runs correctly on modern JVMs.
+**Note:** All target versions pass the full test suite. Java 7 bytecode (class version 51.0) includes StackMapTable generation and runs correctly on modern JVMs. The default test target is `-DJOPA_TARGET_VERSION=1.5`; set it to `1.6` or `1.7` to match your intended runtime. Generated class files require at least the corresponding JVM major version (Java 5 for `-target 1.5`, Java 6 for `-target 1.6`, Java 7 for `-target 1.7`).
 
 ### Advanced Generics Support
 The compiler fully supports complex generic type signatures including:
@@ -66,7 +67,20 @@ The compiler fully supports complex generic type signatures including:
 - ❌ **Lambda Expressions** - Not implemented
 - ❌ **Method References** - Not implemented
 
+## Runtime Compatibility
+- `-target 1.5` → class file version 49.0 (runs on Java 5+)
+- `-target 1.6` → class file version 50.0 (runs on Java 6+)
+- `-target 1.7` → class file version 51.0 with StackMapTable (runs on Java 7+)
+
 ## Building
+
+- Quick start (nix/direnv):
+  ```bash
+  nix develop
+  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  direnv exec . cmake --build build -j"$(nproc)"
+  direnv exec . sh -c "cd build && ctest --output-on-failure"
+  ```
 
 - Requirements:
   - CMake 3.20+ and a C++17 compiler
