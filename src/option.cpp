@@ -263,6 +263,7 @@ Option::Option(ArgumentExpander& arguments,
       pedantic(false),
       noassert(false),
       nosuppressed(false),
+      nowarn_unchecked(false),
       dependence_report_name(NULL)
 {
 
@@ -622,6 +623,11 @@ Option::Option(ArgumentExpander& arguments,
                 // Disable addSuppressed() calls in try-with-resources
                 // for compatibility with older class libraries (e.g. GNU Classpath)
                 nosuppressed = true;
+            }
+            else if (strcmp(arguments.argv[i], "-nowarn:unchecked") == 0)
+            {
+                // Suppress unchecked type conversion warnings (raw type usage)
+                nowarn_unchecked = true;
             }
             else if (strcmp(arguments.argv[i], "+B") == 0 ||
                      strcmp(arguments.argv[i], "--nobytecode") == 0)
