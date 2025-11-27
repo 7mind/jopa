@@ -32,3 +32,31 @@ target_include_directories(jikespg PRIVATE src)
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(jikespg PRIVATE -w)
 endif()
+
+# Force jikespg to build without sanitizer instrumentation even when the
+# top-level build enables ASan/UBSan.
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+    target_compile_options(jikespg PRIVATE
+        -fno-sanitize=address
+        -fno-sanitize=undefined
+        -fno-sanitize=float-divide-by-zero
+        -fno-sanitize=nullability
+        -fno-sanitize=implicit-conversion
+    )
+    target_link_options(jikespg PRIVATE
+        -fno-sanitize=address
+        -fno-sanitize=undefined
+        -fno-sanitize=float-divide-by-zero
+        -fno-sanitize=nullability
+        -fno-sanitize=implicit-conversion
+    )
+elseif(CMAKE_C_COMPILER_ID MATCHES "GNU")
+    target_compile_options(jikespg PRIVATE
+        -fno-sanitize=address
+        -fno-sanitize=undefined
+    )
+    target_link_options(jikespg PRIVATE
+        -fno-sanitize=address
+        -fno-sanitize=undefined
+    )
+endif()

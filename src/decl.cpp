@@ -1212,7 +1212,9 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     }
 
     ParameterizedType* param_type = new ParameterizedType(base_type, type_arg_tuple);
-    compilation_unit -> ast_pool -> RegisterParameterizedType(param_type);
+    // Register with Control, not ast_pool, because ParameterizedTypes can be
+    // referenced cross-file and must outlive individual file cleanup.
+    control.RegisterParameterizedType(param_type);
     return param_type;
 }
 

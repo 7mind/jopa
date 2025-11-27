@@ -1091,7 +1091,11 @@ void FileSymbol::CleanUp()
 
     if (compilation_unit)
     {
-        delete compilation_unit -> ast_pool;
+        // NOTE: Do NOT delete ast_pool here. AST nodes can be referenced
+        // cross-file (e.g., type arguments, wildcards) and may be accessed
+        // after this cleanup. The ast_pool will be cleaned up when the
+        // entire compilation ends and Control is destroyed.
+        // TODO: Track ast_pools in Control for proper cleanup.
         compilation_unit = NULL;
     }
 
