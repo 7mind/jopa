@@ -581,7 +581,7 @@ LiteralValue* IntLiteralTable::FindOrInsertHexInt(LiteralSymbol* literal)
     {
         if (*tail == U_UNDERSCORE)
             continue; // Skip underscores (Java 7)
-        uvalue |= Code::Value(*tail) << i;
+        uvalue |= static_cast<u4>(Code::Value(*tail)) << i;
         i += 4;
     }
     return tail > head ? bad_value : FindOrInsert((i4) uvalue);
@@ -824,14 +824,14 @@ LiteralValue* LongLiteralTable::FindOrInsertHexLong(LiteralSymbol* literal)
     {
         if (*tail == U_UNDERSCORE)
             continue; // Skip underscores (Java 7)
-        low |= Code::Value(*tail) << i;
+        low |= static_cast<u4>(Code::Value(*tail)) << i;
         i += 4;
     }
     for (int j = 0; j < 32 && tail > head; tail--)
     {
         if (*tail == U_UNDERSCORE)
             continue; // Skip underscores (Java 7)
-        high |= Code::Value(*tail) << j;
+        high |= static_cast<u4>(Code::Value(*tail)) << j;
         j += 4;
     }
     return tail > head ? bad_value : FindOrInsert(LongInt(high, low));

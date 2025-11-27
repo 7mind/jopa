@@ -8296,7 +8296,7 @@ void ByteCode::LoadLiteral(LiteralValue* litp, const TypeSymbol* type)
             PutOp(OP_LCONST_1);
         else if (vp -> value >= -1 && vp -> value <= 5)
         {
-            LoadImmediateInteger(vp -> value.LowWord());
+            LoadImmediateInteger(static_cast<i4>(vp -> value.LowWord()));
             PutOp(OP_I2L);
         }
         else
@@ -9191,7 +9191,7 @@ void ByteCode::PutOpIINC(u2 var, int val)
     {
         PutOp(OP_IINC);
         PutU1(var);
-        PutU1(val);
+        PutU1(static_cast<u1>(val));  // IINC interprets byte as signed
     }
     else // else need wide form
     {

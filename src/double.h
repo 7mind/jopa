@@ -612,7 +612,7 @@ public:
     BigInt& operator=(const BigInt&);
     BigInt(const BigInt& op) { data = NULL; *this = op; }
     // destructor
-    ~BigInt() { delete data; }
+    ~BigInt() { delete[] data; }
 
 private:
     // resize data[] to be 1<<k elements
@@ -698,7 +698,7 @@ inline BigInt::BigInt(int i) : data(NULL)
 inline void BigInt::resize(int k)
 {
     maxwds = 1 << k;
-    delete data;
+    delete[] data;
     data = new u4[maxwds];
     this -> k = k;
     wds = 0;

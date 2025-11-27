@@ -2238,6 +2238,12 @@ void Semantic::CleanUpType(TypeSymbol* type)
     delete type -> non_local;
     type -> non_local = NULL;
 
+    // Also null out the class_body's reference to the semantic_environment
+    // to prevent use-after-free if the declaration is still referenced.
+    AstClassBody* class_body = type -> declaration;
+    if (class_body && class_body -> semantic_environment == type -> semantic_environment)
+        class_body -> semantic_environment = NULL;
+
     delete type -> semantic_environment;
     type -> semantic_environment = NULL;
 
