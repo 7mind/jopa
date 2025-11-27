@@ -20,19 +20,12 @@ option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java
 
 # Option to use -noverify flag for JVM tests
 # Required until StackMapTable generation is implemented for Java 7+ bytecode
-option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" ON)
+option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" OFF)
 
 # Bytecode target version for tests (1.5, 1.6, or 1.7)
 # 1.5 and 1.6 work without StackMapTable, 1.7 requires it
 set(JOPA_TARGET_VERSION "1.5" CACHE STRING "Bytecode target version for tests (1.5, 1.6, 1.7)")
 set_property(CACHE JOPA_TARGET_VERSION PROPERTY STRINGS "1.5" "1.6" "1.7")
-
-# Set up JVM flags based on options
-if(JOPA_USE_NOVERIFY)
-    set(JVM_TEST_FLAGS "-noverify")
-else()
-    set(JVM_TEST_FLAGS "")
-endif()
 
 # Find Java for runtime tests (only if JVM tests are enabled)
 if(JOPA_ENABLE_JVM_TESTS)
@@ -42,6 +35,32 @@ if(JOPA_ENABLE_JVM_TESTS)
     if(NOT Java_JAVAP_EXECUTABLE)
         get_filename_component(JAVA_BIN_DIR ${Java_JAVA_EXECUTABLE} DIRECTORY)
         find_program(Java_JAVAP_EXECUTABLE javap HINTS ${JAVA_BIN_DIR})
+    endif()
+
+    # Configure JVM executable based on JOPA_USE_JAMVM_TESTS option
+    if(JOPA_USE_JAMVM_TESTS AND DEFINED JAMVM_EXECUTABLE)
+        set(TEST_JAVA_EXECUTABLE "${JAMVM_EXECUTABLE}")
+        # JamVM needs bootclasspath: jamvm classes.zip MUST come first, then glibj.zip
+        set(JAMVM_CLASSES "${CMAKE_BINARY_DIR}/vendor-install/jamvm/share/jamvm/classes.zip")
+        set(JAMVM_BOOTCP "${CLASSPATH_INSTALL_PREFIX}/share/classpath/glibj.zip")
+        set(JAMVM_NATIVE_LIBS "${CLASSPATH_INSTALL_PREFIX}/lib/classpath")
+        set(TEST_JAVA_BOOTCP_FLAGS "-Xbootclasspath:${JAMVM_CLASSES}:${JAMVM_BOOTCP}" "-Djava.library.path=${JAMVM_NATIVE_LIBS}")
+        # JamVM doesn't support -noverify, so clear JVM_TEST_FLAGS
+        set(JVM_TEST_FLAGS "")
+        # GNU Classpath doesn't have addSuppressed/getSuppressed, use --nosuppressed flag
+        set(JOPA_EXTRA_FLAGS "--nosuppressed")
+        message(STATUS "Tests will run with JamVM: ${JAMVM_EXECUTABLE}")
+        message(STATUS "JamVM bootclasspath: ${JAMVM_BOOTCP}")
+    else()
+        set(TEST_JAVA_EXECUTABLE "${Java_JAVA_EXECUTABLE}")
+        set(TEST_JAVA_BOOTCP_FLAGS "")
+        set(JOPA_EXTRA_FLAGS "")
+        # Set up JVM flags based on options (only for non-JamVM)
+        if(JOPA_USE_NOVERIFY)
+            set(JVM_TEST_FLAGS "-noverify")
+        else()
+            set(JVM_TEST_FLAGS "")
+        endif()
     endif()
 endif()
 
@@ -59,7 +78,7 @@ function(add_jopa_run_test test_name source_file main_class)
     # Compilation test - compiles main source plus any extra sources
     add_test(
         NAME "compile_${test_name}"
-        COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+        COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
                 -sourcepath "${TEST_DIR}"
                 -classpath "${RUNTIME_JAR}"
                 -d "${TEST_OUTPUT_DIR}"
@@ -84,7 +103,7 @@ function(add_jopa_run_test test_name source_file main_class)
         # Runtime test
         add_test(
             NAME "run_${test_name}"
-            COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${TEST_OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
+            COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${TEST_OUTPUT_DIR}:${RUNTIME_JAR}" "${main_class}"
         )
         set_tests_properties("run_${test_name}" PROPERTIES
             LABELS "run"
@@ -100,7 +119,7 @@ set(EnumMethodsTest_OUTPUT "${OUTPUT_DIR}/EnumMethodsTest")
 file(MAKE_DIRECTORY "${EnumMethodsTest_OUTPUT}")
 add_test(
     NAME "compile_EnumMethodsTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${EnumMethodsTest_OUTPUT}"
@@ -111,7 +130,7 @@ set_tests_properties("compile_EnumMethodsTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_EnumMethodsTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${EnumMethodsTest_OUTPUT}:${RUNTIME_JAR}" "EnumMethodsTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${EnumMethodsTest_OUTPUT}:${RUNTIME_JAR}" "EnumMethodsTest"
     )
     set_tests_properties("run_EnumMethodsTest" PROPERTIES
         LABELS "run"
@@ -157,7 +176,7 @@ set(MathUtils_OUTPUT "${OUTPUT_DIR}/MathUtils")
 file(MAKE_DIRECTORY "${MathUtils_OUTPUT}")
 add_test(
     NAME "compile_MathUtils"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MathUtils_OUTPUT}"
@@ -180,7 +199,7 @@ set(SimpleJava6Test_OUTPUT "${OUTPUT_DIR}/SimpleJava6Test")
 file(MAKE_DIRECTORY "${SimpleJava6Test_OUTPUT}")
 add_test(
     NAME "compile_SimpleJava6Test"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION} -g
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION} -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${SimpleJava6Test_OUTPUT}"
@@ -190,7 +209,7 @@ set_tests_properties("compile_SimpleJava6Test" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_SimpleJava6Test"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${SimpleJava6Test_OUTPUT}:${RUNTIME_JAR}" "SimpleJava6Test"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${SimpleJava6Test_OUTPUT}:${RUNTIME_JAR}" "SimpleJava6Test"
     )
     set_tests_properties("run_SimpleJava6Test" PROPERTIES
         LABELS "run"
@@ -203,7 +222,7 @@ set(ReflectionBasicTest_OUTPUT "${OUTPUT_DIR}/ReflectionBasicTest")
 file(MAKE_DIRECTORY "${ReflectionBasicTest_OUTPUT}")
 add_test(
     NAME "compile_ReflectionBasicTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION} -g
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION} -g
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${ReflectionBasicTest_OUTPUT}"
@@ -213,7 +232,7 @@ set_tests_properties("compile_ReflectionBasicTest" PROPERTIES LABELS "compile")
 if(JOPA_ENABLE_JVM_TESTS)
     add_test(
         NAME "run_ReflectionBasicTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${ReflectionBasicTest_OUTPUT}" "ReflectionBasicTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${ReflectionBasicTest_OUTPUT}" "ReflectionBasicTest"
     )
     set_tests_properties("run_ReflectionBasicTest" PROPERTIES
         LABELS "run"
@@ -229,7 +248,7 @@ set(MultiFileTest_OUTPUT "${OUTPUT_DIR}/MultiFileTest")
 file(MAKE_DIRECTORY "${MultiFileTest_OUTPUT}")
 add_test(
     NAME "compile_MultiFileTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MultiFileTest_OUTPUT}"
@@ -249,7 +268,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
     add_test(
         NAME "run_MultiFileTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${MultiFileTest_OUTPUT}:${RUNTIME_JAR}" "MultiFileTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${MultiFileTest_OUTPUT}:${RUNTIME_JAR}" "MultiFileTest"
     )
     set_tests_properties("run_MultiFileTest" PROPERTIES
         LABELS "run;multifile"
@@ -269,7 +288,7 @@ set(DiamondTest_OUTPUT "${OUTPUT_DIR}/DiamondTest")
 file(MAKE_DIRECTORY "${DiamondTest_OUTPUT}")
 add_test(
     NAME "compile_DiamondTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DiamondTest_OUTPUT}"
@@ -287,7 +306,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
     add_test(
         NAME "run_DiamondTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${DiamondTest_OUTPUT}:${RUNTIME_JAR}" "DiamondTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${DiamondTest_OUTPUT}:${RUNTIME_JAR}" "DiamondTest"
     )
     set_tests_properties("run_DiamondTest" PROPERTIES
         LABELS "run;java7"
@@ -300,7 +319,7 @@ set(MultiCatchTest_OUTPUT "${OUTPUT_DIR}/MultiCatchTest")
 file(MAKE_DIRECTORY "${MultiCatchTest_OUTPUT}")
 add_test(
     NAME "compile_MultiCatchTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${MultiCatchTest_OUTPUT}"
@@ -318,7 +337,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
     add_test(
         NAME "run_MultiCatchTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${MultiCatchTest_OUTPUT}:${RUNTIME_JAR}" "MultiCatchTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${MultiCatchTest_OUTPUT}:${RUNTIME_JAR}" "MultiCatchTest"
     )
     set_tests_properties("run_MultiCatchTest" PROPERTIES
         LABELS "run;java7"
@@ -331,7 +350,7 @@ set(TryWithResourcesTest_OUTPUT "${OUTPUT_DIR}/TryWithResourcesTest")
 file(MAKE_DIRECTORY "${TryWithResourcesTest_OUTPUT}")
 add_test(
     NAME "compile_TryWithResourcesTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${TryWithResourcesTest_OUTPUT}"
@@ -347,14 +366,17 @@ if(JOPA_ENABLE_JVM_TESTS)
         LABELS "validate;java7"
         DEPENDS "compile_TryWithResourcesTest"
     )
-    add_test(
-        NAME "run_TryWithResourcesTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${TryWithResourcesTest_OUTPUT}:${RUNTIME_JAR}" "TryWithResourcesTest"
-    )
-    set_tests_properties("run_TryWithResourcesTest" PROPERTIES
-        LABELS "run;java7"
-        DEPENDS "validate_TryWithResourcesTest"
-    )
+    # Skip run test on JamVM since GNU Classpath lacks getSuppressed() which the test uses
+    if(NOT JOPA_USE_JAMVM_TESTS)
+        add_test(
+            NAME "run_TryWithResourcesTest"
+            COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${TryWithResourcesTest_OUTPUT}:${RUNTIME_JAR}" "TryWithResourcesTest"
+        )
+        set_tests_properties("run_TryWithResourcesTest" PROPERTIES
+            LABELS "run;java7"
+            DEPENDS "validate_TryWithResourcesTest"
+        )
+    endif()
 endif()
 
 # Java 7 String Switch Test
@@ -362,7 +384,7 @@ set(StringSwitchTest_OUTPUT "${OUTPUT_DIR}/StringSwitchTest")
 file(MAKE_DIRECTORY "${StringSwitchTest_OUTPUT}")
 add_test(
     NAME "compile_StringSwitchTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.7 -target ${JOPA_TARGET_VERSION}
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.7 -target ${JOPA_TARGET_VERSION}
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${StringSwitchTest_OUTPUT}"
@@ -380,7 +402,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
     add_test(
         NAME "run_StringSwitchTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${StringSwitchTest_OUTPUT}:${RUNTIME_JAR}" "StringSwitchTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${StringSwitchTest_OUTPUT}:${RUNTIME_JAR}" "StringSwitchTest"
     )
     set_tests_properties("run_StringSwitchTest" PROPERTIES
         LABELS "run;java7"
@@ -395,7 +417,7 @@ set(DefaultMethodTest_OUTPUT "${OUTPUT_DIR}/DefaultMethodTest")
 file(MAKE_DIRECTORY "${DefaultMethodTest_OUTPUT}")
 add_test(
     NAME "compile_DefaultMethodTest"
-    COMMAND $<TARGET_FILE:jopa> -source 1.8 -target 1.8
+    COMMAND $<TARGET_FILE:jopa> ${JOPA_EXTRA_FLAGS} -source 1.8 -target 1.8
             -sourcepath "${TEST_DIR}"
             -classpath "${RUNTIME_JAR}"
             -d "${DefaultMethodTest_OUTPUT}"
@@ -413,7 +435,7 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
     add_test(
         NAME "run_DefaultMethodTest"
-        COMMAND ${Java_JAVA_EXECUTABLE} ${JVM_TEST_FLAGS} -cp "${DefaultMethodTest_OUTPUT}:${RUNTIME_JAR}" "DefaultMethodTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${DefaultMethodTest_OUTPUT}:${RUNTIME_JAR}" "DefaultMethodTest"
     )
     set_tests_properties("run_DefaultMethodTest" PROPERTIES
         LABELS "run;java8"

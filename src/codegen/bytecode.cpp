@@ -2474,11 +2474,21 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             // Stack: [caught, primary]
 
             // Primary exception exists: call primary.addSuppressed(caught)
-            PutOp(OP_SWAP);
-            // Stack: [primary, caught]
-            PutOp(OP_INVOKEVIRTUAL);
-            PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
-            // Stack: []
+            // or just discard if nosuppressed is set
+            if (control.option.nosuppressed)
+            {
+                // Stack: [caught, primary]
+                PutOp(OP_POP2);  // discard both
+                // Stack: []
+            }
+            else
+            {
+                PutOp(OP_SWAP);
+                // Stack: [primary, caught]
+                PutOp(OP_INVOKEVIRTUAL);
+                PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+                // Stack: []
+            }
             EmitBranch(OP_GOTO, after_catch, statement);
 
             // check_close_exception:
@@ -2504,11 +2514,21 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             // Stack: [caught, close]
 
             // Close exception exists: call close.addSuppressed(caught)
-            PutOp(OP_SWAP);
-            // Stack: [close, caught]
-            PutOp(OP_INVOKEVIRTUAL);
-            PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
-            // Stack: []
+            // or just discard if nosuppressed is set
+            if (control.option.nosuppressed)
+            {
+                // Stack: [caught, close]
+                PutOp(OP_POP2);  // discard both
+                // Stack: []
+            }
+            else
+            {
+                PutOp(OP_SWAP);
+                // Stack: [close, caught]
+                PutOp(OP_INVOKEVIRTUAL);
+                PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+                // Stack: []
+            }
             EmitBranch(OP_GOTO, after_catch, statement);
 
             // first_close_exception: no previous exception, store caught as close_exception

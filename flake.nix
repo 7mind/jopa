@@ -39,6 +39,14 @@
             git
             which
             file
+
+            # JamVM + GNU Classpath build dependencies
+            autoconf
+            automake
+            libtool
+            libffi
+            zlib
+            antlr
           ];
 
           shellHook = ''

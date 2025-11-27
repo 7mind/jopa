@@ -262,6 +262,7 @@ Option::Option(ArgumentExpander& arguments,
       errors(true),
       pedantic(false),
       noassert(false),
+      nosuppressed(false),
       dependence_report_name(NULL)
 {
 
@@ -615,6 +616,12 @@ Option::Option(ArgumentExpander& arguments,
                      strcmp(arguments.argv[i], "--noassert") == 0)
             {
                 noassert = true;
+            }
+            else if (strcmp(arguments.argv[i], "--nosuppressed") == 0)
+            {
+                // Disable addSuppressed() calls in try-with-resources
+                // for compatibility with older class libraries (e.g. GNU Classpath)
+                nosuppressed = true;
             }
             else if (strcmp(arguments.argv[i], "+B") == 0 ||
                      strcmp(arguments.argv[i], "--nobytecode") == 0)

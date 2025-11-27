@@ -108,7 +108,8 @@ public:
          dump_errors,
          errors,
          pedantic,
-         noassert;
+         noassert,
+         nosuppressed;  // Disable addSuppressed() calls for older class libraries
 
     char *dependence_report_name;
 

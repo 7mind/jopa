@@ -100,3 +100,8 @@ src/grammar2/javahdr.h
 # Local environment
 .env
 .envrc.local
+
+# Vendor dependencies - keep archives, ignore extracted directories
+/vendor/*/
+!/vendor/CMakeLists.txt
+!/vendor/*.tar.gz

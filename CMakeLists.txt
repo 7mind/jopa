@@ -38,6 +38,10 @@ option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
 
+# JamVM bootstrap options
+option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" OFF)
+option(JOPA_USE_JAMVM_TESTS "Run tests with JamVM instead of system JVM" OFF)
+
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
 set(PACKAGE_NAME "jopa")
 set(PACKAGE_TARNAME "${PACKAGE_NAME}")
@@ -45,6 +49,11 @@ set(PACKAGE_STRING "${PACKAGE_NAME} ${JOPA_VERSION}")
 
 include(GNUInstallDirs)
 include(CTest)
+
+# Build JamVM + GNU Classpath if requested
+if(JOPA_BUILD_JAMVM)
+    add_subdirectory(vendor)
+endif()
 
 add_subdirectory(src)
 
