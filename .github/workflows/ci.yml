@@ -28,41 +28,20 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
-      - name: Configure with CMake (Release)
+      - name: Run Primary Tests (Release, Full Matrix)
         run: |
-          nix develop --command bash -c "
-            cmake -S . -B build \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DJOPA_ENABLE_SANITIZERS=OFF \
-              -DJOPA_ENABLE_CPPTRACE=OFF
-          "
-
-      - name: Build Jopa
-        run: |
-          nix develop --command bash -c "
-            cmake --build build -j\$(nproc)
-          "
-
-      - name: Run Primary Tests
-        run: |
-          nix develop --command bash -c "
-            cd build
-            ctest --output-on-failure -j\$(nproc) -E '^parse_'
-          "
+          nix develop --command bash ./scripts/test-primary.sh --release
 
       - name: Generate test summary
         if: always()
         run: |
-          nix develop --command bash -c "
-            cd build
-            echo '## Release Build Test Results' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '### Primary Test Summary' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-            ctest -E '^parse_' 2>&1 | tail -20 >> \$GITHUB_STEP_SUMMARY || true
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-          "
+          echo '## Release Build Test Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6, 1.7' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test artifacts
         if: always()
@@ -91,41 +70,20 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Configure with CMake (Debug)
+      - name: Run Primary Tests (Debug + Sanitizers, Full Matrix)
         run: |
-          nix develop --command bash -c "
-            cmake -S . -B build \
-              -DCMAKE_BUILD_TYPE=Debug \
-              -DJOPA_ENABLE_SANITIZERS=ON \
-              -DJOPA_ENABLE_CPPTRACE=ON
-          "
-
-      - name: Build Jopa
-        run: |
-          nix develop --command bash -c "
-            cmake --build build -j\$(nproc)
-          "
-
-      - name: Run Primary Tests with Sanitizers
-        run: |
-          nix develop --command bash -c "
-            cd build
-            ctest --output-on-failure -j\$(nproc) -E '^parse_'
-          "
+          nix develop --command bash ./scripts/test-primary.sh --sanitizers
 
       - name: Generate test summary
         if: always()
         run: |
-          nix develop --command bash -c "
-            cd build
-            echo '## Debug Build Test Results (with Sanitizers)' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '### Primary Test Summary' >> \$GITHUB_STEP_SUMMARY
-            echo '' >> \$GITHUB_STEP_SUMMARY
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-            ctest -E '^parse_' 2>&1 | tail -20 >> \$GITHUB_STEP_SUMMARY || true
-            echo '\`\`\`' >> \$GITHUB_STEP_SUMMARY
-          "
+          echo '## Debug Build Test Results (with Sanitizers)' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6, 1.7' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Upload test artifacts
         if: always()

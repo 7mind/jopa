@@ -4,24 +4,61 @@ set -euo pipefail
 # Primary test suite - runs semantic/bytecode tests with target version matrix
 # All tests use -source 1.7, targets: 1.5, 1.6, 1.7
 #
-# Usage: test-primary.sh [--quick]
-#   --quick    Only run with default target (1.5), skip matrix
+# Usage: test-primary.sh [OPTIONS]
+#   --quick        Only run with default target (1.5), skip matrix
+#   --sanitizers   Enable AddressSanitizer and UBSan (Debug build)
+#   --release      Use Release build (default is Debug)
+#   --help         Show this help
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${PROJECT_DIR}/build"
 NPROC=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-# Check for --quick flag
+# Default options
 QUICK_MODE=false
-if [[ "${1:-}" == "--quick" ]]; then
-    QUICK_MODE=true
-fi
+SANITIZERS=false
+BUILD_TYPE="Debug"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --quick)
+            QUICK_MODE=true
+            shift
+            ;;
+        --sanitizers)
+            SANITIZERS=true
+            shift
+            ;;
+        --release)
+            BUILD_TYPE="Release"
+            shift
+            ;;
+        --help)
+            echo "Usage: test-primary.sh [OPTIONS]"
+            echo ""
+            echo "Options:"
+            echo "  --quick        Only run with default target (1.5), skip matrix"
+            echo "  --sanitizers   Enable AddressSanitizer and UBSan (Debug build)"
+            echo "  --release      Use Release build (default is Debug)"
+            echo "  --help         Show this help"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
 
 echo "=== Jopa Primary Test Suite ==="
 echo "Project: ${PROJECT_DIR}"
 echo "Build:   ${BUILD_DIR}"
 echo "Parallel jobs: ${NPROC}"
+echo "Build type: ${BUILD_TYPE}"
+echo "Sanitizers: ${SANITIZERS}"
 echo ""
 
 # Target versions to test
@@ -33,6 +70,20 @@ else
     echo "Mode: Full matrix (targets 1.5, 1.6, 1.7)"
 fi
 echo ""
+
+# CMake options
+CMAKE_OPTS=(
+    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+    -DJOPA_ENABLE_JDK_PARSER_TESTS=OFF
+)
+
+if $SANITIZERS; then
+    CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=ON)
+    CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=ON)
+else
+    CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=OFF)
+    CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=OFF)
+fi
 
 FAILED=false
 RESULTS=()
@@ -50,9 +101,7 @@ for TARGET in "${TARGETS[@]}"; do
     echo "Configuring..."
     cmake -B "${BUILD_DIR}" -S "${PROJECT_DIR}" \
         -DJOPA_TARGET_VERSION="${TARGET}" \
-        -DJOPA_ENABLE_SANITIZERS=ON \
-        -DCMAKE_BUILD_TYPE=Debug \
-        -DJOPA_ENABLE_JDK_PARSER_TESTS=OFF \
+        "${CMAKE_OPTS[@]}" \
         >/dev/null 2>&1
 
     # Build
@@ -90,6 +139,8 @@ done
 echo "========================================"
 echo "           SUMMARY"
 echo "========================================"
+echo ""
+echo "Build: ${BUILD_TYPE}, Sanitizers: ${SANITIZERS}"
 echo ""
 for RESULT in "${RESULTS[@]}"; do
     echo "  $RESULT"
