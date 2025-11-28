@@ -157,10 +157,14 @@ inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
 //      }
     for (int k = target_method -> NumFormalParameters() - 1; k >= 0; k--)
     {
-        if (! CanMethodInvocationConvert(target_method -> FormalParameter(k) ->
-                                         Type(),
-                                         source_method -> FormalParameter(k) ->
-                                         Type()))
+        VariableSymbol* target_param = target_method -> FormalParameter(k);
+        VariableSymbol* source_param = source_method -> FormalParameter(k);
+        // Error recovery: parameters might be invalid if there are semantic errors
+        if (! target_param || ! source_param ||
+            ! target_param -> Type() || ! source_param -> Type())
+            return false;
+        if (! CanMethodInvocationConvert(target_param -> Type(),
+                                         source_param -> Type()))
         {
             return false;
         }
@@ -3726,6 +3730,134 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
         }
     }
+
+    //
+    // Type inference for generic methods: If the method's return type is one of its own
+    // type parameters, infer the type from the actual arguments.
+    //
+    if (method && method -> method_return_type_param_index >= 0)
+    {
+        int return_type_param = method -> method_return_type_param_index;
+        TypeSymbol* inferred_type = NULL;
+
+        // Try to infer the type from actual arguments
+        if (method -> param_type_param_indices)
+        {
+            unsigned num_args = method_call -> arguments -> NumArguments();
+            unsigned num_params = method -> param_type_param_indices -> Length();
+            unsigned limit = (num_args < num_params) ? num_args : num_params;
+
+            for (unsigned i = 0; i < limit && ! inferred_type; i++)
+            {
+                int param_type_param = (*(method -> param_type_param_indices))[i];
+                if (param_type_param == return_type_param)
+                {
+                    // This argument corresponds to the same type parameter as the return type
+                    AstExpression* arg = method_call -> arguments -> Argument(i);
+
+                    // Unwrap cast expressions to get the original type
+                    while (arg -> kind == Ast::CAST)
+                    {
+                        AstCastExpression* cast = (AstCastExpression*) arg;
+                        arg = cast -> expression;
+                    }
+
+                    TypeSymbol* arg_type = NULL;
+
+                    // Handle class literals specially: for String.class, extract String
+                    // This handles patterns like getInstance(Class<T> clazz)
+                    if (arg -> kind == Ast::CLASS_LITERAL)
+                    {
+                        AstClassLiteral* class_literal = (AstClassLiteral*) arg;
+                        if (class_literal -> type && class_literal -> type -> symbol)
+                            arg_type = class_literal -> type -> symbol;
+                    }
+                    // Handle anonymous class creation with type arguments
+                    // For doPrivileged(new PrivilegedAction<Provider>() {...}), extract Provider
+                    else if (arg -> kind == Ast::CLASS_CREATION)
+                    {
+                        AstClassCreationExpression* class_creation =
+                            (AstClassCreationExpression*) arg;
+                        // Check if the class type has type arguments (parameterized type)
+                        if (class_creation -> class_type &&
+                            class_creation -> class_type -> parameterized_type &&
+                            class_creation -> class_type -> parameterized_type -> NumTypeArguments() > 0)
+                        {
+                            // Extract the first type argument
+                            // For PrivilegedAction<Provider>, get Provider
+                            Type* type_arg = class_creation -> class_type ->
+                                parameterized_type -> TypeArgument(0);
+                            if (type_arg)
+                                arg_type = type_arg -> Erasure();
+                        }
+                        // For raw types (no type arguments), don't infer - let return type be erased type
+                        // e.g., doPrivileged(new PrivilegedAction() {...}) returns Object, not the anon class
+                    }
+                    else
+                    {
+                        arg_type = arg -> Type();
+                        // For array parameters like T[], extract the element type from the argument
+                        // For example, if argument is String[], we want String (not String[])
+                        // so that the return type T[] becomes String[] (not String[][])
+                        if (arg_type && arg_type -> num_dimensions > 0)
+                        {
+                            // Get the formal parameter to check if it's an array type
+                            VariableSymbol* formal_param = (i < method -> NumFormalParameters())
+                                ? method -> FormalParameter(i) : NULL;
+                            // The parameter type (after erasure) is Object[] for T[]
+                            // If the parameter is also an array, extract element type from argument
+                            if (formal_param && formal_param -> Type() &&
+                                formal_param -> Type() -> num_dimensions > 0)
+                            {
+                                // Strip only the formal parameter's array dimensions from argument
+                                // For toArray(T[] a) called with String[][], T = String[]
+                                unsigned formal_dims = formal_param -> Type() -> num_dimensions;
+                                unsigned arg_dims = arg_type -> num_dimensions;
+                                if (arg_dims > formal_dims)
+                                {
+                                    // Argument has more dimensions - get array type with remaining dims
+                                    unsigned remaining_dims = arg_dims - formal_dims;
+                                    arg_type = arg_type -> base_type -> GetArrayType(
+                                        (Semantic*) this, remaining_dims);
+                                }
+                                else
+                                {
+                                    // Same or fewer dimensions - use base type
+                                    arg_type = arg_type -> base_type;
+                                }
+                            }
+                        }
+                    }
+
+                    if (arg_type && arg_type != control.no_type && arg_type != control.null_type)
+                        inferred_type = arg_type;
+                }
+            }
+        }
+
+        // Substitute the return type with the inferred type
+        if (inferred_type)
+        {
+            // Handle array return types: <T> T[] toArray(T elem)
+            // Get dimensions from the method's declared return type (after type erasure)
+            TypeSymbol* method_return_type = method -> Type();
+            unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+            if (return_dims > 0)
+            {
+                // Return type is an array - ADD dimensions to the inferred type
+                // For <T> T[] toArray(T[] a), if T = String[], return T[] = String[][]
+                unsigned inferred_dims = inferred_type -> num_dimensions;
+                unsigned total_dims = inferred_dims + return_dims;
+                TypeSymbol* base = inferred_type -> num_dimensions > 0
+                    ? inferred_type -> base_type : inferred_type;
+                method_call -> resolved_type = base -> GetArrayType((Semantic*) this, total_dims);
+            }
+            else
+            {
+                method_call -> resolved_type = inferred_type;
+            }
+        }
+    }
 }
 
 
@@ -5185,9 +5317,14 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
                 CanWideningPrimitiveConvert(target_type, source_type);
         }
         // Java 5: Boxing conversion (primitive → wrapper) for method invocation
-        if (control.option.source >= JopaOption::SDK1_5 &&
-            IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
-            return true;
+        // JLS 5.3: Boxing conversion followed by widening reference conversion
+        // e.g., int → Integer → Object
+        if (control.option.source >= JopaOption::SDK1_5)
+        {
+            TypeSymbol* wrapper = GetWrapperType((TypeSymbol*)source_type);
+            if (wrapper && wrapper -> IsSubtype(target_type))
+                return true;
+        }
         return false;
     }
 
@@ -5377,6 +5514,15 @@ LiteralValue* Semantic::CastValue(const TypeSymbol* target_type,
         if (IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type) ||
             IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
             return NULL;
+    }
+
+    // Reference type casts (other than String) are not constant expressions
+    // This includes Object -> Logger, etc.
+    if (! control.IsNumeric((TypeSymbol*)target_type) &&
+        target_type != control.boolean_type &&
+        target_type != control.String())
+    {
+        return NULL;
     }
 
     LiteralValue* literal_value = NULL;
@@ -6819,7 +6965,15 @@ void Semantic::ProcessAND_AND(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
-    if (left_type != control.boolean_type)
+    // Java 5: Allow Boolean wrapper type (auto-unboxing)
+    bool left_ok = left_type == control.boolean_type ||
+        (control.option.source >= JopaOption::SDK1_5 &&
+         left_type == control.Boolean());
+    bool right_ok = right_type == control.boolean_type ||
+        (control.option.source >= JopaOption::SDK1_5 &&
+         right_type == control.Boolean());
+
+    if (! left_ok)
     {
         if (left_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -6828,7 +6982,7 @@ void Semantic::ProcessAND_AND(AstBinaryExpression* expr)
                            left_type -> ExternalName());
         expr -> symbol = control.no_type;
     }
-    if (right_type != control.boolean_type)
+    if (! right_ok)
     {
         if (right_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -6862,7 +7016,15 @@ void Semantic::ProcessOR_OR(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
-    if (left_type != control.boolean_type)
+    // Java 5: Allow Boolean wrapper type (auto-unboxing)
+    bool left_ok = left_type == control.boolean_type ||
+        (control.option.source >= JopaOption::SDK1_5 &&
+         left_type == control.Boolean());
+    bool right_ok = right_type == control.boolean_type ||
+        (control.option.source >= JopaOption::SDK1_5 &&
+         right_type == control.Boolean());
+
+    if (! left_ok)
     {
         if (left_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -6871,7 +7033,7 @@ void Semantic::ProcessOR_OR(AstBinaryExpression* expr)
                            left_type -> ExternalName());
         expr -> symbol = control.no_type;
     }
-    if (right_type != control.boolean_type)
+    if (! right_ok)
     {
         if (right_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -7501,14 +7663,56 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
              (true_type == control.boolean_type ||
               false_type == control.boolean_type)))
         {
-            ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
-                           conditional_expression -> true_expression -> LeftToken(),
-                           conditional_expression -> false_expression -> RightToken(),
-                           true_type -> ContainingPackageName(),
-                           true_type -> ExternalName(),
-                           false_type -> ContainingPackageName(),
-                           false_type -> ExternalName());
-            conditional_expression -> symbol = control.no_type;
+            // Java 5+: Handle primitive vs reference via boxing
+            if (control.option.source >= JopaOption::SDK1_5 &&
+                ! false_type -> Primitive())
+            {
+                // Check if false_type is the boxed form of true_type
+                TypeSymbol* unboxed_false = false_type -> UnboxedType(control);
+                if (unboxed_false && unboxed_false == true_type)
+                {
+                    // Unbox false to match primitive true
+                    conditional_expression -> false_expression =
+                        ConvertToType(conditional_expression -> false_expression,
+                                      true_type);
+                    conditional_expression -> symbol = true_type;
+                }
+                else
+                {
+                    // Box the primitive and use Object as result type
+                    TypeSymbol* boxed_true = true_type -> BoxedType(control);
+                    if (boxed_true && boxed_true != true_type)
+                    {
+                        conditional_expression -> true_expression =
+                            ConvertToType(conditional_expression -> true_expression,
+                                          boxed_true);
+                        // Result is Object (lub of boxed primitive and reference type)
+                        conditional_expression -> symbol = control.Object();
+                    }
+                    else
+                    {
+                        ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
+                                       conditional_expression -> true_expression -> LeftToken(),
+                                       conditional_expression -> false_expression -> RightToken(),
+                                       true_type -> ContainingPackageName(),
+                                       true_type -> ExternalName(),
+                                       false_type -> ContainingPackageName(),
+                                       false_type -> ExternalName());
+                        conditional_expression -> symbol = control.no_type;
+                    }
+                }
+            }
+            else
+            {
+                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
+                               conditional_expression -> true_expression -> LeftToken(),
+                               conditional_expression -> false_expression -> RightToken(),
+                               true_type -> ContainingPackageName(),
+                               true_type -> ExternalName(),
+                               false_type -> ContainingPackageName(),
+                               false_type -> ExternalName());
+                conditional_expression -> symbol = control.no_type;
+            }
         }
         else // must be a primitive type
         {
@@ -7577,7 +7781,46 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
     }
     else // true_type is reference
     {
-        if (CanAssignmentConvert(false_type,
+        // Java 5+: Handle reference vs primitive via boxing
+        if (control.option.source >= JopaOption::SDK1_5 &&
+            false_type -> Primitive())
+        {
+            // Check if true_type is the boxed form of false_type
+            TypeSymbol* unboxed_true = true_type -> UnboxedType(control);
+            if (unboxed_true && unboxed_true == false_type)
+            {
+                // Unbox true to match primitive false
+                conditional_expression -> true_expression =
+                    ConvertToType(conditional_expression -> true_expression,
+                                  false_type);
+                conditional_expression -> symbol = false_type;
+            }
+            else
+            {
+                // Box the primitive and use Object as result type
+                TypeSymbol* boxed_false = false_type -> BoxedType(control);
+                if (boxed_false && boxed_false != false_type)
+                {
+                    conditional_expression -> false_expression =
+                        ConvertToType(conditional_expression -> false_expression,
+                                      boxed_false);
+                    // Result is Object (lub of reference type and boxed primitive)
+                    conditional_expression -> symbol = control.Object();
+                }
+                else
+                {
+                    ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
+                                   conditional_expression -> true_expression -> LeftToken(),
+                                   conditional_expression -> false_expression -> RightToken(),
+                                   true_type -> ContainingPackageName(),
+                                   true_type -> ExternalName(),
+                                   false_type -> ContainingPackageName(),
+                                   false_type -> ExternalName());
+                    conditional_expression -> symbol = control.no_type;
+                }
+            }
+        }
+        else if (CanAssignmentConvert(false_type,
                                  conditional_expression -> true_expression))
         {
             conditional_expression -> true_expression =
@@ -7595,14 +7838,46 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
         }
         else
         {
-            ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
-                           conditional_expression -> true_expression -> LeftToken(),
-                           conditional_expression -> false_expression -> RightToken(),
-                           true_type -> ContainingPackageName(),
-                           true_type -> ExternalName(),
-                           false_type -> ContainingPackageName(),
-                           false_type -> ExternalName());
-            conditional_expression -> symbol = control.no_type;
+            // JLS 15.25.3: If neither operand type is convertible to the other,
+            // find the least upper bound (lub) of the two types.
+            // For classes, this is the most specific common superclass.
+            TypeSymbol* lub = NULL;
+
+            // Try to find common superclass for class types
+            if (! true_type -> ACC_INTERFACE() && ! false_type -> ACC_INTERFACE())
+            {
+                // Walk up true_type's inheritance chain and find first class
+                // that false_type is a subclass of
+                for (TypeSymbol* ancestor = true_type; ancestor; ancestor = ancestor -> super)
+                {
+                    if (false_type -> IsSubclass(ancestor))
+                    {
+                        lub = ancestor;
+                        break;
+                    }
+                }
+            }
+
+            if (lub)
+            {
+                // Found a common superclass - use it as the result type
+                conditional_expression -> true_expression =
+                    ConvertToType(conditional_expression -> true_expression, lub);
+                conditional_expression -> false_expression =
+                    ConvertToType(conditional_expression -> false_expression, lub);
+                conditional_expression -> symbol = lub;
+            }
+            else
+            {
+                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
+                               conditional_expression -> true_expression -> LeftToken(),
+                               conditional_expression -> false_expression -> RightToken(),
+                               true_type -> ContainingPackageName(),
+                               true_type -> ExternalName(),
+                               false_type -> ContainingPackageName(),
+                               false_type -> ExternalName());
+                conditional_expression -> symbol = control.no_type;
+            }
         }
 
         //

@@ -463,6 +463,8 @@ public:
         , bridge_target(NULL)
         , bridges_generated(NULL)
         , return_type_param_index(-1)
+        , method_return_type_param_index(-1)
+        , param_type_param_indices(NULL)
     {
         Symbol::_kind = METHOD;
     }
@@ -632,6 +634,18 @@ public:
     // For example, in class Box<T> { T get() {...} }, get()'s return_type_param_index is 0.
     // This enables proper type substitution during method invocation.
     int return_type_param_index;
+
+    // Index of the method's own type parameter if return type is one.
+    // -1 means the return type is not a method type parameter.
+    // For example, in <T> T identity(T arg), method_return_type_param_index is 0.
+    // This is different from return_type_param_index which is for class type parameters.
+    int method_return_type_param_index;
+
+    // For each formal parameter, stores the index of the method type parameter it uses.
+    // -1 means the parameter doesn't use a method type parameter.
+    // For example, in <T> T identity(T arg), param_type_param_indices[0] = 0.
+    // This enables type inference from actual arguments.
+    Tuple<int>* param_type_param_indices;
 
     //
     // GENERICS SUPPORT - PUBLIC METHODS
