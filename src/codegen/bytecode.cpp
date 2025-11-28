@@ -1101,11 +1101,15 @@ void ByteCode::EndMethod(int method_index, MethodSymbol* msym)
             for (unsigned i = 0; i < msym -> NumFormalParameters(); i++)
             {
                 VariableSymbol* parameter = msym -> FormalParameter(i);
+                int local_index = parameter -> LocalVariableIndex();
+                // Skip parameters without valid local variable indices
+                if (local_index < 0)
+                    continue;
                 local_variable_table_attribute ->
                     AddLocalVariable(0, code_attribute -> CodeLength(),
                                      RegisterName(parameter -> ExternalIdentity()),
                                      RegisterUtf8(parameter -> Type() -> signature),
-                                     parameter -> LocalVariableIndex());
+                                     (u2) local_index);
             }
 
             if (local_variable_table_attribute -> LocalVariableTableLength())

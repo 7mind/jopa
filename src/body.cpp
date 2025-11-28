@@ -1481,8 +1481,9 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
     MethodSymbol* this_method = ThisMethod();
     if (this_method)
     {
-        for (int l = this_method -> NumThrows() - 1; l >= 0; l--)
+        for (unsigned l = this_method -> NumThrows(); l > 0; )
         {
+            --l;
             if (CanAssignmentConvertReference(this_method -> Throws(l),
                                               exception))
                 return false;
