@@ -300,6 +300,12 @@ add_jopa_run_test(AnonymousClassTest "${TEST_DIR}/anonymous/AnonymousClassTest.j
 add_jopa_run_test(AnonymousGenericTest "${TEST_DIR}/anonymous/AnonymousGenericTest.java" "AnonymousGenericTest")
 add_jopa_run_test(TypeTokenTest "${TEST_DIR}/anonymous/TypeTokenTest.java" "TypeTokenTest")
 
+# Chained Generic Return Type Test
+add_jopa_run_test(ChainedGenericReturnType "${TEST_DIR}/ChainedGenericReturnType.java" "ChainedGenericReturnType")
+
+# Enum Constants Type Parameter Array Test
+add_jopa_run_test(EnumConstantsTest "${TEST_DIR}/EnumConstantsTest.java" "EnumConstantsTest")
+
 # StackMapTable Verification Tests
 # These tests exercise control flow patterns that require proper StackMapTable
 # generation for Java 7+ bytecode (class version 51.0+).

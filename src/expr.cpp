@@ -4304,6 +4304,15 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     substituted -> fully_qualified_name &&
                     ! substituted -> Primitive())
                 {
+                    // Handle array return types: T[] getEnumConstants()
+                    // The method's erased return type includes the array dimensions
+                    TypeSymbol* method_return_type = method -> Type();
+                    unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+                    if (return_dims > 0)
+                    {
+                        // Add array dimensions to the substituted type
+                        substituted = substituted -> GetArrayType((Semantic*) this, return_dims);
+                    }
                     method_call -> resolved_type = substituted;
                     // Also track parameterized type for chained calls
                     if (type_arg -> IsParameterized())
@@ -4313,7 +4322,13 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 else if (! substituted)
                 {
                     // Unbounded type parameter erases to Object
-                    method_call -> resolved_type = control.Object();
+                    TypeSymbol* result = control.Object();
+                    // Handle array return types even for unbounded type parameters
+                    TypeSymbol* method_return_type = method -> Type();
+                    unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+                    if (return_dims > 0)
+                        result = result -> GetArrayType((Semantic*) this, return_dims);
+                    method_call -> resolved_type = result;
                 }
                 // If substituted is primitive or lacks fully_qualified_name, keep original resolved_type
             }
@@ -4523,6 +4538,16 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 method_call -> resolved_type = inferred_type;
             }
         }
+    }
+
+    //
+    // Direct parameterized return type: If the method's return type is directly
+    // parameterized (e.g., Map<String, Integer> getMap()), propagate the parameterized
+    // type to the method call for chained calls like getMap().get(key).
+    //
+    if (method && method -> return_parameterized_type && ! method_call -> resolved_parameterized_type)
+    {
+        method_call -> resolved_parameterized_type = method -> return_parameterized_type;
     }
 
     //
