@@ -2226,6 +2226,8 @@ VariableSymbol* TypeSymbol::FindOrInsertLocalShadow(VariableSymbol* local)
 
         variable = InsertVariableSymbol(name_symbol);
         variable -> SetType(local -> Type());
+        // Also copy parameterized_type for generic type substitution
+        variable -> parameterized_type = local -> parameterized_type;
         variable -> SetFlags(ACCESS_FINAL | ACCESS_SYNTHETIC);
         variable -> SetOwner(this);
         variable -> MarkComplete();

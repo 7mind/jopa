@@ -4033,10 +4033,74 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                             current_param = super_param;
                             current_generic = super_param -> generic_type;
                         }
-                        else
+                        // Also check parameterized interfaces (for interface inheritance)
+                        if (! param_type)
                         {
-                            current_generic = current_generic -> super;
-                            current_param = NULL;
+                            for (unsigned iface_idx = 0;
+                                 iface_idx < current_generic -> NumInterfaces() && ! param_type;
+                                 iface_idx++)
+                            {
+                                ParameterizedType* iface_param =
+                                    current_generic -> ParameterizedInterface(iface_idx);
+                                if (iface_param && iface_param -> generic_type == method -> containing_type)
+                                {
+                                    // Found the target interface. Substitute type arguments.
+                                    if (iface_param -> NumTypeArguments() > param_index)
+                                    {
+                                        Type* iface_type_arg = iface_param -> TypeArgument(param_index);
+                                        if (iface_type_arg)
+                                        {
+                                            TypeParameterSymbol* type_param_sym =
+                                                iface_type_arg -> IsTypeParameter()
+                                                    ? iface_type_arg -> GetTypeParameter() : NULL;
+                                            if (type_param_sym && current_param)
+                                            {
+                                                for (unsigned k = 0; k < current_generic -> NumTypeParameters(); k++)
+                                                {
+                                                    if (current_generic -> TypeParameter(k) == type_param_sym)
+                                                    {
+                                                        if (k < current_param -> NumTypeArguments())
+                                                        {
+                                                            Type* substituted_arg =
+                                                                current_param -> TypeArgument(k);
+                                                            if (substituted_arg)
+                                                            {
+                                                                TypeSymbol* result = substituted_arg -> Erasure();
+                                                                if (result && result -> fully_qualified_name &&
+                                                                    ! result -> Primitive())
+                                                                {
+                                                                    method_call -> resolved_type = result;
+                                                                    param_type = iface_param;
+                                                                }
+                                                            }
+                                                        }
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            else if (! type_param_sym)
+                                            {
+                                                // Direct type argument (not a type parameter reference)
+                                                param_type = iface_param;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (! param_type)
+                        {
+                            if (current_generic -> HasParameterizedSuper())
+                            {
+                                ParameterizedType* super_param = current_generic -> GetParameterizedSuper();
+                                current_param = super_param;
+                                current_generic = super_param -> generic_type;
+                            }
+                            else
+                            {
+                                current_generic = current_generic -> super;
+                                current_param = NULL;
+                            }
                         }
                     }
                 }
@@ -4149,8 +4213,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
         }
 
-        // Substitute if we found the parameterized type and have the type argument
-        if (param_type && param_index < param_type -> NumTypeArguments())
+        // Substitute if we found the parameterized type and have the type argument.
+        // Skip this if resolved_type was already set by the cases above (which handle
+        // complex type parameter chains through inheritance hierarchies).
+        if (! method_call -> resolved_type && param_type && param_index < param_type -> NumTypeArguments())
         {
             Type* type_arg = param_type -> TypeArgument(param_index);
             if (type_arg)
@@ -4709,6 +4775,8 @@ void Semantic::ProcessParenthesizedExpression(Ast* expr)
     {
         parenthesized -> value = parenthesized -> expression -> value;
         parenthesized -> symbol = parenthesized -> expression -> symbol;
+        // Also propagate resolved_type for generic type substitution
+        parenthesized -> resolved_type = parenthesized -> expression -> resolved_type;
     }
 }
 
