@@ -871,12 +871,14 @@ Option::Option(ArgumentExpander& arguments,
         case SDK1_3:
             source = SDK1_3;
             break;
-        case UNKNOWN:
-            target = SDK1_4_2;
-            // fallthrough
         case SDK1_4:
         case SDK1_4_2:
             source = SDK1_4;
+            break;
+        case UNKNOWN:
+            // Default to Java 7 (SDK1_7), the highest version we fully support
+            target = SDK1_7;
+            source = SDK1_7;
             break;
         case SDK1_5:
             source = SDK1_5;

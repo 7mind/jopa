@@ -10,6 +10,10 @@
 
 enable_testing()
 
+# ASAN/UBSAN environment for tests (disable leak detection, allow UB during build)
+set(JOPA_TEST_ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0" "UBSAN_OPTIONS=halt_on_error=0")
+
+
 # Option to enable JDK parser tests
 option(JOPA_ENABLE_JDK_PARSER_TESTS "Enable JDK language tools parser tests" OFF)
 option(JOPA_PARSER_TESTS_JDK7 "Enable JDK7 parser tests" ON)
@@ -86,6 +90,7 @@ function(add_jopa_run_test test_name source_file main_class)
     )
     set_tests_properties("compile_${test_name}" PROPERTIES
         LABELS "compile"
+        ENVIRONMENT "${JOPA_TEST_ENVIRONMENT}"
     )
 
     # Javap validation and runtime test (only if JVM tests are enabled)

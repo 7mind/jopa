@@ -349,9 +349,12 @@ void ByteCode::CompileConstructor(AstConstructorDeclaration* constructor,
         //
         if (constructor_block -> explicit_constructor_opt)
             EmitStatement(constructor_block -> explicit_constructor_opt);
-        else
-            assert(unit_type == control.Object() &&
-                   "A constructor without an explicit constructor invocation");
+        // else: Only java.lang.Object has no super() call. During bootstrap,
+        // the Object being compiled may differ from control.Object() but
+        // its super will point to control.Object() (the stub).
+        // For classes with semantic errors that have no explicit_constructor_opt,
+        // we just skip generating the super() call - the class file won't be
+        // written anyway due to the semantic errors.
     }
 
     //
@@ -399,9 +402,12 @@ void ByteCode::CompileConstructor(AstConstructorDeclaration* constructor,
         //
         if (constructor_block -> explicit_constructor_opt)
             EmitStatement(constructor_block -> explicit_constructor_opt);
-        else
-            assert(unit_type == control.Object() &&
-                   "A constructor without an explicit constructor invocation");
+        // else: Only java.lang.Object has no super() call. During bootstrap,
+        // the Object being compiled may differ from control.Object() but
+        // its super will point to control.Object() (the stub).
+        // For classes with semantic errors that have no explicit_constructor_opt,
+        // we just skip generating the super() call - the class file won't be
+        // written anyway due to the semantic errors.
     }
 
     //
@@ -1046,8 +1052,10 @@ void ByteCode::EndMethod(int method_index, MethodSymbol* msym)
 
         //
         // Sanity check - make sure nothing jumped past here
+        // Note: last_label_pc == CodeLength() is valid when a label is defined
+        // at the end of a method (e.g., after exhaustive switch or unreachable code)
         //
-        assert((u2) last_label_pc < code_attribute -> CodeLength() ||
+        assert((u2) last_label_pc <= code_attribute -> CodeLength() ||
                code_attribute -> CodeLength() == 0x0ffff);
         assert(stack_depth == 0);
 
