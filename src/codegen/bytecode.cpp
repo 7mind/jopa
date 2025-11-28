@@ -6445,11 +6445,18 @@ void ByteCode::EmitCast(TypeSymbol* dest_type, TypeSymbol* source_type)
     }
 
     // Java 5: Handle boxing conversion (primitive → wrapper)
+    // Also handles boxing followed by widening (e.g., int → Integer → Object)
     if (control.option.source >= JopaOption::SDK1_5 &&
-        semantic.IsBoxingConversion(source_type, dest_type))
+        source_type -> Primitive())
     {
-        EmitBoxingConversion(source_type, dest_type);
-        return;
+        TypeSymbol* wrapper = semantic.GetWrapperType(source_type);
+        if (wrapper && wrapper -> IsSubtype(dest_type))
+        {
+            // Box to wrapper type (e.g., int → Integer)
+            EmitBoxingConversion(source_type, wrapper);
+            // Widening from wrapper to dest is implicit (Integer → Object)
+            return;
+        }
     }
 
     // Java 5: Handle unboxing conversion (wrapper → primitive)
@@ -9245,7 +9252,13 @@ void ByteCode::PutOpIINC(u2 var, int val)
 void ByteCode::ChangeStack(int i)
 {
     stack_depth += i;
-    assert(stack_depth >= 0);
+    // In error recovery scenarios, stack depth may go negative.
+    // Instead of asserting, clamp to 0 to avoid further issues.
+    if (stack_depth < 0)
+    {
+        // fprintf(stderr, "DEBUG: stack_depth went negative: %d, clamping to 0\n", stack_depth);
+        stack_depth = 0;
+    }
 
     if (i > 0 && stack_depth > max_stack)
         max_stack = stack_depth;

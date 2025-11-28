@@ -170,6 +170,7 @@ add_jopa_run_test(ArrayCovarianceTest "${TEST_DIR}/generics/ArrayCovarianceTest.
 add_jopa_run_test(GenericVarianceTest "${TEST_DIR}/generics/GenericVarianceTest.java" "GenericVarianceTest")
 add_jopa_run_test(GenericsComprehensiveTest "${TEST_DIR}/generics/GenericsComprehensiveTest.java" "GenericsComprehensiveTest")
 add_jopa_run_test(RecursiveGenerics "${TEST_DIR}/generics/RecursiveGenerics.java" "RecursiveGenerics")
+add_jopa_run_test(GenericReturnTypeTest "${TEST_DIR}/generics/GenericReturnTypeTest.java" "GenericReturnTypeTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
@@ -177,6 +178,9 @@ add_jopa_run_test(AutoboxingTest "${TEST_DIR}/autoboxing/AutoboxingTest.java" "A
 add_jopa_run_test(MethodBoxingSimple "${TEST_DIR}/autoboxing/MethodBoxingSimple.java" "MethodBoxingSimple")
 add_jopa_run_test(ReturnBoxingSimple "${TEST_DIR}/autoboxing/ReturnBoxingSimple.java" "ReturnBoxingSimple")
 add_jopa_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple")
+
+# Varargs Tests
+add_jopa_run_test(VarargsMethodTest "${TEST_DIR}/varargs/VarargsMethodTest.java" "VarargsMethodTest")
 
 # Static Import Tests
 set(MathUtils_OUTPUT "${OUTPUT_DIR}/MathUtils")

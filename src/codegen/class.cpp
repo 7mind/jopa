@@ -2101,32 +2101,209 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         // Type parameter reference format: TName;
         //
         const SignatureAttribute* gen_sig = method -> GenericSignature();
-        if (gen_sig && type -> NumTypeParameters() > 0)
+        if (gen_sig)
         {
             const CPUtf8Info* sig_info = gen_sig -> Signature(pool);
             const char* sig = sig_info -> Bytes();
             if (sig)
             {
-                // Find the return type - skip to after the closing ')'
-                // Need to handle nested signatures like (LBox<TT;>;)TT;
+                // First, collect method type parameter names if signature starts with <
+                // Format: <T:Ljava/lang/Object;U:LBound;>
+                const int MAX_METHOD_TYPE_PARAMS = 16;
+                const char* method_type_param_names[MAX_METHOD_TYPE_PARAMS];
+                int method_type_param_lengths[MAX_METHOD_TYPE_PARAMS];
+                int num_method_type_params = 0;
+
                 const char* p = sig;
-                int paren_depth = 0;
-                while (*p)
+                if (*p == '<')
                 {
-                    if (*p == '(') paren_depth++;
-                    else if (*p == ')') {
-                        paren_depth--;
-                        if (paren_depth == 0)
+                    p++; // skip '<'
+                    while (*p && *p != '>')
+                    {
+                        // Parse type parameter name (ends at ':')
+                        const char* name_start = p;
+                        while (*p && *p != ':' && *p != '>') p++;
+                        if (*p == ':' && num_method_type_params < MAX_METHOD_TYPE_PARAMS)
                         {
-                            p++; // skip ')'
-                            break;
+                            method_type_param_names[num_method_type_params] = name_start;
+                            method_type_param_lengths[num_method_type_params] = p - name_start;
+                            num_method_type_params++;
+                            // Skip the bound(s): :Ljava/lang/Object; or :LInterface1;:LInterface2;
+                            while (*p == ':')
+                            {
+                                p++; // skip ':'
+                                // Skip the type signature
+                                int depth = 0;
+                                while (*p)
+                                {
+                                    if (*p == '<') depth++;
+                                    else if (*p == '>') {
+                                        if (depth == 0) break;
+                                        depth--;
+                                    }
+                                    else if (*p == ';' && depth == 0) {
+                                        p++;
+                                        break;
+                                    }
+                                    p++;
+                                }
+                            }
                         }
+                        else break;
                     }
-                    p++;
+                    if (*p == '>') p++; // skip '>'
+                }
+
+                // Now find the parameters section and return type
+                // p should now point to '('
+                if (*p == '(')
+                {
+                    // First pass: count parameters
+                    const char* params_p = p + 1;
+                    int total_params = 0;
+                    while (*params_p && *params_p != ')')
+                    {
+                        while (*params_p == '[') params_p++;
+                        if (*params_p == 'L' || *params_p == 'T')
+                        {
+                            int depth = 0;
+                            while (*params_p)
+                            {
+                                if (*params_p == '<') depth++;
+                                else if (*params_p == '>') depth--;
+                                else if (*params_p == ';' && depth == 0) { params_p++; break; }
+                                params_p++;
+                            }
+                        }
+                        else if (*params_p) params_p++;
+                        total_params++;
+                    }
+
+                    p++; // skip '('
+                    // Second pass: parse parameters and track which use method type params
+                    int param_index = 0;
+                    while (*p && *p != ')')
+                    {
+                        // Check if this parameter uses a method type parameter
+                        // Look for TName; (direct type param), [TName; (array), or
+                        // LClass<TName;>; (parameterized type with type arg)
+                        const char* param_start = p;
+                        while (*p == '[') p++;
+
+                        int found_type_param_idx = -1;
+
+                        if (*p == 'T' && num_method_type_params > 0)
+                        {
+                            // Direct type parameter: TName;
+                            const char* tname_start = p + 1;
+                            const char* tname_end = tname_start;
+                            while (*tname_end && *tname_end != ';') tname_end++;
+                            int tname_len = tname_end - tname_start;
+
+                            for (int i = 0; i < num_method_type_params; i++)
+                            {
+                                if (tname_len == method_type_param_lengths[i])
+                                {
+                                    bool match = true;
+                                    for (int j = 0; j < tname_len; j++)
+                                    {
+                                        if (tname_start[j] != method_type_param_names[i][j])
+                                        {
+                                            match = false;
+                                            break;
+                                        }
+                                    }
+                                    if (match)
+                                    {
+                                        found_type_param_idx = i;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        else if (*p == 'L' && num_method_type_params > 0)
+                        {
+                            // Parameterized type: LClass<TName;>; or LClass<TName;...>;
+                            // Search inside the type arguments for type param references
+                            const char* search = p;
+                            int depth = 0;
+                            while (*search && found_type_param_idx < 0)
+                            {
+                                if (*search == '<') depth++;
+                                else if (*search == '>') { depth--; if (depth < 0) break; }
+                                else if (*search == ';' && depth == 0) break;
+                                else if (*search == 'T' && depth > 0)
+                                {
+                                    // Found a type param reference inside type arguments
+                                    const char* tname_start = search + 1;
+                                    const char* tname_end = tname_start;
+                                    while (*tname_end && *tname_end != ';' && *tname_end != '>' && *tname_end != '<') tname_end++;
+                                    int tname_len = tname_end - tname_start;
+
+                                    for (int i = 0; i < num_method_type_params; i++)
+                                    {
+                                        if (tname_len == method_type_param_lengths[i])
+                                        {
+                                            bool match = true;
+                                            for (int j = 0; j < tname_len; j++)
+                                            {
+                                                if (tname_start[j] != method_type_param_names[i][j])
+                                                {
+                                                    match = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (match)
+                                            {
+                                                found_type_param_idx = i;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                search++;
+                            }
+                        }
+
+                        if (found_type_param_idx >= 0)
+                        {
+                            // This parameter uses method type param
+                            if (! symbol -> param_type_param_indices)
+                            {
+                                int num_params = total_params > 0 ? total_params : 1;
+                                symbol -> param_type_param_indices = new Tuple<int>(num_params);
+                                // Initialize all to -1
+                                for (int k = 0; k < num_params; k++)
+                                    symbol -> param_type_param_indices -> Next() = -1;
+                            }
+                            if (param_index < (int)symbol -> param_type_param_indices -> Length())
+                                (*(symbol -> param_type_param_indices))[param_index] = found_type_param_idx;
+                        }
+
+                        // Skip this parameter's full signature
+                        p = param_start;
+                        while (*p == '[') p++;
+                        if (*p == 'L' || *p == 'T')
+                        {
+                            int depth = 0;
+                            while (*p)
+                            {
+                                if (*p == '<') depth++;
+                                else if (*p == '>') depth--;
+                                else if (*p == ';' && depth == 0) { p++; break; }
+                                p++;
+                            }
+                        }
+                        else if (*p) p++; // primitive type
+                        param_index++;
+                    }
+                    if (*p == ')') p++;
                 }
 
                 // p now points to return type
-                // Check if it's a type parameter: TName;
+                // Check if it's a type parameter or array of type parameter: [TName; or TName;
+                while (*p == '[') p++;
+
                 if (*p == 'T')
                 {
                     const char* name_start = p + 1;
@@ -2136,26 +2313,52 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                     if (*name_end == ';')
                     {
                         int name_len = name_end - name_start;
-                        // Look up this name in the class type parameters
-                        for (unsigned i = 0; i < type -> NumTypeParameters(); i++)
+
+                        // First check method type parameters
+                        for (int i = 0; i < num_method_type_params; i++)
                         {
-                            TypeParameterSymbol* type_param = type -> TypeParameter(i);
-                            const wchar_t* param_name = type_param -> name_symbol -> Name();
-                            // Compare names (type_param name is wchar, sig name is char)
-                            bool match = true;
-                            int j = 0;
-                            for (; j < name_len && param_name[j]; j++)
+                            if (name_len == method_type_param_lengths[i])
                             {
-                                if ((wchar_t)(unsigned char)name_start[j] != param_name[j])
+                                bool match = true;
+                                for (int j = 0; j < name_len; j++)
                                 {
-                                    match = false;
+                                    if (name_start[j] != method_type_param_names[i][j])
+                                    {
+                                        match = false;
+                                        break;
+                                    }
+                                }
+                                if (match)
+                                {
+                                    symbol -> method_return_type_param_index = i;
                                     break;
                                 }
                             }
-                            if (match && j == name_len && param_name[j] == U_NULL)
+                        }
+
+                        // Then check class type parameters (if not found in method params)
+                        if (symbol -> method_return_type_param_index < 0 &&
+                            type -> NumTypeParameters() > 0)
+                        {
+                            for (unsigned i = 0; i < type -> NumTypeParameters(); i++)
                             {
-                                symbol -> return_type_param_index = (int) i;
-                                break;
+                                TypeParameterSymbol* type_param = type -> TypeParameter(i);
+                                const wchar_t* param_name = type_param -> name_symbol -> Name();
+                                bool match = true;
+                                int j = 0;
+                                for (; j < name_len && param_name[j]; j++)
+                                {
+                                    if ((wchar_t)(unsigned char)name_start[j] != param_name[j])
+                                    {
+                                        match = false;
+                                        break;
+                                    }
+                                }
+                                if (match && j == name_len && param_name[j] == U_NULL)
+                                {
+                                    symbol -> return_type_param_index = (int) i;
+                                    break;
+                                }
                             }
                         }
                     }

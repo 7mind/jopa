@@ -4596,6 +4596,101 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     temp_method -> DetachTypeParameters();
     delete temp_method;
 
+    //
+    // For generic methods, check if return type is one of the method's type parameters.
+    // Also track which parameters use method type parameters (for type inference).
+    //
+    if (method -> IsGenericMethod())
+    {
+        // Get the element type name (handle both T and T[] return types)
+        AstTypeName* element_type_name = return_type_name;
+        if (! element_type_name)
+        {
+            // Check if it's an array type like T[]
+            AstArrayType* array_type = method_declaration -> type -> ArrayTypeCast();
+            if (array_type)
+                element_type_name = array_type -> type -> TypeNameCast();
+        }
+
+        // Check if return type (or array element type) is a method type parameter
+        if (element_type_name && element_type_name -> name && ! element_type_name -> base_opt &&
+            ! element_type_name -> type_arguments_opt)
+        {
+            const NameSymbol* type_name = lex_stream -> NameSymbol(
+                element_type_name -> name -> identifier_token);
+            for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = method -> TypeParameter(i);
+                if (type_param -> name_symbol == type_name)
+                {
+                    method -> method_return_type_param_index = (int) i;
+                    break;
+                }
+            }
+        }
+
+        // Track which formal parameters use method type parameters
+        unsigned num_params = method_declarator -> NumFormalParameters();
+        if (num_params > 0)
+        {
+            method -> param_type_param_indices = new Tuple<int>(num_params);
+            for (unsigned p = 0; p < num_params; p++)
+            {
+                int param_index = -1;
+                AstFormalParameter* formal = method_declarator -> FormalParameter(p);
+                AstType* formal_type = formal -> type;
+
+                // Handle array types (e.g., T[] arg) - extract the element type
+                AstArrayType* array_type = formal_type -> ArrayTypeCast();
+                if (array_type)
+                    formal_type = array_type -> type;
+
+                AstTypeName* param_type_name = formal_type -> TypeNameCast();
+                if (param_type_name && param_type_name -> name && ! param_type_name -> base_opt)
+                {
+                    // Check if the parameter type itself is a type parameter (e.g., T arg)
+                    if (! param_type_name -> type_arguments_opt)
+                    {
+                        const NameSymbol* param_name = lex_stream -> NameSymbol(
+                            param_type_name -> name -> identifier_token);
+                        for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = method -> TypeParameter(i);
+                            if (type_param -> name_symbol == param_name)
+                            {
+                                param_index = (int) i;
+                                break;
+                            }
+                        }
+                    }
+                    // Check if a type argument is a type parameter (e.g., Class<T> clazz)
+                    else if (param_type_name -> type_arguments_opt &&
+                             param_type_name -> type_arguments_opt -> NumTypeArguments() > 0)
+                    {
+                        AstType* first_arg = param_type_name -> type_arguments_opt -> TypeArgument(0);
+                        AstTypeName* arg_type_name = first_arg -> TypeNameCast();
+                        if (arg_type_name && arg_type_name -> name &&
+                            ! arg_type_name -> base_opt && ! arg_type_name -> type_arguments_opt)
+                        {
+                            const NameSymbol* arg_name = lex_stream -> NameSymbol(
+                                arg_type_name -> name -> identifier_token);
+                            for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+                            {
+                                TypeParameterSymbol* type_param = method -> TypeParameter(i);
+                                if (type_param -> name_symbol == arg_name)
+                                {
+                                    param_index = (int) i;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                method -> param_type_param_indices -> Next() = param_index;
+            }
+        }
+    }
+
     // Propagate varargs flag from last parameter to method
     if (method -> NumFormalParameters() > 0)
     {

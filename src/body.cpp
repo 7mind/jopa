@@ -810,7 +810,7 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
     bool is_string_switch = (type == control.String());
     switch_statement -> is_string_switch = is_string_switch;
 
-    bool is_enum_switch = (type && type -> ACC_ENUM());
+    bool is_enum_switch = (type && (type -> ACC_ENUM() || type -> IsEnum()));
     switch_statement -> is_enum_switch = is_enum_switch;
     switch_statement -> enum_type = is_enum_switch ? type : NULL;
 
