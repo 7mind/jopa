@@ -860,6 +860,80 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
         }
     }
 
+    // Phase 3: Varargs constructors
+    if (constructor_set.Length() == 0 && control.option.source >= JopaOption::SDK1_5)
+    {
+        for (ctor = containing_type -> FindMethodSymbol(control.init_name_symbol);
+             ctor; ctor = ctor -> next_method)
+        {
+            if (! ctor -> IsTyped())
+                ctor -> ProcessMethodSignature(this, right_tok);
+
+            bool is_varargs = ctor -> ACC_VARARGS();
+            if (! is_varargs)
+                continue;
+
+            unsigned num_formals = ctor -> NumFormalParameters();
+            if (num_formals == 0 || ! ConstructorAccessCheck(ctor, ! class_creation))
+                continue;
+
+            // Check that we have at least num_formals - 1 args (the fixed params)
+            unsigned num_fixed = num_formals - 1;
+            if (num_arguments < num_fixed)
+                continue;
+
+            unsigned i;
+            // Check fixed parameters
+            for (i = 0; i < num_fixed; i++)
+            {
+                if (! CanMethodInvocationConvert(ctor -> FormalParameter(i) -> Type(),
+                                                 args -> Argument(i) -> Type()))
+                {
+                    break;
+                }
+            }
+            if (i < num_fixed)
+                continue;
+
+            // Check varargs parameters
+            TypeSymbol* varargs_type = ctor -> FormalParameter(num_formals - 1) -> Type();
+            TypeSymbol* component_type = varargs_type -> IsArray() ?
+                varargs_type -> ArraySubtype() : varargs_type;
+
+            // Special case: when num_arguments == num_formals, the last argument
+            // can also be assignable to the varargs array type itself
+            if (num_arguments == num_formals && i == num_fixed)
+            {
+                AstExpression* last_arg = args -> Argument(i);
+                if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
+                {
+                    i++; // Accept this argument as array
+                }
+            }
+
+            // Check remaining varargs arguments against component type
+            for ( ; i < num_arguments; i++)
+            {
+                AstExpression* expr = args -> Argument(i);
+                if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                {
+                    break;
+                }
+            }
+
+            if (i == num_arguments)
+            {
+                if (MoreSpecific(ctor, constructor_set))
+                {
+                    constructor_set.Reset();
+                    constructor_set.Next() = ctor;
+                }
+                else if (NoMethodMoreSpecific(constructor_set, ctor))
+                    constructor_set.Next() = ctor;
+            }
+        }
+    }
+
     if (constructor_set.Length() == 0)
     {
         if (! containing_type -> Bad() || NumErrors() == 0)
