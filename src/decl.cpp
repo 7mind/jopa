@@ -4453,8 +4453,9 @@ void Semantic::ComputeMethodsClosure(TypeSymbol* type, TokenIndex tok)
         //
         // If the method in question is neither a constructor nor an
         // initializer, then ...
+        // Skip bridge methods - they are invisible to source-level resolution.
         //
-        if (*(method -> Name()) != U_LESS)
+        if (*(method -> Name()) != U_LESS && ! method -> ACC_BRIDGE())
         {
             type -> expanded_method_table -> Overload(method);
         }
