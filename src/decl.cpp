@@ -4646,10 +4646,18 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     //
     // Check if the return type is a type parameter of the containing class.
     // This is needed for proper type substitution during method invocation.
+    // Handle both T and T[] return types (array of type parameter).
     //
     AstTypeName* return_type_name = method_declaration -> type -> TypeNameCast();
+    if (! return_type_name)
+    {
+        // Check if it's an array type like T[]
+        AstArrayType* array_type = method_declaration -> type -> ArrayTypeCast();
+        if (array_type)
+            return_type_name = array_type -> type -> TypeNameCast();
+    }
     if (return_type_name && return_type_name -> name && ! return_type_name -> base_opt &&
-        ! return_type_name -> type_arguments_opt && dims == 0)
+        ! return_type_name -> type_arguments_opt)
     {
         // It's a simple name - check if it matches a class type parameter
         const NameSymbol* type_name = lex_stream -> NameSymbol(
@@ -4663,6 +4671,15 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
                 break;
             }
         }
+    }
+
+    //
+    // If the return type is a parameterized type (e.g., Map<String, Integer>),
+    // store it for use when chaining method calls like getMap().get(key).
+    //
+    if (return_type_name && return_type_name -> parameterized_type)
+    {
+        method -> return_parameterized_type = return_type_name -> parameterized_type;
     }
 
     //

@@ -465,6 +465,7 @@ public:
         , return_type_param_index(-1)
         , method_return_type_param_index(-1)
         , param_type_param_indices(NULL)
+        , return_parameterized_type(NULL)
     {
         Symbol::_kind = METHOD;
     }
@@ -646,6 +647,11 @@ public:
     // For example, in <T> T identity(T arg), param_type_param_indices[0] = 0.
     // This enables type inference from actual arguments.
     Tuple<int>* param_type_param_indices;
+
+    // If the return type is a parameterized type (like Map<String, Integer>),
+    // this stores that parameterized type. This enables proper type propagation
+    // when chaining method calls like getMap().get(key).
+    ParameterizedType* return_parameterized_type;
 
     //
     // GENERICS SUPPORT - PUBLIC METHODS

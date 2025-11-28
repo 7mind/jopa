@@ -78,4 +78,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Generic type information
     public native java.lang.reflect.Type getGenericSuperclass();
     public native java.lang.reflect.Type[] getGenericInterfaces();
+
+    // Enum methods
+    public native T[] getEnumConstants();
 }
