@@ -3144,19 +3144,19 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
     // Generic constructors have their own type parameters separate from the class
     // Example: <T> MyClass(T arg) { ... }
     MethodSymbol* temp_constructor = NULL;
+    MethodSymbol* saved_method = ThisMethod();
     if (constructor_declaration -> type_parameters_opt)
     {
         // Create temporary constructor to hold type parameters during processing
         temp_constructor = new MethodSymbol(control.init_name_symbol);
         temp_constructor -> SetContainingType(this_type);
 
-        MethodSymbol* saved_method = ThisMethod();
         ThisMethod() = temp_constructor;
 
         ProcessMethodTypeParameters(temp_constructor,
                                     constructor_declaration -> type_parameters_opt);
 
-        ThisMethod() = saved_method;
+        // Note: Don't restore ThisMethod() yet - need type params visible for ProcessFormalParameters
     }
 
     AstMethodDeclarator* constructor_declarator =
@@ -3232,6 +3232,9 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
 
     ProcessFormalParameters(block_symbol, constructor_declarator);
 
+    // Restore ThisMethod() after processing parameters (type params no longer needed)
+    ThisMethod() = saved_method;
+
     //
     // Note that constructors are always named "<init>", but if this is a
     // method with missing return type, we use the method name.
@@ -3247,6 +3250,13 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
                        constructor_declarator, this_type -> Name(),
                        constructor -> FileLoc());
         delete block_symbol;
+        // Clean up temp_constructor if we created one
+        if (temp_constructor)
+        {
+            temp_constructor -> ClearTypeParameters();
+            delete temp_constructor;
+        }
+        ThisMethod() = saved_method;
         return;
     }
 
