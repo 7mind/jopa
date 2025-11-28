@@ -942,10 +942,21 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
     }
     if (constructor_set.Length() > 1)
     {
-        ReportSemError(SemanticError::AMBIGUOUS_CONSTRUCTOR_INVOCATION,
-                       left_tok, right_tok, containing_type -> Name(),
-                       constructor_set[0] -> Header(),
-                       constructor_set[1] -> Header());
+        // Don't report ambiguity if any argument has no_type - there's already
+        // an error upstream that caused this spurious ambiguity
+        bool has_bad_arg = false;
+        for (unsigned i = 0; i < num_arguments && !has_bad_arg; i++)
+        {
+            if (args -> Argument(i) -> Type() == control.no_type)
+                has_bad_arg = true;
+        }
+        if (!has_bad_arg)
+        {
+            ReportSemError(SemanticError::AMBIGUOUS_CONSTRUCTOR_INVOCATION,
+                           left_tok, right_tok, containing_type -> Name(),
+                           constructor_set[0] -> Header(),
+                           constructor_set[1] -> Header());
+        }
     }
 
     ctor = constructor_set[0];
