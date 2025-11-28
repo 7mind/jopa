@@ -7,6 +7,7 @@ JOPA is a Java compiler written in C++.
 - Avoid workarounds and temporary solutions. If you must, mark the line with a TODO and track it in `./TODO.md`
 - Never ignore pre-existing bugs - fix them and keep a log of discovered/fixed ones
 - GNU Classpath builds fine with Javac. If we encounter a semantic error there, our compiler is flawed and we need to fix it, not mask issues
+- Always pipe build/test logs into a log in /tmp through tee
 
 ## Build System
 

@@ -440,6 +440,9 @@ public:
     SymbolSet referenced_package_imports;
     SymbolSet referenced_type_imports;
 
+    // Flag to track if single-type imports have been fully processed
+    bool imports_processed;
+
     int return_code;
 
     // The constructor
@@ -449,6 +452,7 @@ public:
           lex_stream(file_symbol_ -> lex_stream),
           compilation_unit(file_symbol_ -> compilation_unit),
           directory_symbol(file_symbol_ -> directory_symbol),
+          imports_processed(false),
           return_code(0),
           error(NULL),
           this_package(file_symbol_ -> package),
