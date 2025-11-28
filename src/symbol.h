@@ -658,6 +658,13 @@ public:
         type_parameters -> Next() = param;
     }
 
+    // Clear type parameters without deleting them (for ownership transfer)
+    void ClearTypeParameters()
+    {
+        delete type_parameters;  // Delete the tuple but not the TypeParameterSymbols
+        type_parameters = NULL;
+    }
+
     // Check if this method is generic
     bool IsGenericMethod() const
     {
@@ -1759,6 +1766,9 @@ public:
 
     inline SymbolTable* Table();
 
+    // Unlink all types in this block and nested blocks from parent type sets
+    void UnlinkTypesRecursively();
+
 private:
     SymbolTable* table;
 };
@@ -2247,6 +2257,9 @@ inline void SymbolTable::DeleteAnonymousTypes()
     for (unsigned i = 0; i < NumAnonymousSymbols(); i++)
     {
         TypeSymbol* symbol = AnonymousSym(i);
+        // Recursively delete nested anonymous types first (this unlinks them)
+        symbol -> DeleteAnonymousTypes();
+        // Now unlink this symbol from its parents
         symbol -> UnlinkFromParents();
         delete symbol;
     }

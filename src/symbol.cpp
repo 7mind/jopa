@@ -840,6 +840,28 @@ BlockSymbol::~BlockSymbol()
     delete table;
 }
 
+void BlockSymbol::UnlinkTypesRecursively()
+{
+    if (!table)
+        return;
+
+    // Unlink anonymous types in this block
+    for (unsigned i = 0; i < table->NumAnonymousSymbols(); i++)
+        table->AnonymousSym(i)->UnlinkFromParents();
+
+    // Unlink regular types in this block
+    for (unsigned i = 0; i < table->NumTypeSymbols(); i++)
+        table->TypeSym(i)->UnlinkFromParents();
+
+    // Recursively process nested blocks (stored in OtherSym pool)
+    for (unsigned i = 0; i < table->NumOtherSymbols(); i++)
+    {
+        BlockSymbol* nested = table->OtherSym(i)->BlockCast();
+        if (nested)
+            nested->UnlinkTypesRecursively();
+    }
+}
+
 PathSymbol::PathSymbol(const NameSymbol* name_symbol_)
     : name_symbol(name_symbol_)
     , zipfile(NULL)
@@ -1484,6 +1506,13 @@ void MethodSymbol::CleanUp()
         symbol -> MarkComplete();
         (*formal_parameters)[k] = symbol;
     }
+
+    //
+    // Unlink any local/anonymous types from their parent types' subtypes sets
+    // before destroying the block. This prevents dangling pointers.
+    //
+    if (block_symbol)
+        block_symbol->UnlinkTypesRecursively();
 
     //
     // Destroy the old symbol and replace it by the new one.

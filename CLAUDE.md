@@ -13,7 +13,14 @@
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues
-- Configure with: `cmake -S . -B build -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"`
+- Configure with debug info for readable stack traces:
+  ```
+  cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
+    -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
+    -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+  ```
 - For bootstrap builds, set env vars to allow compilation to continue past non-fatal errors:
   - `ASAN_OPTIONS=detect_leaks=0` (leak detection fails configure checks)
   - `UBSAN_OPTIONS=halt_on_error=0` (some UB is tolerable during bootstrap)

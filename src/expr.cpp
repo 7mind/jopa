@@ -385,8 +385,8 @@ void Semantic::ReportMethodNotFound(AstMethodInvocation* method_call,
             if (MemberAccessCheck(type, method, base) ||
                 method_shadow -> NumConflicts() > 0)
             {
-                int diff = method_call -> arguments -> NumArguments() -
-                    method -> NumFormalParameters();
+                int diff = (int)method_call -> arguments -> NumArguments() -
+                    (int)method -> NumFormalParameters();
                 if (diff < 0)
                     diff = - diff;
                 if (diff < difference)
@@ -605,7 +605,7 @@ void Semantic::ReportConstructorNotFound(Ast* ast, TypeSymbol* type)
     {
         if (ConstructorAccessCheck(ctor, ! class_creation))
         {
-            int diff = num_arguments - ctor -> NumFormalParameters();
+            int diff = (int)num_arguments - (int)ctor -> NumFormalParameters();
             if (diff < 0)
                 diff = - diff;
             if (diff < difference)
@@ -2983,30 +2983,35 @@ void Semantic::ProcessAmbiguousName(AstName* name)
 
                 if (base_param_type)
                 {
-                    AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
-                    if (field_decl && field_decl -> type)
+                    TypeSymbol* declaring_class = (TypeSymbol*) field -> owner;
+                    // Only check type parameter substitution if the field is declared
+                    // in a file we can read tokens from (same compilation unit)
+                    if (declaring_class && declaring_class -> file_symbol == source_file_symbol)
                     {
-                        AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
-                        if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
+                        AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
+                        if (field_decl && field_decl -> type)
                         {
-                            // It's a simple name (not qualified), could be a type parameter
-                            // Match by name from the source code
-                            const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
-
-                            // Compare with class type parameter names
-                            TypeSymbol* declaring_class = (TypeSymbol*) field -> owner;
-                            for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
+                            AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
+                            if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
                             {
-                                TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
-                                if (wcscmp(field_type_text, type_param -> Name()) == 0)
+                                // It's a simple name (not qualified), could be a type parameter
+                                // Match by name from the source code
+                                const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
+
+                                // Compare with class type parameter names
+                                for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
                                 {
-                                    // Match! Substitute with the corresponding type argument
-                                    if (i < base_param_type -> NumTypeArguments())
+                                    TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
+                                    if (wcscmp(field_type_text, type_param -> Name()) == 0)
                                     {
-                                        Type* type_arg = base_param_type -> TypeArgument(i);
-                                        name -> resolved_type = type_arg -> Erasure();
+                                        // Match! Substitute with the corresponding type argument
+                                        if (i < base_param_type -> NumTypeArguments())
+                                        {
+                                            Type* type_arg = base_param_type -> TypeArgument(i);
+                                            name -> resolved_type = type_arg -> Erasure();
+                                        }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
                         }
@@ -3081,30 +3086,35 @@ void Semantic::ProcessFieldAccess(Ast* expr)
 
                 if (receiver_param_type)
                 {
-                    AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
-                    if (field_decl && field_decl -> type)
+                    TypeSymbol* declaring_class = (TypeSymbol*) field -> owner;
+                    // Only check type parameter substitution if the field is declared
+                    // in a file we can read tokens from (same compilation unit)
+                    if (declaring_class && declaring_class -> file_symbol == source_file_symbol)
                     {
-                        AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
-                        if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
+                        AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
+                        if (field_decl && field_decl -> type)
                         {
-                            // It's a simple name (not qualified), could be a type parameter
-                            // Match by name from the source code
-                            const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
-
-                            // Compare with class type parameter names
-                            TypeSymbol* declaring_class = (TypeSymbol*) field -> owner;
-                            for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
+                            AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
+                            if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
                             {
-                                TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
-                                if (wcscmp(field_type_text, type_param -> Name()) == 0)
+                                // It's a simple name (not qualified), could be a type parameter
+                                // Match by name from the source code
+                                const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
+
+                                // Compare with class type parameter names
+                                for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
                                 {
-                                    // Match! Substitute with the corresponding type argument
-                                    if (i < receiver_param_type -> NumTypeArguments())
+                                    TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
+                                    if (wcscmp(field_type_text, type_param -> Name()) == 0)
                                     {
-                                        Type* type_arg = receiver_param_type -> TypeArgument(i);
-                                        field_access -> resolved_type = type_arg -> Erasure();
+                                        // Match! Substitute with the corresponding type argument
+                                        if (i < receiver_param_type -> NumTypeArguments())
+                                        {
+                                            Type* type_arg = receiver_param_type -> TypeArgument(i);
+                                            field_access -> resolved_type = type_arg -> Erasure();
+                                        }
+                                        break;
                                     }
-                                    break;
                                 }
                             }
                         }
