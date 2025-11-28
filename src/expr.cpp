@@ -5855,9 +5855,14 @@ void Semantic::ProcessNOT(AstPreUnaryExpression* expr)
 {
     ProcessExpression(expr -> expression);
 
-    if (expr -> expression -> Type() != control.boolean_type)
+    TypeSymbol* type = expr -> expression -> Type();
+    // In Java 5+, Boolean can be unboxed to boolean
+    bool is_boolean = type == control.boolean_type ||
+                      (control.option.source >= JopaOption::SDK1_5 &&
+                       type == control.Boolean());
+
+    if (! is_boolean)
     {
-        TypeSymbol* type = expr -> expression -> Type();
         if (expr -> expression -> symbol != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
                            expr -> expression,
