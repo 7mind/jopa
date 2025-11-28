@@ -4079,15 +4079,70 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         }
 
         // Case 3: Walk up the inheritance hierarchy from base_type
+        // Track type argument substitutions through the chain
         if (! param_type && base_type)
         {
-            for (TypeSymbol* current = base_type; current && ! param_type; current = current -> super)
+            // Start with the first parameterized super in the chain
+            ParameterizedType* current_param_super = base_type -> HasParameterizedSuper()
+                ? base_type -> GetParameterizedSuper() : NULL;
+            TypeSymbol* current = base_type;
+
+            while (current && ! param_type)
             {
                 if (current -> HasParameterizedSuper())
                 {
                     ParameterizedType* param_super = current -> GetParameterizedSuper();
                     if (param_super -> generic_type == method -> containing_type)
-                        param_type = param_super;
+                    {
+                        // Found the method's containing type. Check if we need to substitute.
+                        if (param_super -> NumTypeArguments() > param_index)
+                        {
+                            Type* type_arg = param_super -> TypeArgument(param_index);
+                            if (type_arg && type_arg -> IsTypeParameter())
+                            {
+                                // The type argument is a type parameter - need to substitute
+                                // using the previous level's type arguments
+                                TypeParameterSymbol* tps = type_arg -> GetTypeParameter();
+                                if (current_param_super && tps)
+                                {
+                                    // Find this type parameter's position in current's type params
+                                    for (unsigned k = 0; k < current -> NumTypeParameters(); k++)
+                                    {
+                                        if (current -> TypeParameter(k) == tps &&
+                                            k < current_param_super -> NumTypeArguments())
+                                        {
+                                            Type* substituted_type = current_param_super -> TypeArgument(k);
+                                            if (substituted_type)
+                                            {
+                                                TypeSymbol* result = substituted_type -> Erasure();
+                                                if (result && result -> fully_qualified_name &&
+                                                    ! result -> Primitive())
+                                                {
+                                                    method_call -> resolved_type = result;
+                                                    param_type = param_super; // Mark as found
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                // Concrete type argument - use it directly
+                                param_type = param_super;
+                            }
+                        }
+                        break;
+                    }
+                    // Update current_param_super for the next iteration
+                    current_param_super = param_super;
+                    current = param_super -> generic_type;
+                }
+                else
+                {
+                    current_param_super = NULL;
+                    current = current -> super;
                 }
             }
         }
