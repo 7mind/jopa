@@ -1672,6 +1672,9 @@ inline void Semantic::ProcessEnumConstantMembers(AstClassBody* class_body)
         // Link the AST node to the symbol
         enum_constant -> field_symbol = field;
 
+        // Set the enum ordinal on the field symbol too (used for switch statements)
+        field -> enum_ordinal = i;
+
         // Mark as deprecated if needed
         if (lex_stream -> IsDeprecated(enum_constant -> LeftToken()))
             field -> MarkDeprecated();
@@ -3441,6 +3444,9 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
                 if (ordinal_param)
                     ordinal_ref -> symbol = ordinal_param;
                 super_call -> arguments -> AddArgument(ordinal_ref);
+
+                // Set the symbol to the Enum constructor
+                super_call -> symbol = control.Enum_InitMethod();
             }
 
             super_call -> semicolon_token = right_loc;

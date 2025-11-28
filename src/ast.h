@@ -2939,11 +2939,15 @@ public:
     AstExpression* expression;
     AstBlock* switch_block;
     bool is_string_switch; // true if switching on String type
+    bool is_enum_switch;   // true if switching on enum type
+    TypeSymbol* enum_type; // the enum type for enum switches (NULL otherwise)
 
     inline AstSwitchStatement(StoragePool* p)
         : AstStatement(SWITCH)
         , pool(p)
         , is_string_switch(false)
+        , is_enum_switch(false)
+        , enum_type(NULL)
     {}
     ~AstSwitchStatement() {}
 

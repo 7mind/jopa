@@ -1911,6 +1911,13 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
         if (! switch_statement -> DefaultCase())
         {
             EmitExpression(switch_statement -> expression);
+            // For enum switch, call ordinal() to convert to int
+            if (switch_statement -> is_enum_switch)
+            {
+                PutOp(OP_INVOKEVIRTUAL);
+                PutU2(RegisterLibraryMethodref(control.Enum_ordinalMethod()));
+                ChangeStack(1); // Return value (int)
+            }
             Label lab;
             if (switch_statement -> Case(0) -> value)
             {
@@ -1979,6 +1986,11 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
         }
     }
 
+    // Enum switches must use lookupswitch because enum case labels don't have
+    // an IntLiteralValue - they use map_index from the sorted case list.
+    if (switch_statement -> is_enum_switch)
+        use_lookup = true;
+
     //
     // Set up the environment for the switch block.  This must be done before
     // emitting the expression, in case the expression is an assignment.
@@ -1993,6 +2005,14 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
                       semantic.lex_stream -> Line(switch_statement ->
                                                   expression -> LeftToken()));
     EmitExpression(switch_statement -> expression);
+
+    // For enum switch, call ordinal() to convert to int
+    if (switch_statement -> is_enum_switch)
+    {
+        PutOp(OP_INVOKEVIRTUAL);
+        PutU2(RegisterLibraryMethodref(control.Enum_ordinalMethod()));
+        ChangeStack(1); // Return value (int)
+    }
 
     PutOp(use_lookup ? OP_LOOKUPSWITCH : OP_TABLESWITCH);
     op_start = last_op_pc; // pc at start of instruction

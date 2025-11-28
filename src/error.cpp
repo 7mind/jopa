@@ -1677,6 +1677,8 @@ void SemanticError::InitializeMessages()
     messages[TYPE_NOT_ITERABLE] =
         "The type of this expression, \"%1\", is not an array type nor an "
         "instance of \"java.lang.Iterable\".";
+    messages[INVALID_ENUM_SWITCH_CASE] =
+        "Case label must be an unqualified constant name of enum type \"%T1\".";
     messages[TYPE_IS_VOID] =
         "An expression of type \"void\" is not valid in this context where "
         "a value is expected.";
