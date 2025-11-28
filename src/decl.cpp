@@ -247,6 +247,7 @@ void Semantic::ProcessTypeNames()
 
     CheckPackage();
     ProcessImports();
+    imports_processed = true;
 
     //
     // Make sure that compilation unit contains exactly one public type, and
@@ -2494,6 +2495,11 @@ void Semantic::ProcessImportQualifiedName(AstName* name)
         else
         {
             PackageSymbol* package = symbol -> PackageCast();
+            // Ensure the package's directory list is populated from the classpath
+            // before looking for types. This is needed when the type hasn't been
+            // registered yet (e.g., during import processing before all files are loaded).
+            control.FindPathsToDirectory(package);
+
             type = package -> FindTypeSymbol(name_symbol);
             if (! type)
             {
@@ -2503,8 +2509,11 @@ void Semantic::ProcessImportQualifiedName(AstName* name)
                     type = ReadType(file_symbol, package, name_symbol,
                                     name -> identifier_token);
             }
-            else if (type -> SourcePending())
-                control.ProcessHeaders(type -> file_symbol);
+            else
+            {
+                if (type -> SourcePending())
+                    control.ProcessHeaders(type -> file_symbol);
+            }
 
             //
             // If the field_access was resolved to a type, save it later use.
@@ -4306,22 +4315,43 @@ void Semantic::AddInheritedMethods(TypeSymbol* base_type,
 
 void Semantic::ComputeTypesClosure(TypeSymbol* type, TokenIndex tok)
 {
+    bool skip_supertypes = false;
     if (! type -> HeaderProcessed())
-        type -> ProcessTypeHeaders();
+    {
+        // Check if the type's file is currently processing imports.
+        // If so, defer header processing to avoid looking up types before
+        // imports are available.
+        Semantic* type_sem = type -> semantic_environment ? type -> semantic_environment -> sem : NULL;
+        if (type_sem && ! type_sem -> imports_processed)
+        {
+            // This type's file is still processing imports. We can't process
+            // headers yet because type lookups would fail (imports not ready).
+            // We'll still populate nested types (they were registered during
+            // ProcessTypeNames), but skip supertype processing.
+            skip_supertypes = true;
+        }
+        else
+        {
+            type -> ProcessTypeHeaders();
+        }
+    }
     type -> expanded_type_table = new ExpandedTypeTable();
 
     TypeSymbol* super_class = type -> super;
-    if (super_class)
+    if (! skip_supertypes)
     {
-        if (! super_class -> expanded_type_table)
-            ComputeTypesClosure(super_class, tok);
-    }
+        if (super_class)
+        {
+            if (! super_class -> expanded_type_table)
+                ComputeTypesClosure(super_class, tok);
+        }
 
-    for (unsigned j = 0; j < type -> NumInterfaces(); j++)
-    {
-        TypeSymbol* interf = type -> Interface(j);
-        if (! interf -> expanded_type_table)
-            ComputeTypesClosure(interf, tok);
+        for (unsigned j = 0; j < type -> NumInterfaces(); j++)
+        {
+            TypeSymbol* interf = type -> Interface(j);
+            if (! interf -> expanded_type_table)
+                ComputeTypesClosure(interf, tok);
+        }
     }
 
     if (! type -> NestedTypesProcessed())
@@ -4334,10 +4364,13 @@ void Semantic::ComputeTypesClosure(TypeSymbol* type, TokenIndex tok)
                 InsertTypeShadowSymbol(type -> TypeSym(i));
         }
     }
-    if (super_class)
-        AddInheritedTypes(type, super_class);
-    for (unsigned k = 0; k < type -> NumInterfaces(); k++)
-        AddInheritedTypes(type, type -> Interface(k));
+    if (! skip_supertypes)
+    {
+        if (super_class)
+            AddInheritedTypes(type, super_class);
+        for (unsigned k = 0; k < type -> NumInterfaces(); k++)
+            AddInheritedTypes(type, type -> Interface(k));
+    }
     type -> expanded_type_table -> CompressSpace();
 }
 
