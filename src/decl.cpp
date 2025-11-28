@@ -4346,6 +4346,7 @@ void Semantic::ComputeTypesClosure(TypeSymbol* type, TokenIndex tok)
             type -> ProcessTypeHeaders();
         }
     }
+
     type -> expanded_type_table = new ExpandedTypeTable();
 
     TypeSymbol* super_class = type -> super;
@@ -5280,16 +5281,35 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
         if (type)
             break;
         // Search for declared or inherited member types.
-        type = env -> Type();
-        if (! type -> expanded_type_table)
-            ComputeTypesClosure(type, identifier_token);
+        TypeSymbol* enclosing = env -> Type();
+        if (! enclosing -> expanded_type_table)
+            ComputeTypesClosure(enclosing, identifier_token);
         TypeShadowSymbol* type_shadow_symbol =
-            type -> expanded_type_table -> FindTypeShadowSymbol(name_symbol);
+            enclosing -> expanded_type_table -> FindTypeShadowSymbol(name_symbol);
+
         if (type_shadow_symbol)
         {
             type = FindTypeInShadow(type_shadow_symbol, identifier_token);
             if (type)
                 break;
+        }
+
+        // If not found and the class has a superclass, the table might be
+        // incomplete (created when skip_supertypes was true). Delete and
+        // recompute it, then try the lookup again.
+        if (! type_shadow_symbol && enclosing -> super)
+        {
+            delete enclosing -> expanded_type_table;
+            enclosing -> expanded_type_table = NULL;
+            ComputeTypesClosure(enclosing, identifier_token);
+            type_shadow_symbol =
+                enclosing -> expanded_type_table -> FindTypeShadowSymbol(name_symbol);
+            if (type_shadow_symbol)
+            {
+                type = FindTypeInShadow(type_shadow_symbol, identifier_token);
+                if (type)
+                    break;
+            }
         }
     }
 
