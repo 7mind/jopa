@@ -1330,7 +1330,7 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
     }
 
     MethodSymbol* method = method_set[0] -> method_symbol;
-    if (method -> ACC_SYNTHETIC())
+    if (method -> ACC_SYNTHETIC() && ! method -> ACC_BRIDGE())
     {
         // Allow enum synthetic methods (values, valueOf) to be called
         bool is_enum_synthetic = method -> containing_type -> IsEnum() &&
@@ -1718,7 +1718,7 @@ MethodShadowSymbol* Semantic::FindMethodInEnvironment(SemanticEnvironment*& wher
         //
         // The method was inherited.
         //
-        if (method_symbol -> ACC_SYNTHETIC())
+        if (method_symbol -> ACC_SYNTHETIC() && ! method_symbol -> ACC_BRIDGE())
         {
             // Allow enum synthetic methods (values, valueOf) to be called
             bool is_enum_synthetic = method_symbol -> containing_type -> IsEnum() &&
