@@ -4119,7 +4119,9 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                     ! result -> Primitive())
                                                 {
                                                     method_call -> resolved_type = result;
-                                                    param_type = param_super; // Mark as found
+                                                    // Don't set param_type here - we've already done the
+                                                    // full substitution and don't want the code below
+                                                    // to overwrite with the wrong type argument
                                                 }
                                             }
                                             break;
