@@ -3338,7 +3338,21 @@ void ByteCode::EmitBranchIfExpression(AstExpression* p, bool cond, Label& lab,
                                       AstStatement* over)
 {
     p = StripNops(p);
-    assert(p -> Type() == control.boolean_type);
+    assert(p -> Type() == control.boolean_type ||
+           p -> Type() == control.Boolean());  // Allow Boolean with auto-unboxing
+
+    // Handle Boolean unboxing: emit call to booleanValue()
+    if (p -> Type() == control.Boolean())
+    {
+        EmitExpression(p);
+        PutOp(OP_INVOKEVIRTUAL);
+        PutU2(RegisterLibraryMethodref(control.Boolean_booleanValueMethod()));
+        if (cond)
+            EmitBranch(OP_IFNE, lab, over);  // branch if true
+        else
+            EmitBranch(OP_IFEQ, lab, over);  // branch if false
+        return;
+    }
 
     if (p -> IsConstant())
     {

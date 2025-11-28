@@ -14,6 +14,9 @@
 - Never ignore pre-existing bugs you discover, we need to fix ALL the bugs (and keep a log of discovered/fixed ones)
 - Don't ignore pre-existing bugs, fix them!
 - Use jopa-stub-rt for GNU Classpath bootstrap! Don't forget to add missing stubs into jopa-stub-rt!
+- When working on GNU Classpath bootstrap, concentrate on fixing semantic errors first, not crashes!
+- When you see a class of semantic errors, reproduce with an isolated self-contained test with main method, integrate that test into primary test suite and then fix!
+- In order to integrate a new test, put it into ./test directory and register in test/CMakeLists.txt with `add_jopa_run_test` directive
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues
