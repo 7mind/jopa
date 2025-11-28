@@ -3953,15 +3953,27 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         ParameterizedType* param_type = NULL;
 
         // Case 1: Check if the receiver variable has a parameterized type
+        // Also check if the base expression has resolved_parameterized_type (for chained calls)
         if (base)
         {
             VariableSymbol* var = base -> symbol -> VariableCast();
+            ParameterizedType* base_param_type = NULL;
+
             if (var && var -> parameterized_type)
             {
-                ParameterizedType* var_param = var -> parameterized_type;
-                if (var_param -> generic_type == method -> containing_type)
+                base_param_type = var -> parameterized_type;
+            }
+            else if (base -> ExpressionCast() && base -> ExpressionCast() -> resolved_parameterized_type)
+            {
+                // For chained method calls like map.get(x).get(y)
+                base_param_type = base -> ExpressionCast() -> resolved_parameterized_type;
+            }
+
+            if (base_param_type)
+            {
+                if (base_param_type -> generic_type == method -> containing_type)
                 {
-                    param_type = var_param;
+                    param_type = base_param_type;
                 }
                 else
                 {
@@ -3969,8 +3981,8 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     // hierarchy and propagate type arguments.
                     // E.g., GenericExtender<Integer> extends Container<E>
                     // where get() is in Container<T>. Need to map Integer -> E -> T.
-                    TypeSymbol* current_generic = var_param -> generic_type;
-                    ParameterizedType* current_param = var_param;
+                    TypeSymbol* current_generic = base_param_type -> generic_type;
+                    ParameterizedType* current_param = base_param_type;
 
                     while (current_generic && ! param_type)
                     {
@@ -4013,6 +4025,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                                 ! result -> Primitive())
                                                             {
                                                                 method_call -> resolved_type = result;
+                                                                // Also track parameterized type for chained calls
+                                                                if (substituted_arg -> IsParameterized())
+                                                                    method_call -> resolved_parameterized_type =
+                                                                        substituted_arg -> GetParameterizedType();
                                                                 param_type = super_param; // Mark as found
                                                             }
                                                         }
@@ -4070,6 +4086,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                                     ! result -> Primitive())
                                                                 {
                                                                     method_call -> resolved_type = result;
+                                                                    // Also track parameterized type for chained calls
+                                                                    if (substituted_arg -> IsParameterized())
+                                                                        method_call -> resolved_parameterized_type =
+                                                                            substituted_arg -> GetParameterizedType();
                                                                     param_type = iface_param;
                                                                 }
                                                             }
@@ -4183,6 +4203,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                     ! result -> Primitive())
                                                 {
                                                     method_call -> resolved_type = result;
+                                                    // Also track parameterized type for chained calls
+                                                    if (substituted_type -> IsParameterized())
+                                                        method_call -> resolved_parameterized_type =
+                                                            substituted_type -> GetParameterizedType();
                                                     // Don't set param_type here - we've already done the
                                                     // full substitution and don't want the code below
                                                     // to overwrite with the wrong type argument
@@ -4229,6 +4253,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     ! substituted -> Primitive())
                 {
                     method_call -> resolved_type = substituted;
+                    // Also track parameterized type for chained calls
+                    if (type_arg -> IsParameterized())
+                        method_call -> resolved_parameterized_type =
+                            type_arg -> GetParameterizedType();
                 }
                 else if (! substituted)
                 {
@@ -4775,8 +4803,10 @@ void Semantic::ProcessParenthesizedExpression(Ast* expr)
     {
         parenthesized -> value = parenthesized -> expression -> value;
         parenthesized -> symbol = parenthesized -> expression -> symbol;
-        // Also propagate resolved_type for generic type substitution
+        // Also propagate resolved_type and resolved_parameterized_type for generic type substitution
         parenthesized -> resolved_type = parenthesized -> expression -> resolved_type;
+        parenthesized -> resolved_parameterized_type =
+            parenthesized -> expression -> resolved_parameterized_type;
     }
 }
 
