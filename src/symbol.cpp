@@ -1334,6 +1334,144 @@ void MethodSymbol::SetSignature(Control& control, TypeSymbol* placeholder)
 
 
 //
+// Helper function to check if a name matches a method type parameter.
+// Returns the type parameter index if found, -1 otherwise.
+//
+static int FindMethodTypeParameter(AstName* name, MethodSymbol* method, LexStream* lex_stream)
+{
+    if (! name || ! method || ! lex_stream)
+        return -1;
+
+    const NameSymbol* name_sym = lex_stream -> NameSymbol(name -> identifier_token);
+    if (! name_sym)
+        return -1;
+
+    for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+    {
+        TypeParameterSymbol* type_param = method -> TypeParameter(i);
+        if (type_param -> name_symbol == name_sym)
+            return (int) i;
+    }
+    return -1;
+}
+
+//
+// Helper function to generate the generic type signature from an AST type node.
+// This handles type parameters, parameterized types, arrays, and wildcards.
+//
+static void GenerateTypeSignatureFromAst(AstType* type, MethodSymbol* method,
+                                         LexStream* lex_stream,
+                                         char* buffer, unsigned& length)
+{
+    if (! type)
+        return;
+
+    // Handle array types
+    AstArrayType* array_type = type -> ArrayTypeCast();
+    if (array_type)
+    {
+        // Add '[' for each dimension
+        unsigned dims = array_type -> NumBrackets();
+        for (unsigned d = 0; d < dims; d++)
+            buffer[length++] = '[';
+        // Recursively handle element type
+        GenerateTypeSignatureFromAst(array_type -> type, method, lex_stream, buffer, length);
+        return;
+    }
+
+    // Handle type names (including parameterized types and type parameter references)
+    AstTypeName* type_name = type -> TypeNameCast();
+    if (type_name)
+    {
+        // First check if this is a type parameter reference (simple name, no base, no type args)
+        if (type_name -> name && ! type_name -> base_opt && ! type_name -> type_arguments_opt)
+        {
+            // Check if this name matches one of the method's type parameters by name
+            int type_param_idx = FindMethodTypeParameter(type_name -> name, method, lex_stream);
+            if (type_param_idx >= 0)
+            {
+                // This is a reference to a method type parameter
+                TypeParameterSymbol* type_param = method -> TypeParameter(type_param_idx);
+                buffer[length++] = 'T';
+                const char* name = type_param -> Utf8Name();
+                unsigned name_len = type_param -> Utf8NameLength();
+                for (unsigned j = 0; j < name_len; j++)
+                    buffer[length++] = name[j];
+                buffer[length++] = ';';
+                return;
+            }
+        }
+
+        // Not a type parameter reference, use the resolved type
+        TypeSymbol* resolved = type_name -> symbol;
+        if (! resolved)
+            return;
+
+        // Check if this is a parameterized type with type arguments
+        if (type_name -> type_arguments_opt && type_name -> type_arguments_opt -> NumTypeArguments() > 0)
+        {
+            // Generate parameterized type signature: LClassName<TypeArgs>;
+            const char* full_sig = resolved -> SignatureString();
+            unsigned sig_len = strlen(full_sig);
+
+            // Copy everything except trailing ';'
+            for (unsigned i = 0; i < sig_len - 1; i++)
+                buffer[length++] = full_sig[i];
+
+            // Add type arguments
+            buffer[length++] = '<';
+            for (unsigned i = 0; i < type_name -> type_arguments_opt -> NumTypeArguments(); i++)
+            {
+                AstType* arg = type_name -> type_arguments_opt -> TypeArgument(i);
+                GenerateTypeSignatureFromAst(arg, method, lex_stream, buffer, length);
+            }
+            buffer[length++] = '>';
+            buffer[length++] = ';';
+        }
+        else
+        {
+            // Simple type, just use its signature
+            const char* sig = resolved -> SignatureString();
+            unsigned sig_len = strlen(sig);
+            for (unsigned i = 0; i < sig_len; i++)
+                buffer[length++] = sig[i];
+        }
+        return;
+    }
+
+    // Handle wildcards
+    AstWildcard* wildcard = type -> WildcardCast();
+    if (wildcard)
+    {
+        if (wildcard -> extends_token_opt)
+        {
+            buffer[length++] = '+';
+            GenerateTypeSignatureFromAst(wildcard -> bounds_opt, method, lex_stream, buffer, length);
+        }
+        else if (wildcard -> super_token_opt)
+        {
+            buffer[length++] = '-';
+            GenerateTypeSignatureFromAst(wildcard -> bounds_opt, method, lex_stream, buffer, length);
+        }
+        else
+        {
+            buffer[length++] = '*';
+        }
+        return;
+    }
+
+    // Handle primitive types
+    AstPrimitiveType* primitive = type -> PrimitiveTypeCast();
+    if (primitive && primitive -> symbol)
+    {
+        const char* sig = primitive -> symbol -> SignatureString();
+        unsigned sig_len = strlen(sig);
+        for (unsigned i = 0; i < sig_len; i++)
+            buffer[length++] = sig[i];
+    }
+}
+
+//
 // Generate the generic signature for a generic method (Signature attribute)
 // Format: TypeParameters? (TypeSignature*) ReturnDescriptor ThrowsSignature*
 //
@@ -1344,9 +1482,17 @@ void MethodSymbol::SetGenericSignature(Control& control)
         return;  // For now, only handle methods with type parameters
 
     // Estimate size: type parameters + parameters + return type
-    unsigned estimated_size = 500;
+    unsigned estimated_size = 1000;
     char* buffer = new char[estimated_size];
     unsigned length = 0;
+
+    // Get lex_stream from containing type's semantic environment
+    LexStream* lex_stream = NULL;
+    if (containing_type && containing_type -> semantic_environment &&
+        containing_type -> semantic_environment -> sem)
+    {
+        lex_stream = containing_type -> semantic_environment -> sem -> lex_stream;
+    }
 
     // Add type parameters if present: <T:Ljava/lang/Object;>
     if (NumTypeParameters() > 0)
@@ -1365,14 +1511,49 @@ void MethodSymbol::SetGenericSignature(Control& control)
     }
 
     // Add parameter types: (TypeSignature*)
+    // We need to use the AST to preserve type argument information
     buffer[length++] = '(';
+
+    // Try to get parameter types from AST declaration
+    AstMethodDeclaration* method_decl = declaration ? declaration -> MethodDeclarationCast() : NULL;
+    AstMethodDeclarator* declarator = method_decl ? method_decl -> method_declarator : NULL;
+
     for (unsigned i = 0; i < NumFormalParameters(); i++)
     {
-        TypeSymbol* param_type = FormalParameter(i) -> Type();
-        const char* param_sig = param_type -> SignatureString();
-        unsigned param_len = strlen(param_sig);
-        for (unsigned j = 0; j < param_len; j++)
-            buffer[length++] = param_sig[j];
+        bool used_ast = false;
+
+        // If we have AST info and this parameter uses a method type parameter,
+        // generate the signature from AST to preserve type arguments
+        if (declarator && lex_stream && i < declarator -> NumFormalParameters())
+        {
+            AstFormalParameter* formal = declarator -> FormalParameter(i);
+            if (formal && formal -> type)
+            {
+                // Check if this parameter uses a method type parameter
+                bool uses_method_type_param = false;
+                if (param_type_param_indices && i < param_type_param_indices -> Length())
+                {
+                    if ((*(param_type_param_indices))[i] >= 0)
+                        uses_method_type_param = true;
+                }
+
+                if (uses_method_type_param)
+                {
+                    GenerateTypeSignatureFromAst(formal -> type, this, lex_stream, buffer, length);
+                    used_ast = true;
+                }
+            }
+        }
+
+        if (! used_ast)
+        {
+            // Fall back to erased type signature
+            TypeSymbol* param_type = FormalParameter(i) -> Type();
+            const char* param_sig = param_type -> SignatureString();
+            unsigned param_len = strlen(param_sig);
+            for (unsigned j = 0; j < param_len; j++)
+                buffer[length++] = param_sig[j];
+        }
     }
     buffer[length++] = ')';
 
@@ -1381,6 +1562,22 @@ void MethodSymbol::SetGenericSignature(Control& control)
     if (is_constructor)
     {
         buffer[length++] = 'V';
+    }
+    else if (method_return_type_param_index >= 0)
+    {
+        // Return type is a method type parameter - use TName; format
+        TypeParameterSymbol* type_param = TypeParameter(method_return_type_param_index);
+        buffer[length++] = 'T';
+        const char* name = type_param -> Utf8Name();
+        unsigned name_len = type_param -> Utf8NameLength();
+        for (unsigned i = 0; i < name_len; i++)
+            buffer[length++] = name[i];
+        buffer[length++] = ';';
+    }
+    else if (method_decl && method_decl -> type && lex_stream)
+    {
+        // Try to use AST for return type to preserve any parameterized type info
+        GenerateTypeSignatureFromAst(method_decl -> type, this, lex_stream, buffer, length);
     }
     else
     {

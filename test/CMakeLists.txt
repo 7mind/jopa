@@ -174,6 +174,10 @@ add_jopa_run_test(GenericReturnTypeTest "${TEST_DIR}/generics/GenericReturnTypeT
 add_jopa_run_test(ExplicitTypeArgs "${TEST_DIR}/generics/ExplicitTypeArgs.java" "ExplicitTypeArgs")
 add_jopa_run_test(EnumForwardRef "${TEST_DIR}/generics/EnumForwardRef.java" "EnumForwardRef")
 add_jopa_run_test(BooleanUnbox "${TEST_DIR}/generics/BooleanUnbox.java" "BooleanUnbox")
+add_jopa_run_test(ArrayCloneTest "${TEST_DIR}/generics/ArrayCloneTest.java" "ArrayCloneTest")
+add_jopa_run_test(EnumConstructorTest "${TEST_DIR}/generics/EnumConstructorTest.java" "EnumConstructorTest")
+add_jopa_run_test(DoPrivilegedTest "${TEST_DIR}/generics/DoPrivilegedTest.java" "DoPrivilegedTest")
+add_jopa_run_test(GenericMethodTest "${TEST_DIR}/generics/GenericMethodTest.java" "GenericMethodTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
