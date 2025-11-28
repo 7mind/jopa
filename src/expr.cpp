@@ -4510,8 +4510,26 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                         }
                     }
 
+                    // Only use arg_type for inference if it's meaningful.
+                    // For wrapped type params like Class<T>, if arg is raw Class,
+                    // arg_type equals the formal param erasure and gives no info.
                     if (arg_type && arg_type != control.no_type && arg_type != control.null_type)
-                        inferred_type = arg_type;
+                    {
+                        VariableSymbol* formal_param = (i < method -> NumFormalParameters())
+                            ? method -> FormalParameter(i) : NULL;
+                        // Skip if arg_type is just the erasure of the formal param
+                        // (e.g., raw Class for Class<T>), unless it's a class literal
+                        if (formal_param && arg_type == formal_param -> Type() &&
+                            arg -> kind != Ast::CLASS_LITERAL)
+                        {
+                            // Raw type matches param erasure - no useful inference
+                            // Skip this arg for type inference
+                        }
+                        else
+                        {
+                            inferred_type = arg_type;
+                        }
+                    }
                 }
             }
         }
