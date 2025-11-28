@@ -836,6 +836,16 @@ void Semantic::ProcessSuperinterface(TypeSymbol* base_type, AstTypeName* name)
         }
         name -> symbol = interf; // save type name in ast.
         base_type -> AddInterface(interf);
+
+        // If the interface has type arguments (e.g., implements Comparable<String>),
+        // store the parameterized interface for type inference
+        ParameterizedType* param_interf = NULL;
+        if (name -> type_arguments_opt)
+        {
+            param_interf = ProcessTypeArguments(interf, name -> type_arguments_opt);
+        }
+        base_type -> AddParameterizedInterface(param_interf);
+
         interf -> subtypes -> AddElement(base_type);
         AddDependence(base_type, interf);
         while (interf)
@@ -1094,7 +1104,13 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     // but hasn't been processed yet
     if (! base_type -> HeaderProcessed() && base_type -> declaration)
     {
+        // Save and restore processing_type across header processing since
+        // ProcessTypeHeaders clobbers it. We need to preserve it so that
+        // type parameters from the current type being processed are still
+        // visible when resolving type arguments.
+        TypeSymbol* saved_processing_type = processing_type;
         base_type -> ProcessTypeHeaders();
+        processing_type = saved_processing_type;
     }
 
     // Check if the base type is actually a generic type
@@ -4724,7 +4740,11 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     // save for processing bodies later.
     method_declaration -> method_symbol = method;
 
-    if (method -> ACC_ABSTRACT() && ! this_type -> ACC_ABSTRACT())
+    // Abstract methods in non-abstract classes are an error, except for enums.
+    // Enums can have abstract methods if every enum constant provides an implementation.
+    // (We don't verify all constants implement it here - that's checked elsewhere)
+    if (method -> ACC_ABSTRACT() && ! this_type -> ACC_ABSTRACT() &&
+        ! this_type -> IsEnum())
     {
         ReportSemError(SemanticError::NON_ABSTRACT_TYPE_CONTAINS_ABSTRACT_METHOD,
                        method_declaration -> LeftToken(),
@@ -5097,6 +5117,24 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
                 return erased ? erased : control.Object();
             }
         }
+        // For anonymous/local classes whose owner is a method, check the
+        // enclosing method's type parameters. This allows anonymous class
+        // methods to reference type parameters from the enclosing generic method.
+        // e.g., in: <T> Processor<T> createProcessor() { return new Processor<T>() { void process(T item) {} }; }
+        // the anonymous class's process method needs to see T from createProcessor.
+        MethodSymbol* enclosing_method = processing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                {
+                    TypeSymbol* erased = type_param -> ErasedType();
+                    return erased ? erased : control.Object();
+                }
+            }
+        }
     }
 
     for ( ; env; env = env -> previous)
@@ -5114,6 +5152,21 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
+            }
+        }
+        // For anonymous/local classes whose owner is a method, check the
+        // enclosing method's type parameters.
+        MethodSymbol* enclosing_method = enclosing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                {
+                    TypeSymbol* erased = type_param -> ErasedType();
+                    return erased ? erased : control.Object();
+                }
             }
         }
 

@@ -903,6 +903,20 @@ public:
         interfaces -> Next() = type_symbol;
     }
 
+    // Get parameterized interface at index i (may be NULL)
+    ParameterizedType* ParameterizedInterface(unsigned i) const
+    {
+        return (parameterized_interfaces && i < parameterized_interfaces -> Length())
+            ? (*parameterized_interfaces)[i] : NULL;
+    }
+    // Add parameterized interface (must be called in parallel with AddInterface)
+    void AddParameterizedInterface(ParameterizedType* ptype)
+    {
+        if (! parameterized_interfaces)
+            parameterized_interfaces = new Tuple<ParameterizedType*>(8);
+        parameterized_interfaces -> Next() = ptype;
+    }
+
     unsigned NumAnonymousTypes()
     {
         return anonymous_types ? anonymous_types -> Length() : 0;
@@ -1452,6 +1466,9 @@ private:
     Tuple<TypeSymbol*>* nested_types;
     // The interfaces that were declared in the header of the type.
     Tuple<TypeSymbol*>* interfaces;
+    // Parameterized interfaces (e.g., implements Comparable<String>)
+    // Stored in parallel with interfaces tuple - same index maps to same interface
+    Tuple<ParameterizedType*>* parameterized_interfaces;
     // The anonymous types that were declared in this type.
     Tuple<TypeSymbol*>* anonymous_types;
 

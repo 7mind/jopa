@@ -139,9 +139,39 @@ bool Semantic::IsConstantFalse(AstExpression* expr)
 
 
 //
+// Returns true if source_type can be converted to target_type via subtyping only.
+// This does NOT include boxing or unboxing conversions, which is required for
+// method specificity comparison according to JLS 15.12.2.5.
+//
+inline bool Semantic::CanSubtypeConvert(const TypeSymbol* target_type,
+                                        const TypeSymbol* source_type)
+{
+    if (target_type == control.no_type)
+        return false;
+    if (source_type == control.no_type)
+        return true;
+
+    // Primitives: only widening primitive conversion
+    if (source_type -> Primitive())
+    {
+        if (target_type -> Primitive())
+            return target_type == source_type ||
+                CanWideningPrimitiveConvert(target_type, source_type);
+        return false;  // No boxing for specificity
+    }
+
+    // References: only subtyping
+    if (target_type -> Primitive())
+        return false;  // No unboxing for specificity
+    return source_type == control.null_type ||
+        source_type -> IsSubtype(target_type);
+}
+
 // Returns true if source_method is more specific than target_method, which
 // is defined as the type that declared the method, as well as all method
 // parameter types, being equal or more specific in the source_method.
+// JLS 15.12.2.5: Specificity is determined using subtyping only, NOT
+// boxing/unboxing conversions.
 //
 inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
                                    MethodSymbol* target_method)
@@ -163,8 +193,9 @@ inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
         if (! target_param || ! source_param ||
             ! target_param -> Type() || ! source_param -> Type())
             return false;
-        if (! CanMethodInvocationConvert(target_param -> Type(),
-                                         source_param -> Type()))
+        // Use subtyping only for specificity, not boxing/unboxing
+        if (! CanSubtypeConvert(target_param -> Type(),
+                                source_param -> Type()))
         {
             return false;
         }
@@ -758,6 +789,9 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
     unsigned num_arguments = args -> NumArguments();
     assert(containing_type -> ConstructorMembersProcessed());
     MethodSymbol* ctor;
+
+    // JLS 15.12.2: Two-phase constructor resolution
+    // Phase 1: Find applicable constructors using subtyping only (no boxing/unboxing)
     for (ctor = containing_type -> FindMethodSymbol(control.init_name_symbol);
          ctor; ctor = ctor -> next_method)
     {
@@ -770,8 +804,9 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
             unsigned i;
             for (i = 0; i < num_arguments; i++)
             {
-                if (! CanMethodInvocationConvert(ctor -> FormalParameter(i) -> Type(),
-                                                 args -> Argument(i) -> Type()))
+                // Phase 1 uses subtyping only
+                if (! CanSubtypeConvert(ctor -> FormalParameter(i) -> Type(),
+                                        args -> Argument(i) -> Type()))
                 {
                     break;
                 }
@@ -785,6 +820,42 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
                 }
                 else if (NoMethodMoreSpecific(constructor_set, ctor))
                     constructor_set.Next() = ctor;
+            }
+        }
+    }
+
+    // Phase 2: If Phase 1 found nothing, try with boxing/unboxing
+    if (constructor_set.Length() == 0 && control.option.source >= JopaOption::SDK1_5)
+    {
+        for (ctor = containing_type -> FindMethodSymbol(control.init_name_symbol);
+             ctor; ctor = ctor -> next_method)
+        {
+            if (! ctor -> IsTyped())
+                ctor -> ProcessMethodSignature(this, right_tok);
+
+            if (num_arguments == ctor -> NumFormalParameters() &&
+                ConstructorAccessCheck(ctor, ! class_creation))
+            {
+                unsigned i;
+                for (i = 0; i < num_arguments; i++)
+                {
+                    // Phase 2 allows boxing/unboxing
+                    if (! CanMethodInvocationConvert(ctor -> FormalParameter(i) -> Type(),
+                                                     args -> Argument(i) -> Type()))
+                    {
+                        break;
+                    }
+                }
+                if (i == num_arguments)
+                {
+                    if (MoreSpecific(ctor, constructor_set))
+                    {
+                        constructor_set.Reset();
+                        constructor_set.Next() = ctor;
+                    }
+                    else if (NoMethodMoreSpecific(constructor_set, ctor))
+                        constructor_set.Next() = ctor;
+                }
             }
         }
     }
@@ -976,6 +1047,9 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
     // interfaces, so either the original method implements them all, or it
     // is also abstract and we are free to choose which one to use.
     //
+
+    // JLS 15.12.2: Three-phase method resolution
+    // Phase 1: Non-varargs methods using subtyping only (no boxing/unboxing)
     for (MethodShadowSymbol* method_shadow = type -> expanded_method_table ->
              FindMethodShadowSymbol(name_symbol);
          method_shadow; method_shadow = method_shadow -> next_method)
@@ -985,63 +1059,31 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
         if (! method -> IsTyped())
             method -> ProcessMethodSignature(this, id_token);
 
-        //
-        // If there are method shadow conflicts, they are necessarily public
-        // abstract methods inherited from interfaces; and we can skip the
-        // member access check because we can always invoke the public version.
-        //
         unsigned num_args = method_call -> arguments -> NumArguments();
-        if (MethodApplicableByArity(method, num_args) &&
+        unsigned num_formals = method -> NumFormalParameters();
+        bool is_varargs = method -> ACC_VARARGS();
+
+        // Phase 1 skips varargs methods
+        if (is_varargs)
+            continue;
+
+        if (num_args == num_formals &&
             (MemberAccessCheck(type, method, base) ||
              method_shadow -> NumConflicts() > 0))
         {
             unsigned i;
-            unsigned num_formals = method -> NumFormalParameters();
-            bool is_varargs = method -> ACC_VARARGS();
-
-            // Check fixed parameters
-            unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
-            for (i = 0; i < num_fixed && i < num_args; i++)
+            for (i = 0; i < num_formals; i++)
             {
                 AstExpression* expr = method_call -> arguments -> Argument(i);
-                if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
-                                                 expr -> Type()))
+                // Phase 1 uses subtyping only
+                if (! CanSubtypeConvert(method -> FormalParameter(i) -> Type(),
+                                        expr -> Type()))
                 {
                     break;
                 }
             }
 
-            // Check varargs parameters against component type (or array type)
-            if (i == num_fixed && is_varargs && num_formals > 0)
-            {
-                TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
-                TypeSymbol* component_type = varargs_type -> IsArray() ?
-                    varargs_type -> ArraySubtype() : varargs_type;
-
-                // Special case: when num_args == num_formals, the last argument
-                // can also be assignable to the varargs array type itself
-                // (JLS 15.12.2.4 - no wrapping needed in that case)
-                if (num_args == num_formals && i == num_fixed)
-                {
-                    AstExpression* last_arg = method_call -> arguments -> Argument(i);
-                    if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
-                    {
-                        i++; // Accept this argument as array
-                    }
-                }
-
-                // Check remaining varargs arguments against component type
-                for ( ; i < num_args; i++)
-                {
-                    AstExpression* expr = method_call -> arguments -> Argument(i);
-                    if (! CanMethodInvocationConvert(component_type, expr -> Type()))
-                    {
-                        break;
-                    }
-                }
-            }
-
-            if (i == num_args)
+            if (i == num_formals)
             {
                 if (MoreSpecific(method, method_set))
                 {
@@ -1050,6 +1092,137 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
                 }
                 else if (NoMethodMoreSpecific(method_set, method))
                     method_set.Next() = method_shadow;
+            }
+        }
+    }
+
+    // Phase 2: Non-varargs methods with boxing/unboxing
+    if (method_set.Length() == 0 && control.option.source >= JopaOption::SDK1_5)
+    {
+        for (MethodShadowSymbol* method_shadow = type -> expanded_method_table ->
+                 FindMethodShadowSymbol(name_symbol);
+             method_shadow; method_shadow = method_shadow -> next_method)
+        {
+            MethodSymbol* method = method_shadow -> method_symbol;
+
+            if (! method -> IsTyped())
+                method -> ProcessMethodSignature(this, id_token);
+
+            unsigned num_args = method_call -> arguments -> NumArguments();
+            unsigned num_formals = method -> NumFormalParameters();
+            bool is_varargs = method -> ACC_VARARGS();
+
+            // Phase 2 skips varargs methods
+            if (is_varargs)
+                continue;
+
+            if (num_args == num_formals &&
+                (MemberAccessCheck(type, method, base) ||
+                 method_shadow -> NumConflicts() > 0))
+            {
+                unsigned i;
+                for (i = 0; i < num_formals; i++)
+                {
+                    AstExpression* expr = method_call -> arguments -> Argument(i);
+                    // Phase 2 allows boxing/unboxing
+                    if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
+                                                     expr -> Type()))
+                    {
+                        break;
+                    }
+                }
+
+                if (i == num_formals)
+                {
+                    if (MoreSpecific(method, method_set))
+                    {
+                        method_set.Reset();
+                        method_set.Next() = method_shadow;
+                    }
+                    else if (NoMethodMoreSpecific(method_set, method))
+                        method_set.Next() = method_shadow;
+                }
+            }
+        }
+    }
+
+    // Phase 3: Varargs methods with boxing/unboxing
+    if (method_set.Length() == 0)
+    {
+        for (MethodShadowSymbol* method_shadow = type -> expanded_method_table ->
+                 FindMethodShadowSymbol(name_symbol);
+             method_shadow; method_shadow = method_shadow -> next_method)
+        {
+            MethodSymbol* method = method_shadow -> method_symbol;
+
+            if (! method -> IsTyped())
+                method -> ProcessMethodSignature(this, id_token);
+
+            unsigned num_args = method_call -> arguments -> NumArguments();
+            if (MethodApplicableByArity(method, num_args) &&
+                (MemberAccessCheck(type, method, base) ||
+                 method_shadow -> NumConflicts() > 0))
+            {
+                unsigned i;
+                unsigned num_formals = method -> NumFormalParameters();
+                bool is_varargs = method -> ACC_VARARGS();
+
+                // Phase 3 only considers varargs methods
+                if (! is_varargs)
+                    continue;
+
+                // Check fixed parameters
+                unsigned num_fixed = num_formals - 1;
+                for (i = 0; i < num_fixed && i < num_args; i++)
+                {
+                    AstExpression* expr = method_call -> arguments -> Argument(i);
+                    if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
+                                                     expr -> Type()))
+                    {
+                        break;
+                    }
+                }
+
+                // Check varargs parameters against component type (or array type)
+                if (i == num_fixed && num_formals > 0)
+                {
+                    TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+                    TypeSymbol* component_type = varargs_type -> IsArray() ?
+                        varargs_type -> ArraySubtype() : varargs_type;
+
+                    // Special case: when num_args == num_formals, the last argument
+                    // can also be assignable to the varargs array type itself
+                    // (JLS 15.12.2.4 - no wrapping needed in that case)
+                    if (num_args == num_formals && i == num_fixed)
+                    {
+                        AstExpression* last_arg = method_call -> arguments -> Argument(i);
+                        if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
+                        {
+                            i++; // Accept this argument as array
+                        }
+                    }
+
+                    // Check remaining varargs arguments against component type
+                    for ( ; i < num_args; i++)
+                    {
+                        AstExpression* expr = method_call -> arguments -> Argument(i);
+                        if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (i == num_args)
+                {
+                    if (MoreSpecific(method, method_set))
+                    {
+                        method_set.Reset();
+                        method_set.Next() = method_shadow;
+                    }
+                    else if (NoMethodMoreSpecific(method_set, method))
+                        method_set.Next() = method_shadow;
+                }
             }
         }
     }
@@ -1137,76 +1310,173 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
             FindMethodShadowSymbol(name_symbol);
         if (method_shadow)
         {
-            for ( ; method_shadow;
-                  method_shadow = method_shadow -> next_method)
+            // JLS 15.12.2: Three-phase method resolution
+            // Phase 1: Non-varargs methods using subtyping only (no boxing/unboxing)
+            for (MethodShadowSymbol* shadow = method_shadow; shadow;
+                  shadow = shadow -> next_method)
             {
-                MethodSymbol* method = method_shadow -> method_symbol;
+                MethodSymbol* method = shadow -> method_symbol;
 
                 if (! method -> IsTyped())
                     method -> ProcessMethodSignature(this, id_token);
 
-                //
-                // Since type -> IsOwner(this_type()), i.e., type encloses
-                // this_type(), method is accessible, even if it is private.
-                //
                 unsigned num_args = method_call -> arguments -> NumArguments();
-                if (MethodApplicableByArity(method, num_args))
+                unsigned num_formals = method -> NumFormalParameters();
+                bool is_varargs = method -> ACC_VARARGS();
+
+                // Phase 1 skips varargs methods
+                if (is_varargs)
+                    continue;
+
+                if (num_args == num_formals)
                 {
                     unsigned i;
-                    unsigned num_formals = method -> NumFormalParameters();
-                    bool is_varargs = method -> ACC_VARARGS();
-
-                    // Check fixed parameters
-                    unsigned num_fixed = is_varargs ? num_formals - 1 : num_formals;
-                    for (i = 0; i < num_fixed && i < num_args; i++)
+                    for (i = 0; i < num_formals; i++)
                     {
                         AstExpression* expr = method_call -> arguments -> Argument(i);
-                        if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
-                                                         expr -> Type()))
+                        // Phase 1 uses subtyping only
+                        if (! CanSubtypeConvert(method -> FormalParameter(i) -> Type(),
+                                                expr -> Type()))
                         {
                             break;
                         }
                     }
 
-                    // Check varargs parameters against component type (or array type)
-                    if (i == num_fixed && is_varargs && num_formals > 0)
-                    {
-                        TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
-                        TypeSymbol* component_type = varargs_type -> IsArray() ?
-                            varargs_type -> ArraySubtype() : varargs_type;
-
-                        // Special case: when num_args == num_formals, the last argument
-                        // can also be assignable to the varargs array type itself
-                        // (JLS 15.12.2.4 - no wrapping needed in that case)
-                        if (num_args == num_formals && i == num_fixed)
-                        {
-                            AstExpression* last_arg = method_call -> arguments -> Argument(i);
-                            if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
-                            {
-                                i++; // Accept this argument as array
-                            }
-                        }
-
-                        // Check remaining varargs arguments against component type
-                        for ( ; i < num_args; i++)
-                        {
-                            AstExpression* expr = method_call -> arguments -> Argument(i);
-                            if (! CanMethodInvocationConvert(component_type, expr -> Type()))
-                            {
-                                break;
-                            }
-                        }
-                    }
-
-                    if (i == num_args)
+                    if (i == num_formals)
                     {
                         if (MoreSpecific(method, methods_found))
                         {
                             methods_found.Reset();
-                            methods_found.Next() = method_shadow;
+                            methods_found.Next() = shadow;
                         }
                         else if (NoMethodMoreSpecific(methods_found, method))
-                            methods_found.Next() = method_shadow;
+                            methods_found.Next() = shadow;
+                    }
+                }
+            }
+
+            // Phase 2: Non-varargs methods with boxing/unboxing
+            if (methods_found.Length() == 0 && control.option.source >= JopaOption::SDK1_5)
+            {
+                for (MethodShadowSymbol* shadow = method_shadow; shadow;
+                      shadow = shadow -> next_method)
+                {
+                    MethodSymbol* method = shadow -> method_symbol;
+
+                    if (! method -> IsTyped())
+                        method -> ProcessMethodSignature(this, id_token);
+
+                    unsigned num_args = method_call -> arguments -> NumArguments();
+                    unsigned num_formals = method -> NumFormalParameters();
+                    bool is_varargs = method -> ACC_VARARGS();
+
+                    // Phase 2 skips varargs methods
+                    if (is_varargs)
+                        continue;
+
+                    if (num_args == num_formals)
+                    {
+                        unsigned i;
+                        for (i = 0; i < num_formals; i++)
+                        {
+                            AstExpression* expr = method_call -> arguments -> Argument(i);
+                            // Phase 2 allows boxing/unboxing
+                            if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
+                                                             expr -> Type()))
+                            {
+                                break;
+                            }
+                        }
+
+                        if (i == num_formals)
+                        {
+                            if (MoreSpecific(method, methods_found))
+                            {
+                                methods_found.Reset();
+                                methods_found.Next() = shadow;
+                            }
+                            else if (NoMethodMoreSpecific(methods_found, method))
+                                methods_found.Next() = shadow;
+                        }
+                    }
+                }
+            }
+
+            // Phase 3: Varargs methods with boxing/unboxing
+            if (methods_found.Length() == 0)
+            {
+                for (MethodShadowSymbol* shadow = method_shadow; shadow;
+                      shadow = shadow -> next_method)
+                {
+                    MethodSymbol* method = shadow -> method_symbol;
+
+                    if (! method -> IsTyped())
+                        method -> ProcessMethodSignature(this, id_token);
+
+                    unsigned num_args = method_call -> arguments -> NumArguments();
+                    unsigned num_formals = method -> NumFormalParameters();
+                    bool is_varargs = method -> ACC_VARARGS();
+
+                    // Phase 3 only considers varargs methods
+                    if (! is_varargs)
+                        continue;
+
+                    if (MethodApplicableByArity(method, num_args))
+                    {
+                        unsigned i;
+
+                        // Check fixed parameters
+                        unsigned num_fixed = num_formals - 1;
+                        for (i = 0; i < num_fixed && i < num_args; i++)
+                        {
+                            AstExpression* expr = method_call -> arguments -> Argument(i);
+                            if (! CanMethodInvocationConvert(method -> FormalParameter(i) -> Type(),
+                                                             expr -> Type()))
+                            {
+                                break;
+                            }
+                        }
+
+                        // Check varargs parameters against component type (or array type)
+                        if (i == num_fixed && num_formals > 0)
+                        {
+                            TypeSymbol* varargs_type = method -> FormalParameter(num_formals - 1) -> Type();
+                            TypeSymbol* component_type = varargs_type -> IsArray() ?
+                                varargs_type -> ArraySubtype() : varargs_type;
+
+                            // Special case: when num_args == num_formals, the last argument
+                            // can also be assignable to the varargs array type itself
+                            // (JLS 15.12.2.4 - no wrapping needed in that case)
+                            if (num_args == num_formals && i == num_fixed)
+                            {
+                                AstExpression* last_arg = method_call -> arguments -> Argument(i);
+                                if (CanMethodInvocationConvert(varargs_type, last_arg -> Type()))
+                                {
+                                    i++; // Accept this argument as array
+                                }
+                            }
+
+                            // Check remaining varargs arguments against component type
+                            for ( ; i < num_args; i++)
+                            {
+                                AstExpression* expr = method_call -> arguments -> Argument(i);
+                                if (! CanMethodInvocationConvert(component_type, expr -> Type()))
+                                {
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (i == num_args)
+                        {
+                            if (MoreSpecific(method, methods_found))
+                            {
+                                methods_found.Reset();
+                                methods_found.Next() = shadow;
+                            }
+                            else if (NoMethodMoreSpecific(methods_found, method))
+                                methods_found.Next() = shadow;
+                        }
                     }
                 }
             }
@@ -3693,7 +3963,42 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
         }
 
-        // Case 2: Walk up the inheritance hierarchy from base_type
+        // Case 2: For super.method() calls, check if THIS type has a parameterized super
+        // that matches the method's containing type
+        if (! param_type && base && base -> SuperExpressionCast())
+        {
+            TypeSymbol* current_type = ThisType();
+            if (current_type && current_type -> HasParameterizedSuper())
+            {
+                ParameterizedType* param_super = current_type -> GetParameterizedSuper();
+                if (param_super -> generic_type == method -> containing_type)
+                {
+                    param_type = param_super;
+                }
+                else
+                {
+                    // The method might be from an ancestor of the direct super
+                    // Walk up through parameterized supers
+                    TypeSymbol* super_type = param_super -> generic_type;
+                    while (super_type && ! param_type)
+                    {
+                        if (super_type -> HasParameterizedSuper())
+                        {
+                            ParameterizedType* ancestor_param = super_type -> GetParameterizedSuper();
+                            if (ancestor_param -> generic_type == method -> containing_type)
+                                param_type = ancestor_param;
+                            super_type = ancestor_param -> generic_type;
+                        }
+                        else
+                        {
+                            super_type = super_type -> super;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Case 3: Walk up the inheritance hierarchy from base_type
         if (! param_type && base_type)
         {
             for (TypeSymbol* current = base_type; current && ! param_type; current = current -> super)
@@ -3773,8 +4078,10 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                         if (class_literal -> type && class_literal -> type -> symbol)
                             arg_type = class_literal -> type -> symbol;
                     }
-                    // Handle anonymous class creation with type arguments
+                    // Handle class creation expressions
                     // For doPrivileged(new PrivilegedAction<Provider>() {...}), extract Provider
+                    // For doPrivileged(new StringAction(...)) where StringAction implements
+                    // PrivilegedAction<String>, extract String from the implemented interface
                     else if (arg -> kind == Ast::CLASS_CREATION)
                     {
                         AstClassCreationExpression* class_creation =
@@ -3791,8 +4098,43 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                             if (type_arg)
                                 arg_type = type_arg -> Erasure();
                         }
-                        // For raw types (no type arguments), don't infer - let return type be erased type
-                        // e.g., doPrivileged(new PrivilegedAction() {...}) returns Object, not the anon class
+                        // No explicit type arguments - check if the created class implements
+                        // the parameter interface with type arguments
+                        else if (class_creation -> class_type &&
+                                 class_creation -> class_type -> symbol &&
+                                 i < method -> NumFormalParameters())
+                        {
+                            TypeSymbol* created_type = class_creation -> class_type -> symbol;
+                            VariableSymbol* formal_param = method -> FormalParameter(i);
+                            TypeSymbol* param_erasure = formal_param -> Type();
+                            if (created_type && param_erasure && param_erasure -> ACC_INTERFACE())
+                            {
+                                // Search for the interface in the created type's hierarchy
+                                TypeSymbol* search_type = created_type;
+                                while (search_type && ! arg_type)
+                                {
+                                    for (unsigned k = 0; k < search_type -> NumInterfaces(); k++)
+                                    {
+                                        if (search_type -> Interface(k) == param_erasure)
+                                        {
+                                            ParameterizedType* param_interf =
+                                                search_type -> ParameterizedInterface(k);
+                                            if (param_interf &&
+                                                param_interf -> NumTypeArguments() > 0)
+                                            {
+                                                Type* type_arg = param_interf -> TypeArgument(0);
+                                                if (type_arg)
+                                                    arg_type = type_arg -> Erasure();
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    search_type = search_type -> super;
+                                }
+                            }
+                        }
+                        // For raw types (no type arguments and no parameterized interface),
+                        // don't infer - let return type be erased type
                     }
                     else
                     {
@@ -3826,6 +4168,46 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                     // Same or fewer dimensions - use base type
                                     arg_type = arg_type -> base_type;
                                 }
+                            }
+                        }
+                        // For parameterized interface inference:
+                        // If arg_type implements a parameterized interface that matches the
+                        // formal parameter type, extract the type argument from that interface.
+                        // E.g., for doPrivileged(action) where action is StringAction
+                        // implementing PrivilegedAction<String>, infer T=String.
+                        if (arg_type && i < method -> NumFormalParameters())
+                        {
+                            VariableSymbol* formal_param = method -> FormalParameter(i);
+                            TypeSymbol* param_erasure = formal_param -> Type();
+                            if (param_erasure && param_erasure -> ACC_INTERFACE())
+                            {
+                                // Check if arg_type implements this interface with type args
+                                TypeSymbol* search_type = arg_type;
+                                TypeSymbol* inferred_from_interface = NULL;
+                                while (search_type && ! inferred_from_interface)
+                                {
+                                    for (unsigned k = 0; k < search_type -> NumInterfaces(); k++)
+                                    {
+                                        if (search_type -> Interface(k) == param_erasure)
+                                        {
+                                            // Found the interface - check for type arguments
+                                            ParameterizedType* param_interf =
+                                                search_type -> ParameterizedInterface(k);
+                                            if (param_interf &&
+                                                param_interf -> NumTypeArguments() > 0)
+                                            {
+                                                Type* type_arg = param_interf -> TypeArgument(0);
+                                                if (type_arg)
+                                                    inferred_from_interface = type_arg -> Erasure();
+                                            }
+                                            break;
+                                        }
+                                    }
+                                    // Also check superclass hierarchy
+                                    search_type = search_type -> super;
+                                }
+                                if (inferred_from_interface)
+                                    arg_type = inferred_from_interface;
                             }
                         }
                     }

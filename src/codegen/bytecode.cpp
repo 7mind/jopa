@@ -534,8 +534,11 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
 
     //
     // Add Signature attribute for generic methods
+    // Methods need signature if they have:
+    // 1. Method type parameters (NumTypeParameters() > 0), OR
+    // 2. Return type is a class type parameter (return_type_param_index >= 0)
     //
-    if (msym -> NumTypeParameters() > 0)
+    if (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0)
     {
         msym -> SetGenericSignature(control);
         if (msym -> GenericSignature())
@@ -9259,7 +9262,7 @@ void ByteCode::PutOpIINC(u2 var, int val)
         PutOp(OP_WIDE);
         PutOp(OP_IINC);
         PutU2(var);
-        PutU2(val);
+        PutU2(static_cast<u2>(val));  // Wide IINC stores signed 16-bit, cast to u2 for bit pattern
     }
 }
 

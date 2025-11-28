@@ -178,6 +178,7 @@ add_jopa_run_test(ArrayCloneTest "${TEST_DIR}/generics/ArrayCloneTest.java" "Arr
 add_jopa_run_test(EnumConstructorTest "${TEST_DIR}/generics/EnumConstructorTest.java" "EnumConstructorTest")
 add_jopa_run_test(DoPrivilegedTest "${TEST_DIR}/generics/DoPrivilegedTest.java" "DoPrivilegedTest")
 add_jopa_run_test(GenericMethodTest "${TEST_DIR}/generics/GenericMethodTest.java" "GenericMethodTest")
+add_jopa_run_test(InterfaceTypeArgTest "${TEST_DIR}/generics/InterfaceTypeArgTest.java" "InterfaceTypeArgTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")

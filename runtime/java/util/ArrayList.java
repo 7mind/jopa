@@ -1,7 +1,7 @@
 // Minimal ArrayList for testing enhanced for-loop
 package java.util;
 
-public class ArrayList implements java.lang.Iterable {
+public class ArrayList<E> implements List<E>, java.lang.Iterable<E> {
     private Object[] elements;
     private int size;
 
@@ -10,7 +10,7 @@ public class ArrayList implements java.lang.Iterable {
         size = 0;
     }
 
-    public boolean add(Object e) {
+    public boolean add(E e) {
         if (size >= elements.length) {
             Object[] newElements = new Object[elements.length * 2];
             for (int i = 0; i < size; i++) {
@@ -23,41 +23,98 @@ public class ArrayList implements java.lang.Iterable {
         return true;
     }
 
-    public Object get(int index) {
+    @SuppressWarnings("unchecked")
+    public E get(int index) {
         if (index < 0 || index >= size) {
             throw new RuntimeException("Index out of bounds");
         }
-        return elements[index];
+        return (E) elements[index];
     }
 
     public int size() {
         return size;
     }
 
-    public Iterator iterator() {
-        return new ArrayListIterator(this);
+    public boolean isEmpty() {
+        return size == 0;
     }
 
-    private static class ArrayListIterator implements Iterator {
-        private ArrayList list;
+    public boolean contains(Object o) {
+        return false;
+    }
+
+    public Object[] toArray() {
+        return elements;
+    }
+
+    public <T> T[] toArray(T[] a) {
+        return a;
+    }
+
+    public boolean remove(Object o) {
+        return false;
+    }
+
+    public boolean containsAll(Collection<?> c) {
+        return false;
+    }
+
+    public boolean addAll(Collection<? extends E> c) {
+        return false;
+    }
+
+    public boolean removeAll(Collection<?> c) {
+        return false;
+    }
+
+    public boolean retainAll(Collection<?> c) {
+        return false;
+    }
+
+    public void clear() {
+        size = 0;
+    }
+
+    public E set(int index, E element) {
+        return null;
+    }
+
+    public void add(int index, E element) {
+    }
+
+    public E remove(int index) {
+        return null;
+    }
+
+    public int indexOf(Object o) {
+        return -1;
+    }
+
+    public int lastIndexOf(Object o) {
+        return -1;
+    }
+
+    public Iterator<E> iterator() {
+        return new ArrayListIterator();
+    }
+
+    private class ArrayListIterator implements Iterator<E> {
         private int index;
 
-        ArrayListIterator(ArrayList list) {
-            this.list = list;
+        ArrayListIterator() {
             this.index = 0;
         }
 
         public boolean hasNext() {
-            return index < list.size();
+            return index < size;
         }
 
-        public Object next() {
+        @SuppressWarnings("unchecked")
+        public E next() {
             if (!hasNext()) {
                 throw new RuntimeException("No more elements");
             }
-            Object result = list.get(index);
-            index++;
-            return result;
+            return (E) elements[index++];
         }
 
         public void remove() {

@@ -1041,6 +1041,7 @@ private:
                                              const TypeSymbol*);
     bool CanCastConvert(TypeSymbol*, TypeSymbol*, TokenIndex = 0);
     bool CanMethodInvocationConvert(const TypeSymbol*, const TypeSymbol*);
+    bool CanSubtypeConvert(const TypeSymbol*, const TypeSymbol*);
     bool CanAssignmentConvert(const TypeSymbol*, AstExpression*);
     bool CanAssignmentConvertReference(const TypeSymbol*, const TypeSymbol*);
     LiteralValue* CastValue(const TypeSymbol*, AstExpression*);
