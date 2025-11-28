@@ -3395,6 +3395,17 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
         delete temp_constructor;  // Clean up temporary
     }
 
+    // Propagate varargs flag from last parameter to constructor
+    if (constructor -> NumFormalParameters() > 0)
+    {
+        VariableSymbol* last_param =
+            constructor -> FormalParameter(constructor -> NumFormalParameters() - 1);
+        if (last_param -> ACC_VARARGS())
+        {
+            constructor -> SetACC_VARARGS();
+        }
+    }
+
     constructor -> SetSignature(control);
 
     for (unsigned k = 0; k < constructor_declaration -> NumThrows(); k++)
