@@ -1,5 +1,7 @@
 # JOPA Project Guidelines
 
+- Avoid workarounds and temporary solutions. If you must, always mark corresponding line with a TODO and keep a list of TODOs in ./TODO.md
+
 ## Build System
 - Clang-based C++ project
 - Use CMake for building
