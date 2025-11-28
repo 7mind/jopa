@@ -2198,7 +2198,8 @@ void Semantic::CheckSimpleName(AstName* name, SemanticEnvironment* where_found)
         }
         else if (variable_symbol -> owner -> TypeCast() &&
                  ! variable_symbol -> IsDeclarationComplete() &&
-                 ! ProcessingSimpleAssignment())
+                 ! ProcessingSimpleAssignment() &&
+                 ThisVariable())  // Only report error in field initializers, not in method bodies
         {
             ReportSemError(SemanticError::NAME_NOT_YET_AVAILABLE,
                            name -> identifier_token,
@@ -3889,7 +3890,8 @@ void Semantic::ProcessMethodInvocation(Ast* expr)
 {
     AstMethodInvocation* method_call = (AstMethodInvocation*) expr;
 
-    if (method_call -> type_arguments_opt)
+    if (method_call -> type_arguments_opt &&
+        control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::EXPLICIT_TYPE_ARGUMENTS_UNSUPPORTED,
                        method_call -> type_arguments_opt);
@@ -4740,7 +4742,8 @@ void Semantic::ProcessClassCreationExpression(Ast* expr)
     //
     // Check the arguments to the constructor.
     //
-    if (class_creation -> type_arguments_opt)
+    if (class_creation -> type_arguments_opt &&
+        control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::EXPLICIT_TYPE_ARGUMENTS_UNSUPPORTED,
                        class_creation -> type_arguments_opt);

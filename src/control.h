@@ -224,6 +224,7 @@ public:                                                         \
     METHOD_ACCESSOR(AutoCloseable_close, AutoCloseable(), "close", "()V");
     TYPE_ACCESSOR(Boolean, lang_package);
     FIELD_ACCESSOR(Boolean, TYPE, "java/lang/Class");
+    METHOD_ACCESSOR(Boolean_booleanValue, Boolean(), "booleanValue", "()Z");
     TYPE_ACCESSOR(Byte, lang_package);
     FIELD_ACCESSOR(Byte, TYPE, "java/lang/Class");
     TYPE_ACCESSOR(Character, lang_package);

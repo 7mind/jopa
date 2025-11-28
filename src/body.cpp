@@ -436,7 +436,12 @@ void Semantic::ProcessIfStatement(Ast* stmt)
     ProcessExpression(if_statement -> expression);
 
     TypeSymbol* cond_type = if_statement -> expression -> Type();
-    if (cond_type != control.boolean_type && cond_type != control.no_type)
+    // Allow Boolean wrapper type with auto-unboxing in Java 5+
+    bool is_boolean = cond_type == control.boolean_type ||
+                      cond_type == control.no_type ||
+                      (control.option.source >= JopaOption::SDK1_5 &&
+                       cond_type == control.Boolean());
+    if (! is_boolean)
     {
         ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
                        if_statement -> expression,
@@ -483,6 +488,9 @@ void Semantic::ProcessWhileStatement(Ast* stmt)
 
     ProcessExpression(while_statement -> expression);
     TypeSymbol* cond_type = while_statement -> expression -> Type();
+    // Allow Boolean wrapper type with auto-unboxing in Java 5+
+    bool is_boolean_wrapper = control.option.source >= JopaOption::SDK1_5 &&
+                              cond_type == control.Boolean();
     if (cond_type == control.boolean_type)
     {
         if (IsConstantFalse(while_statement -> expression))
@@ -496,6 +504,12 @@ void Semantic::ProcessWhileStatement(Ast* stmt)
         {
             while_statement -> can_complete_normally = true;
         }
+    }
+    else if (is_boolean_wrapper)
+    {
+        // Boolean wrapper can complete normally (value not known at compile time)
+        if (while_statement -> is_reachable)
+            while_statement -> can_complete_normally = true;
     }
     else if (cond_type != control.no_type)
     {
@@ -569,6 +583,9 @@ void Semantic::ProcessForStatement(Ast* stmt)
     {
         ProcessExpression(for_statement -> end_expression_opt);
         TypeSymbol* cond_type = for_statement -> end_expression_opt -> Type();
+        // Allow Boolean wrapper type with auto-unboxing in Java 5+
+        bool is_boolean_wrapper = control.option.source >= JopaOption::SDK1_5 &&
+                                  cond_type == control.Boolean();
         if (cond_type == control.boolean_type)
         {
             if (IsConstantFalse(for_statement -> end_expression_opt))
@@ -582,6 +599,12 @@ void Semantic::ProcessForStatement(Ast* stmt)
             {
                 for_statement -> can_complete_normally = true;
             }
+        }
+        else if (is_boolean_wrapper)
+        {
+            // Boolean wrapper can complete normally (value not known at compile time)
+            if (for_statement -> is_reachable)
+                for_statement -> can_complete_normally = true;
         }
         else if (cond_type != control.no_type)
         {
@@ -685,6 +708,14 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
         symbol -> SetFlags(access_flags);
         symbol -> SetOwner(ThisMethod());
         symbol -> declarator = variable_declarator;
+
+        // Copy parameterized type information if present (for generics type substitution)
+        AstTypeName* type_name = foreach -> formal_parameter -> type -> TypeNameCast();
+        if (type_name && type_name -> parameterized_type)
+        {
+            symbol -> parameterized_type = type_name -> parameterized_type;
+        }
+
         symbol -> SetLocation();
         symbol -> SetLocalVariableIndex(enclosing_block_symbol ->
                                         max_variable_index++);
@@ -1138,7 +1169,12 @@ void Semantic::ProcessDoStatement(Ast* stmt)
     ProcessExpression(do_statement -> expression);
 
     TypeSymbol* type = do_statement -> expression -> Type();
-    if (type != control.boolean_type && type != control.no_type)
+    // Allow Boolean wrapper type with auto-unboxing in Java 5+
+    bool is_boolean = type == control.boolean_type ||
+                      type == control.no_type ||
+                      (control.option.source >= JopaOption::SDK1_5 &&
+                       type == control.Boolean());
+    if (! is_boolean)
     {
         ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
                        do_statement -> expression,
@@ -2109,7 +2145,12 @@ void Semantic::ProcessAssertStatement(Ast* stmt)
     ProcessExpression(assert_statement -> condition);
 
     TypeSymbol* type = assert_statement -> condition -> Type();
-    if (type != control.no_type && type != control.boolean_type)
+    // Allow Boolean wrapper type with auto-unboxing in Java 5+
+    bool is_boolean = type == control.boolean_type ||
+                      type == control.no_type ||
+                      (control.option.source >= JopaOption::SDK1_5 &&
+                       type == control.Boolean());
+    if (! is_boolean)
     {
         ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
                        assert_statement -> condition,
@@ -2121,7 +2162,8 @@ void Semantic::ProcessAssertStatement(Ast* stmt)
     // assert variable (creating it if necessary as a side-effect). However,
     // if we are not emitting asserts, we can skip this.
     //
-    else if (! IsConstantTrue(assert_statement -> condition) &&
+    else if (type == control.boolean_type &&
+             ! IsConstantTrue(assert_statement -> condition) &&
              ! control.option.noassert)
     {
         assert_statement -> assert_variable =
@@ -2248,7 +2290,8 @@ void Semantic::ProcessThisCall(AstThisCall* this_call)
     // Signal that we are about to process an explicit constructor invocation.
     ExplicitConstructorInvocation() = this_call;
 
-    if (this_call -> type_arguments_opt)
+    if (this_call -> type_arguments_opt &&
+        control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::EXPLICIT_TYPE_ARGUMENTS_UNSUPPORTED,
                        this_call -> type_arguments_opt);
@@ -2364,7 +2407,8 @@ void Semantic::ProcessSuperCall(AstSuperCall* super_call)
                 CreateAccessToType(super_call, super_type -> EnclosingType());
     }
 
-    if (super_call -> type_arguments_opt)
+    if (super_call -> type_arguments_opt &&
+        control.option.source < JopaOption::SDK1_5)
     {
         ReportSemError(SemanticError::EXPLICIT_TYPE_ARGUMENTS_UNSUPPORTED,
                        super_call -> type_arguments_opt);
