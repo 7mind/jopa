@@ -1219,11 +1219,55 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
         }
         else
         {
-            // Simple type - use the TypeSymbol
-            TypeSymbol* arg_sym = type_arg_ast -> symbol;
-            if (! arg_sym || arg_sym -> Bad())
-                arg_sym = control.no_type; // Use placeholder for bad types
-            type_arg_tuple -> Next() = new Type(arg_sym);
+            // Check if the type argument is a type parameter reference
+            // Type parameters are stored as their erased type in symbol, but we need
+            // to track them as TYPE_PARAMETER kind for proper type substitution.
+            TypeParameterSymbol* type_param_sym = NULL;
+            if (type_name && ! type_name -> type_arguments_opt)
+            {
+                const NameSymbol* arg_name = lex_stream -> NameSymbol(
+                    type_name -> name -> identifier_token);
+                // Check processing_type's type parameters
+                if (processing_type)
+                {
+                    for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
+                    {
+                        TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
+                        if (tp -> name_symbol == arg_name)
+                        {
+                            type_param_sym = tp;
+                            break;
+                        }
+                    }
+                }
+                // Also check enclosing method's type parameters
+                if (! type_param_sym && ThisMethod())
+                {
+                    for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
+                    {
+                        TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
+                        if (tp -> name_symbol == arg_name)
+                        {
+                            type_param_sym = tp;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (type_param_sym)
+            {
+                // Type argument is a type parameter - store as TYPE_PARAMETER
+                type_arg_tuple -> Next() = new Type(type_param_sym);
+            }
+            else
+            {
+                // Simple type - use the TypeSymbol
+                TypeSymbol* arg_sym = type_arg_ast -> symbol;
+                if (! arg_sym || arg_sym -> Bad())
+                    arg_sym = control.no_type; // Use placeholder for bad types
+                type_arg_tuple -> Next() = new Type(arg_sym);
+            }
         }
     }
 

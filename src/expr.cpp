@@ -3956,10 +3956,90 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         if (base)
         {
             VariableSymbol* var = base -> symbol -> VariableCast();
-            if (var && var -> parameterized_type &&
-                var -> parameterized_type -> generic_type == method -> containing_type)
+            if (var && var -> parameterized_type)
             {
-                param_type = var -> parameterized_type;
+                ParameterizedType* var_param = var -> parameterized_type;
+                if (var_param -> generic_type == method -> containing_type)
+                {
+                    param_type = var_param;
+                }
+                else
+                {
+                    // The method is inherited from a superclass. Walk up the inheritance
+                    // hierarchy and propagate type arguments.
+                    // E.g., GenericExtender<Integer> extends Container<E>
+                    // where get() is in Container<T>. Need to map Integer -> E -> T.
+                    TypeSymbol* current_generic = var_param -> generic_type;
+                    ParameterizedType* current_param = var_param;
+
+                    while (current_generic && ! param_type)
+                    {
+                        if (current_generic -> HasParameterizedSuper())
+                        {
+                            ParameterizedType* super_param = current_generic -> GetParameterizedSuper();
+                            if (super_param -> generic_type == method -> containing_type)
+                            {
+                                // Found the target. Now substitute type arguments.
+                                // super_param's type arguments may reference current_generic's
+                                // type parameters, which we need to substitute with current_param's
+                                // type arguments.
+                                // For now, handle the simple case where the super's type argument
+                                // is directly a type parameter of current_generic.
+                                if (super_param -> NumTypeArguments() > param_index)
+                                {
+                                    Type* super_type_arg = super_param -> TypeArgument(param_index);
+                                    if (super_type_arg)
+                                    {
+                                        // Check if this type arg is a type parameter of current_generic
+                                        TypeParameterSymbol* type_param_sym =
+                                            super_type_arg -> IsTypeParameter()
+                                                ? super_type_arg -> GetTypeParameter() : NULL;
+                                        if (type_param_sym && current_param)
+                                        {
+                                            // Find which type parameter index this is
+                                            for (unsigned k = 0; k < current_generic -> NumTypeParameters(); k++)
+                                            {
+                                                if (current_generic -> TypeParameter(k) == type_param_sym)
+                                                {
+                                                    // Substitute with current_param's type argument
+                                                    if (k < current_param -> NumTypeArguments())
+                                                    {
+                                                        Type* substituted_arg =
+                                                            current_param -> TypeArgument(k);
+                                                        if (substituted_arg)
+                                                        {
+                                                            TypeSymbol* result = substituted_arg -> Erasure();
+                                                            if (result && result -> fully_qualified_name &&
+                                                                ! result -> Primitive())
+                                                            {
+                                                                method_call -> resolved_type = result;
+                                                                param_type = super_param; // Mark as found
+                                                            }
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        else
+                                        {
+                                            // Direct type argument (not a type parameter reference)
+                                            param_type = super_param;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                            current_param = super_param;
+                            current_generic = super_param -> generic_type;
+                        }
+                        else
+                        {
+                            current_generic = current_generic -> super;
+                            current_param = NULL;
+                        }
+                    }
+                }
             }
         }
 
