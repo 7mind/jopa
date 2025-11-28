@@ -10,6 +10,8 @@
 - Use Valgrind
 - Use execinfo.h and arg2line
 - You may replace JAVAC command in  vendor/CMakeLists.txt: like "JAVAC=valgrind --error-exitcode=1 --log-file=${CMAKE_BINARY_DIR}/valgrind-%p.log ${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+- REMEMBER: GNU Classpath builds fine with Javac. If we encounter a semantic error there, our compiler is flawed and we need to fix it, not mask issues!
+
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues
