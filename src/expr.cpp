@@ -8272,10 +8272,28 @@ void Semantic::ProcessInstanceofExpression(Ast* expr)
     // Check for illegal instanceof with parameterized types
     // Due to type erasure, instanceof cannot check type arguments at runtime
     // Example: obj instanceof List<String> is illegal
+    // But unbounded wildcards like List<?> are allowed (JLS 15.20.2)
     else if (control.option.source >= JopaOption::SDK1_5)
     {
+        // Check for illegal instanceof with parameterized types that use
+        // concrete type arguments. Unbounded wildcards like List<?> are allowed.
         AstTypeName* type_name = instanceof -> type -> TypeNameCast();
+        bool has_illegal_type_arg = false;
         if (type_name && type_name -> type_arguments_opt)
+        {
+            AstTypeArguments* type_args = type_name -> type_arguments_opt;
+            for (unsigned i = 0; i < type_args -> NumTypeArguments(); i++)
+            {
+                AstWildcard* wildcard = type_args -> TypeArgument(i) -> WildcardCast();
+                // Not a wildcard, or wildcard with bounds (extends/super)
+                if (!wildcard || wildcard -> bounds_opt)
+                {
+                    has_illegal_type_arg = true;
+                    break;
+                }
+            }
+        }
+        if (has_illegal_type_arg)
         {
             // instanceof with parameterized type is illegal due to type erasure
             // Use instanceof with raw type and cast to parameterized type instead
