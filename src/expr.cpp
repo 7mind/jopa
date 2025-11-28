@@ -2994,6 +2994,28 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                         break;
                     }
                 }
+
+                // Also check for nested types (member types can be statically imported)
+                if (!static_member)
+                {
+                    if (!import_type -> expanded_type_table)
+                        ComputeTypesClosure(import_type, name -> identifier_token);
+
+                    if (import_type -> expanded_type_table)
+                    {
+                        TypeShadowSymbol* type_shadow =
+                            import_type -> expanded_type_table -> FindTypeShadowSymbol(name_symbol);
+                        if (type_shadow && type_shadow -> type_symbol)
+                        {
+                            TypeSymbol* nested = type_shadow -> type_symbol;
+                            if (nested -> ACC_STATIC() && TypeAccessCheck(nested))
+                            {
+                                static_member = nested;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
 
             // If not found in single imports, check static-on-demand imports
@@ -3041,7 +3063,37 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                         }
                     }
 
-                    // Check for static methods (if no field found)
+                    // Check for nested types (if no field found)
+                    if (!static_member)
+                    {
+                        if (!import_type -> expanded_type_table)
+                            ComputeTypesClosure(import_type, name -> identifier_token);
+
+                        if (import_type -> expanded_type_table)
+                        {
+                            TypeShadowSymbol* type_shadow =
+                                import_type -> expanded_type_table -> FindTypeShadowSymbol(name_symbol);
+                            if (type_shadow && type_shadow -> type_symbol)
+                            {
+                                TypeSymbol* nested = type_shadow -> type_symbol;
+                                if (nested -> ACC_STATIC() && TypeAccessCheck(nested))
+                                {
+                                    if (static_member)
+                                    {
+                                        // Ambiguous static import
+                                        ReportSemError(SemanticError::AMBIGUOUS_TYPE,
+                                                     name -> identifier_token,
+                                                     name_symbol -> Name());
+                                        name -> symbol = control.no_type;
+                                        return;
+                                    }
+                                    static_member = nested;
+                                }
+                            }
+                        }
+                    }
+
+                    // Check for static methods (if no field or type found)
                     if (!static_member)
                     {
                         if (!import_type -> MethodMembersProcessed())
