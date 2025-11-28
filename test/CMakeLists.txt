@@ -142,6 +142,7 @@ if(JOPA_ENABLE_JVM_TESTS)
         DEPENDS "compile_EnumMethodsTest"
     )
 endif()
+add_jopa_run_test(EnumTopLevelSwitchTest "${TEST_DIR}/enums/EnumTopLevelSwitchTest.java" "EnumTopLevelSwitchTest")
 
 # Varargs Tests
 add_jopa_run_test(VarargsTest "${TEST_DIR}/varargs/VarargsTest.java" "VarargsTest")

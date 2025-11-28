@@ -2294,7 +2294,8 @@ void Semantic::ProcessSuperCall(AstSuperCall* super_call)
     TypeSymbol* this_type = ThisType();
     if (super_call -> symbol)
     {
-        assert(this_type -> Anonymous());
+        // Symbol is pre-set for anonymous classes and enum constructors
+        assert(this_type -> Anonymous() || this_type -> ACC_ENUM());
         return;
     }
 
