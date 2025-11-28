@@ -5736,13 +5736,13 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
 
                 if (field_symbol)
                 {
-                    // Create: CONSTANT_NAME = new EnumType("CONSTANT_NAME", ordinal)
+                    // Create: CONSTANT_NAME = new EnumType("CONSTANT_NAME", ordinal, user_args...)
 
                     // Left side: field reference
                     AstName* field_ref = ast_pool -> GenName(enum_constant -> identifier_token);
                     field_ref -> symbol = field_symbol;
 
-                    // Right side: new EnumType("name", ordinal)
+                    // Right side: new EnumType("name", ordinal, user_args...)
                     AstClassCreationExpression* creation = ast_pool -> GenClassCreationExpression();
                     creation -> new_token = loc;
                     AstName* type_name = ast_pool -> GenName(loc);
@@ -5750,9 +5750,14 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
                     creation -> class_type = ast_pool -> GenTypeName(type_name);
                     creation -> class_type -> symbol = this_type;
 
-                    // Arguments: ("CONSTANT_NAME", ordinal)
+                    // Count user-provided arguments
+                    unsigned num_user_args = 0;
+                    if (enum_constant -> arguments_opt)
+                        num_user_args = enum_constant -> arguments_opt -> NumArguments();
+
+                    // Arguments: ("CONSTANT_NAME", ordinal, user_args...)
                     creation -> arguments = ast_pool -> GenArguments(loc, loc);
-                    creation -> arguments -> AllocateArguments(2);
+                    creation -> arguments -> AllocateArguments(2 + num_user_args);
 
                     // String name argument - create string literal
                     const NameSymbol* name_symbol = field_symbol -> Identity();
@@ -5767,18 +5772,45 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
                     ordinal_arg -> symbol = control.int_type;
                     creation -> arguments -> AddArgument(ordinal_arg);
 
-                    // Set the constructor symbol (not the type!)
-                    // For enums, we need the private constructor with (String, int) parameters
-                    // Find it by iterating through all methods in the type
-                    MethodSymbol* constructor = NULL;
-                    for (unsigned m = 0; m < this_type -> NumMethodSymbols(); m++)
+                    // Add user-provided arguments
+                    // Process each argument semantically before adding
+                    if (enum_constant -> arguments_opt)
                     {
-                        MethodSymbol* method = this_type -> MethodSym(m);
-                        if (method -> Identity() == control.init_name_symbol &&
-                            method -> NumFormalParameters() == 2)
+                        // Set up context for expression processing
+                        ThisMethod() = init_method;
+                        ThisVariable() = NULL;
+                        LocalBlockStack().Push(declaration -> method_body_opt);
+                        LocalSymbolTable().Push(init_method -> block_symbol -> Table());
+
+                        for (unsigned a = 0; a < enum_constant -> arguments_opt -> NumArguments(); a++)
                         {
-                            constructor = method;
-                            break;
+                            AstExpression* arg = enum_constant -> arguments_opt -> Argument(a);
+                            // Process the argument expression
+                            ProcessExpression(arg);
+                            creation -> arguments -> AddArgument(arg);
+                        }
+
+                        LocalSymbolTable().Pop();
+                        LocalBlockStack().Pop();
+                    }
+
+                    // Use the constructor symbol from semantic analysis if available,
+                    // otherwise find it by matching parameter count
+                    MethodSymbol* constructor = enum_constant -> ctor_symbol;
+                    if (! constructor)
+                    {
+                        // Find constructor with matching parameter count:
+                        // 2 implicit params (name, ordinal) + user args
+                        unsigned expected_params = 2 + num_user_args;
+                        for (unsigned m = 0; m < this_type -> NumMethodSymbols(); m++)
+                        {
+                            MethodSymbol* method = this_type -> MethodSym(m);
+                            if (method -> Identity() == control.init_name_symbol &&
+                                method -> NumFormalParameters() == expected_params)
+                            {
+                                constructor = method;
+                                break;
+                            }
                         }
                     }
                     creation -> symbol = constructor;
@@ -5794,6 +5826,8 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
                     AstExpressionStatement* stmt = ast_pool -> GenExpressionStatement();
                     stmt -> expression = assignment;
                     stmt -> semicolon_token_opt = loc;
+                    stmt -> is_reachable = true;
+                    stmt -> can_complete_normally = true;
 
                     // Add to static initializer
                     declaration -> method_body_opt -> AddStatement(stmt);

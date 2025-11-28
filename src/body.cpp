@@ -2713,6 +2713,34 @@ void Semantic::ProcessConstructorBody(AstConstructorDeclaration* constructor_dec
             compilation_unit -> ast_pool -> GenArguments(loc, loc);
         super_call -> semicolon_token = loc;
 
+        // For enum constructors (except java.lang.Enum itself), pass name and ordinal
+        // to the super(String, int) constructor of java.lang.Enum
+        if (this_type -> IsEnum() && this_type != control.Enum())
+        {
+            super_call -> arguments -> AllocateArguments(2);
+
+            // Get the name and ordinal parameter symbols from the constructor's block symbol
+            VariableSymbol* name_param = this_method -> block_symbol -> FindVariableSymbol(
+                control.FindOrInsertName(L"name", 4));
+            VariableSymbol* ordinal_param = this_method -> block_symbol -> FindVariableSymbol(
+                control.FindOrInsertName(L"ordinal", 7));
+
+            // Create name argument reference
+            AstName* name_ref = compilation_unit -> ast_pool -> GenName(loc);
+            if (name_param)
+                name_ref -> symbol = name_param;
+            super_call -> arguments -> AddArgument(name_ref);
+
+            // Create ordinal argument reference
+            AstName* ordinal_ref = compilation_unit -> ast_pool -> GenName(loc);
+            if (ordinal_param)
+                ordinal_ref -> symbol = ordinal_param;
+            super_call -> arguments -> AddArgument(ordinal_ref);
+
+            // Set the symbol to the Enum(String, int) constructor
+            super_call -> symbol = control.Enum_InitMethod();
+        }
+
         constructor_block -> explicit_constructor_opt = super_call;
 
         ProcessSuperCall(super_call);

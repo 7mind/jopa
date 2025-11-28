@@ -17,6 +17,7 @@
 - When working on GNU Classpath bootstrap, concentrate on fixing semantic errors first, not crashes!
 - When you see a class of semantic errors, reproduce with an isolated self-contained test with main method, integrate that test into primary test suite and then fix!
 - In order to integrate a new test, put it into ./test directory and register in test/CMakeLists.txt with `add_jopa_run_test` directive
+- Any issues in primary test suite always MUST be fixed before we proceed with GNU classpath, regardless if they are pre-existing
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues

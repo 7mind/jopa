@@ -3859,6 +3859,16 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
         }
     }
+
+    //
+    // Special case: array.clone() returns the array type, not Object.
+    // JLS 10.7: Every array type T[] has a public method clone() with return type T[].
+    //
+    if (method && base_type && base_type -> IsArray() &&
+        method -> name_symbol == control.clone_name_symbol)
+    {
+        method_call -> resolved_type = base_type;
+    }
 }
 
 
