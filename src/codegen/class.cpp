@@ -6,6 +6,7 @@
 #include "semantic.h"
 #include "zipfile.h"
 #include "typeparam.h"
+#include "paramtype.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -1910,7 +1911,9 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
 
     //
     // For Java 5+, parse the Signature attribute to get type parameters
+    // and parameterized superclass
     //
+    const char* super_sig_start = NULL;  // Track where superclass signature starts
     if (control.option.source >= JopaOption::SDK1_5 &&
         class_data -> Signature())
     {
@@ -1918,10 +1921,11 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         const char* sig = sig_info -> Bytes();
         // Class signature format: <T:Bound;>SuperclassSig InterfaceSig*
         // Parse type parameters if signature starts with '<'
+        const char* p = sig;
         if (sig && sig[0] == '<')
         {
             // Skip the '<' and parse type parameters
-            const char* p = sig + 1;
+            p = sig + 1;
             unsigned param_index = 0;
             while (*p && *p != '>')
             {
@@ -1959,7 +1963,13 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                     p++;
                 }
             }
+            // Skip past the closing '>'
+            if (*p == '>')
+                p++;
         }
+        // p now points to superclass signature (or start of sig if no type params)
+        if (*p == 'L')
+            super_sig_start = p;
     }
 
     //
@@ -1981,6 +1991,128 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
             type -> supertypes_closure -> AddElement(type -> super);
             type -> supertypes_closure -> Union(*type -> super ->
                                                 supertypes_closure);
+
+            // Parse parameterized superclass from signature if present
+            // Signature format: Ljava/lang/ref/Reference<TT;>;
+            if (super_sig_start && type -> super && *super_sig_start == 'L')
+            {
+                const char* p = super_sig_start + 1;  // skip 'L'
+                // Find class name end (at '<' or ';')
+                while (*p && *p != '<' && *p != ';')
+                    p++;
+
+                if (*p == '<')
+                {
+                    // Has type arguments - parse them
+                    p++;  // skip '<'
+                    Tuple<Type*>* type_args = new Tuple<Type*>(4);
+
+                    while (*p && *p != '>')
+                    {
+                        if (*p == 'T')
+                        {
+                            // Type variable reference like "TT;"
+                            p++;  // skip 'T'
+                            const char* var_start = p;
+                            while (*p && *p != ';')
+                                p++;
+                            int var_len = p - var_start;
+                            if (*p == ';')
+                                p++;  // skip ';'
+
+                            // Find matching type parameter
+                            wchar_t* var_name = new wchar_t[var_len + 1];
+                            Control::ConvertUtf8ToUnicode(var_name, var_start, var_len);
+                            var_name[var_len] = U_NULL;
+
+                            TypeParameterSymbol* found_param = NULL;
+                            for (unsigned j = 0; j < type -> NumTypeParameters(); j++)
+                            {
+                                TypeParameterSymbol* tp = type -> TypeParameter(j);
+                                if (tp -> name_symbol &&
+                                    wcscmp(tp -> name_symbol -> Name(), var_name) == 0)
+                                {
+                                    found_param = tp;
+                                    break;
+                                }
+                            }
+                            delete[] var_name;
+
+                            if (found_param)
+                            {
+                                type_args -> Next() = new Type(found_param);
+                            }
+                            else
+                            {
+                                // Fallback to Object if type param not found
+                                type_args -> Next() = new Type(control.Object());
+                            }
+                        }
+                        else if (*p == 'L')
+                        {
+                            // Class type argument like "Ljava/lang/String;"
+                            const char* class_start = p;
+                            int depth = 0;
+                            while (*p && !(*p == ';' && depth == 0))
+                            {
+                                if (*p == '<') depth++;
+                                else if (*p == '>') depth--;
+                                p++;
+                            }
+                            if (*p == ';')
+                                p++;
+
+                            // Get the TypeSymbol for this class
+                            const char* sig_ptr = class_start;
+                            TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                            type_args -> Next() = new Type(arg_type);
+                        }
+                        else if (*p == '[')
+                        {
+                            // Array type argument
+                            const char* sig_ptr = p;
+                            TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                            type_args -> Next() = new Type(arg_type);
+                            p = sig_ptr;
+                        }
+                        else if (*p == '*')
+                        {
+                            // Unbounded wildcard '?'
+                            p++;
+                            type_args -> Next() = new Type(control.Object());
+                        }
+                        else if (*p == '+' || *p == '-')
+                        {
+                            // Bounded wildcard: +Bound (extends) or -Bound (super)
+                            p++;  // skip + or -
+                            if (*p == 'L' || *p == 'T' || *p == '[')
+                            {
+                                const char* sig_ptr = p;
+                                TypeSymbol* bound_type = ProcessSignature(type, sig_ptr, tok);
+                                type_args -> Next() = new Type(bound_type);
+                                p = sig_ptr;
+                            }
+                        }
+                        else
+                        {
+                            // Unknown, skip one char
+                            p++;
+                        }
+                    }
+
+                    if (type_args -> Length() > 0)
+                    {
+                        ParameterizedType* param_super = new ParameterizedType(
+                            type -> super, type_args);
+                        control.RegisterParameterizedType(param_super);
+                        type -> SetParameterizedSuper(param_super);
+                    }
+                    else
+                    {
+                        delete type_args;
+                    }
+                }
+            }
         }
     }
     for (i = class_data -> InterfacesCount() - 1; i >= 0; i--)
