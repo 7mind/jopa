@@ -699,6 +699,7 @@ TypeSymbol::TypeSymbol(const NameSymbol* name_symbol_)
     nested_type_signatures(NULL),
     nested_types(NULL),
     interfaces(NULL),
+    parameterized_interfaces(NULL),
     anonymous_types(NULL),
     array(NULL),
     type_parameters(NULL),
@@ -771,6 +772,7 @@ TypeSymbol::~TypeSymbol()
     delete class_literals;
     delete nested_types;
     delete interfaces;
+    delete parameterized_interfaces;
     delete anonymous_types;
     delete array;
 
@@ -1477,9 +1479,11 @@ static void GenerateTypeSignatureFromAst(AstType* type, MethodSymbol* method,
 //
 void MethodSymbol::SetGenericSignature(Control& control)
 {
-    // Only generic methods or methods with generic return/param types need signature
-    if (NumTypeParameters() == 0)
-        return;  // For now, only handle methods with type parameters
+    // Methods need signature if they have:
+    // 1. Method type parameters (NumTypeParameters() > 0), OR
+    // 2. Return type is a class type parameter (return_type_param_index >= 0)
+    if (NumTypeParameters() == 0 && return_type_param_index < 0)
+        return;
 
     // Estimate size: type parameters + parameters + return type
     unsigned estimated_size = 1000;
@@ -1573,6 +1577,30 @@ void MethodSymbol::SetGenericSignature(Control& control)
         for (unsigned i = 0; i < name_len; i++)
             buffer[length++] = name[i];
         buffer[length++] = ';';
+    }
+    else if (return_type_param_index >= 0 && containing_type)
+    {
+        // Return type is a class type parameter - use TName; format
+        // Get type parameter from containing type
+        TypeParameterSymbol* type_param = containing_type -> TypeParameter(return_type_param_index);
+        if (type_param)
+        {
+            buffer[length++] = 'T';
+            const char* name = type_param -> Utf8Name();
+            unsigned name_len = type_param -> Utf8NameLength();
+            for (unsigned i = 0; i < name_len; i++)
+                buffer[length++] = name[i];
+            buffer[length++] = ';';
+        }
+        else
+        {
+            // Fallback to erased type
+            TypeSymbol* return_type = Type();
+            const char* return_sig = return_type -> SignatureString();
+            unsigned return_len = strlen(return_sig);
+            for (unsigned i = 0; i < return_len; i++)
+                buffer[length++] = return_sig[i];
+        }
     }
     else if (method_decl && method_decl -> type && lex_stream)
     {

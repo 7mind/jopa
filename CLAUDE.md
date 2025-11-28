@@ -18,6 +18,8 @@
 - When you see a class of semantic errors, reproduce with an isolated self-contained test with main method, integrate that test into primary test suite and then fix!
 - In order to integrate a new test, put it into ./test directory and register in test/CMakeLists.txt with `add_jopa_run_test` directive
 - Any issues in primary test suite always MUST be fixed before we proceed with GNU classpath, regardless if they are pre-existing
+- For any semantic errors we should always start by checking the correctness of our stub runtime and extend it if necessary! Don't forget to always rebuild the stub runtime jar after modifications before running any tests. 
+- Only use stub runtime jar for tests, don't use system rt.jar or directories on the disk
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues
