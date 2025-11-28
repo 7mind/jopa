@@ -421,6 +421,9 @@ if(JOPA_ENABLE_JVM_TESTS)
     )
 endif()
 
+# Enum Switch Test
+add_jopa_run_test(EnumSwitchTest "${TEST_DIR}/java7/EnumSwitchTest.java" "EnumSwitchTest")
+
 # Java 8 Tests
 # Tests default methods (partial Java 8 support).
 # Note: JOPA supports Java 7 bytecode (v51.0) with StackMapTable generation.

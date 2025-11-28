@@ -810,6 +810,10 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
     bool is_string_switch = (type == control.String());
     switch_statement -> is_string_switch = is_string_switch;
 
+    bool is_enum_switch = (type && type -> ACC_ENUM());
+    switch_statement -> is_enum_switch = is_enum_switch;
+    switch_statement -> enum_type = is_enum_switch ? type : NULL;
+
     if (is_string_switch)
     {
         if (main_block -> helper_variable_index < 0)
@@ -822,6 +826,7 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
 
     if (! control.IsSimpleIntegerValueType(type) &&
         type != control.String() &&
+        ! is_enum_switch &&
         type != control.no_type)
     {
         ReportSemError(SemanticError::TYPE_NOT_INTEGER,
@@ -854,6 +859,43 @@ void Semantic::ProcessSwitchStatement(Ast* stmt)
                 switch_block_statement -> SwitchLabel(k);
             if (switch_label -> expression_opt)
             {
+                // For enum switch, case labels must be unqualified enum constant names.
+                // Handle them specially without calling ProcessExpression.
+                if (switch_statement -> is_enum_switch)
+                {
+                    AstName* name = switch_label -> expression_opt -> NameCast();
+                    VariableSymbol* enum_constant = NULL;
+
+                    if (name && ! name -> base_opt)
+                    {
+                        // Simple name - look it up in the enum type
+                        NameSymbol* name_symbol = lex_stream -> NameSymbol(name -> identifier_token);
+                        enum_constant =
+                            switch_statement -> enum_type -> FindVariableSymbol(name_symbol);
+                        if (enum_constant && ! enum_constant -> ACC_ENUM())
+                            enum_constant = NULL; // Not an enum constant
+                    }
+
+                    if (! enum_constant)
+                    {
+                        // Not a valid enum constant - report error
+                        ReportSemError(SemanticError::INVALID_ENUM_SWITCH_CASE,
+                                       switch_label -> expression_opt,
+                                       switch_statement -> enum_type -> ContainingPackageName(),
+                                       switch_statement -> enum_type -> ExternalName());
+                    }
+                    else
+                    {
+                        // Valid enum constant - create case element
+                        CaseElement* case_element =
+                            compilation_unit -> ast_pool -> GenCaseElement(j, k);
+                        switch_statement -> AddCase(case_element);
+                        case_element -> value = enum_constant -> enum_ordinal;
+                        case_element -> string_value = NULL;
+                    }
+                    continue; // Skip the rest of the case label processing
+                }
+
                 ProcessExpression(switch_label -> expression_opt);
                 TypeSymbol* case_type =
                     switch_label -> expression_opt -> Type();

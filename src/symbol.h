@@ -1573,6 +1573,10 @@ public:
     // points to this variable.
     unsigned pool_index;
 
+    // For enum constants, this is the ordinal (position in the enum declaration).
+    // For non-enum variables, this is -1.
+    int enum_ordinal;
+
     VariableSymbol* accessed_local;
 
     virtual const wchar_t* Name() const { return name_symbol -> Name(); }
@@ -1636,6 +1640,7 @@ public:
         , initial_value(NULL)
         , signature(NULL)
         , parameterized_type(NULL)
+        , enum_ordinal(-1)
         , accessed_local(NULL)
         , external_name_symbol(NULL)
         , status(0)
