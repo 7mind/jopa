@@ -13,6 +13,7 @@
 - REMEMBER: GNU Classpath builds fine with Javac. If we encounter a semantic error there, our compiler is flawed and we need to fix it, not mask issues!
 - Never ignore pre-existing bugs you discover, we need to fix ALL the bugs (and keep a log of discovered/fixed ones)
 - Don't ignore pre-existing bugs, fix them!
+- Use jopa-stub-rt for GNU Classpath bootstrap! Don't forget to add missing stubs into jopa-stub-rt!
 
 ## ASAN/UBSAN Build (recommended for debugging)
 - Always use sanitizer-enabled build when debugging memory issues
