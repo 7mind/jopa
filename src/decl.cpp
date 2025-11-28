@@ -3307,6 +3307,9 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
             type_param -> owner = constructor;  // Update owner to actual constructor
             constructor -> AddTypeParameter(type_param);
         }
+        // Clear type_parameters from temp before deleting, so destructor doesn't free them
+        // (they are now owned by constructor)
+        temp_constructor -> ClearTypeParameters();
         delete temp_constructor;  // Clean up temporary
     }
 

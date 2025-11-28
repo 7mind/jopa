@@ -139,7 +139,7 @@ public:
     inline int Sign() const { return value.word >> 31; }
     inline int Exponent() const
     {
-        return ((value.word & EXP_BITS) >> FRACT_SIZE) - BIAS;
+        return static_cast<int>((value.word & EXP_BITS) >> FRACT_SIZE) - BIAS;
     }
     inline u4 Fraction() const
     {
@@ -386,7 +386,7 @@ public:
     inline int Sign() const { return HighWord() >> 31; }
     inline int Exponent() const
     {
-        return ((HighWord() & EXP_BITS) >> (FRACT_SIZE_HI)) - BIAS;
+        return static_cast<int>((HighWord() & EXP_BITS) >> FRACT_SIZE_HI) - BIAS;
     }
     inline LongInt Fraction() const
     {

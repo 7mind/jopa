@@ -2841,7 +2841,7 @@ BigInt BigInt::operator +(const unsigned op) const
             result.maxwds = 1 << (++result.k);
             x = new u4[result.maxwds];
             memcpy(x, result.data, wds * sizeof(u4));
-            delete result.data;
+            delete[] result.data;
             result.data = x;
         }
         result.data[result.wds++] = carry;
@@ -2922,7 +2922,7 @@ BigInt BigInt::operator *(unsigned op) const
             result.maxwds = 1 << (++result.k);
             x = new u4[result.maxwds];
             memcpy(x, result.data, wds * sizeof(u4));
-            delete result.data;
+            delete[] result.data;
             result.data = x;
         }
         result.data[result.wds++] = carry;

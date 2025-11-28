@@ -2009,15 +2009,15 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
         PutU4(ncases);
         for (i = 0; i < ncases; i++)
         {
-            PutU4(switch_statement -> Case(i) -> value);
+            PutU4(static_cast<u4>(switch_statement -> Case(i) -> value));
             UseLabel(case_labels[i], 4,
                      code_attribute -> CodeLength() - op_start);
         }
     }
     else
     {
-        PutU4(low);
-        PutU4(high);
+        PutU4(static_cast<u4>(low));
+        PutU4(static_cast<u4>(high));
         for (i = 0; i < nlabels; i++)
         {
             UseLabel(case_labels[i], 4,
@@ -2177,15 +2177,15 @@ bool ByteCode::EmitStringSwitchStatement(AstSwitchStatement* switch_statement)
         PutU4(ncases);
         for (i = 0; i < ncases; i++)
         {
-            PutU4(switch_statement -> Case(i) -> value);
+            PutU4(static_cast<u4>(switch_statement -> Case(i) -> value));
             UseLabel(hash_labels[i], 4,
                      code_attribute -> CodeLength() - switch_op_start);
         }
     }
     else
     {
-        PutU4(low);
-        PutU4(high);
+        PutU4(static_cast<u4>(low));
+        PutU4(static_cast<u4>(high));
         unsigned j = 0;
         for (i4 k = low; k <= high; k++, j++)
         {
@@ -6578,6 +6578,9 @@ int ByteCode::EmitClassCreationExpression(AstClassCreationExpression* expr,
     if (expr -> resolution_opt)
         expr = expr -> resolution_opt;
     MethodSymbol* constructor = (MethodSymbol*) expr -> symbol;
+    // If constructor is NULL (unresolved due to semantic errors), skip code generation
+    if (! constructor)
+        return need_value ? 1 : 0;
     TypeSymbol* type = constructor -> containing_type;
 
     PutOp(OP_NEW);
@@ -6922,6 +6925,9 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
 int ByteCode::CompleteCall(MethodSymbol* msym, int stack_words,
                            bool need_value, TypeSymbol* base_type)
 {
+    // If method is NULL (unresolved due to semantic errors), skip code generation
+    if (! msym)
+        return need_value ? 1 : 0;
     ChangeStack(- stack_words);
     TypeSymbol* type = (base_type ? base_type : msym -> containing_type);
     PutU2(RegisterMethodref(type, msym));
@@ -7658,6 +7664,9 @@ void ByteCode::EmitPreUnaryIncrementExpressionField(VariableCategory kind,
 
 void ByteCode::EmitThisInvocation(AstThisCall* this_call)
 {
+    // If symbol is NULL (unresolved due to semantic errors), skip code generation
+    if (! this_call -> symbol)
+        return;
     //
     // Pass enclosing instance along, then real arguments.
     //
@@ -7695,6 +7704,9 @@ void ByteCode::EmitThisInvocation(AstThisCall* this_call)
 
 void ByteCode::EmitSuperInvocation(AstSuperCall* super_call)
 {
+    // If symbol is NULL (unresolved due to semantic errors), skip code generation
+    if (! super_call -> symbol)
+        return;
     //
     // Pass enclosing instance along, then real arguments, then shadow
     // variables, and finally any extra null argument for accessibility

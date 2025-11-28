@@ -799,6 +799,7 @@ class ByteCode : public ClassFile, public StringConstant, public Operators
 
     u2 RegisterMethodref(const TypeSymbol* type, const MethodSymbol* method)
     {
+        assert(type && method && "null type or method in RegisterMethodref");
         CPInfo::ConstantPoolTag kind = type -> ACC_INTERFACE()
             ? CPInfo::CONSTANT_InterfaceMethodref
             : CPInfo::CONSTANT_Methodref;
