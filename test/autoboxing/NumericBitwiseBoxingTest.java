@@ -54,7 +54,7 @@ public class NumericBitwiseBoxingTest {
         test("Integer | int", (I3 | i3) == 0xFF);
 
         // Integer | Integer
-        test("Integer | Integer", (I1 | I2) == 0xF0);
+        test("Integer | Integer", (I1 | I2) == 0xFF);
 
         // long | Long
         long l3 = 0xF000L;
