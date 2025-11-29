@@ -59,8 +59,8 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Annotations
     public native Annotation[] getDeclaredAnnotations();
     public native Annotation[] getAnnotations();
-    public native Annotation getAnnotation(Class annotationType);
-    public native boolean isAnnotationPresent(Class annotationType);
+    public native <A extends Annotation> A getAnnotation(Class<A> annotationType);
+    public native boolean isAnnotationPresent(Class<? extends Annotation> annotationType);
 
     // Declaring class for inner classes
     public native Class getDeclaringClass();

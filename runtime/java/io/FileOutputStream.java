@@ -9,6 +9,8 @@ public class FileOutputStream extends OutputStream {
 
     public FileOutputStream(File file, boolean append) throws FileNotFoundException {}
 
+    public FileOutputStream(FileDescriptor fdObj) {}
+
     public void write(int b) throws IOException {}
 
     public void write(byte[] b) throws IOException {}
