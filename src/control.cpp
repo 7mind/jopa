@@ -1385,6 +1385,73 @@ void Control::ProcessPackageDeclaration(FileSymbol* file_symbol,
                                                     package_declaration -> name)
                               : unnamed_package);
 
+    //
+    // Register the source root directory with unnamed_package.
+    // This ensures that sibling packages can find each other.
+    // For a file in package com.sun.tools.javah at path /foo/com/sun/tools/javah/X.java,
+    // the source root is /foo/ which should be registered with unnamed_package.
+    //
+    if (package_declaration && file_symbol -> directory_symbol)
+    {
+        DirectorySymbol* dir = file_symbol -> directory_symbol;
+        const char* dir_name = dir -> DirectoryName();
+        int dir_len = dir -> DirectoryNameLength();
+
+        // Get the full package path (e.g., "com/sun/tools/javah") as wchar_t
+        wchar_t* pkg_name = file_symbol -> package -> PackageName();
+        int pkg_len = file_symbol -> package -> PackageNameLength();
+
+        // Calculate source root by stripping package path from directory path.
+        // dir_name: /home/user/project/com/sun/tools/javah
+        // pkg_name: com/sun/tools/javah
+        // source_root: /home/user/project
+        if (pkg_len > 0 && dir_len > pkg_len)
+        {
+            // Check if directory ends with package path (preceded by slash)
+            int root_len = dir_len - pkg_len;
+            if (root_len > 0 && dir_name[root_len - 1] == U_SLASH)
+            {
+                // Verify the suffix matches
+                bool matches = true;
+                for (int i = 0; i < pkg_len && matches; i++)
+                {
+                    if ((wchar_t)dir_name[root_len + i] != pkg_name[i])
+                        matches = false;
+                }
+
+                if (matches)
+                {
+                    // Create name for source root (without trailing slash)
+                    root_len--;
+                    wchar_t* root_name = new wchar_t[root_len + 1];
+                    for (int i = 0; i < root_len; i++)
+                        root_name[i] = dir_name[i];
+                    root_name[root_len] = U_NULL;
+
+                    // Find or create the source root directory
+                    DirectorySymbol* source_root = ProcessSubdirectories(root_name, root_len, true);
+                    delete[] root_name;
+
+                    if (source_root)
+                    {
+                        // Register source root with unnamed_package if not already there
+                        bool found = false;
+                        for (unsigned i = 0; i < unnamed_package -> directory.Length(); i++)
+                        {
+                            if (unnamed_package -> directory[i] == source_root)
+                            {
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (! found)
+                            unnamed_package -> directory.Next() = source_root;
+                    }
+                }
+            }
+        }
+    }
+
     for (unsigned i = 0; i < file_symbol -> lex_stream -> NumTypes(); i++)
     {
         TokenIndex identifier_token = file_symbol -> lex_stream ->

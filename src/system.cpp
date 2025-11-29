@@ -272,6 +272,56 @@ void Control::FindPathsToDirectory(PackageSymbol* package)
                 if (directory_symbol)
                     package -> directory.Next() = directory_symbol;
             }
+
+            //
+            // Also check unnamed_package directories. These may have been
+            // registered by ProcessPackageDeclaration for source files
+            // passed on the command line with absolute paths.
+            //
+            for (unsigned i = 0; i < unnamed_package -> directory.Length(); i++)
+            {
+                DirectorySymbol* root_dir = unnamed_package -> directory[i];
+                DirectorySymbol* subdirectory_symbol =
+                    root_dir -> FindDirectorySymbol(package -> Identity());
+                if (! root_dir -> IsZip())
+                {
+                    if (! subdirectory_symbol)
+                    {
+                        int length = root_dir -> DirectoryNameLength() +
+                            package -> Utf8NameLength() + 1; // +1 for '/'
+                        char* directory_name = new char[length + 1];
+                        strcpy(directory_name, root_dir -> DirectoryName());
+                        if (root_dir -> DirectoryName()[root_dir -> DirectoryNameLength() - 1] != U_SLASH)
+                            strcat(directory_name, StringConstant::U8S_SL);
+                        strcat(directory_name, package -> Utf8Name());
+
+                        if (SystemIsDirectory(directory_name))
+                            subdirectory_symbol = root_dir ->
+                                InsertDirectorySymbol(package -> Identity(),
+                                                      root_dir -> IsSourceDirectory());
+                        delete [] directory_name;
+                    }
+
+                    if (subdirectory_symbol)
+                        subdirectory_symbol -> ReadDirectory();
+                }
+
+                if (subdirectory_symbol)
+                {
+                    // Check if already added
+                    bool found = false;
+                    for (unsigned j = 0; j < package -> directory.Length(); j++)
+                    {
+                        if (package -> directory[j] == subdirectory_symbol)
+                        {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (! found)
+                        package -> directory.Next() = subdirectory_symbol;
+                }
+            }
         }
     }
 }
