@@ -117,7 +117,7 @@ The compiler fully supports complex generic type signatures including:
 - CMake 3.20+ and a C++17 compiler (Clang recommended)
 - libzip
 - iconv and/or ICU (uc) for encoding support
-- Java JDK (only for running tests and `jar` tool - not needed for compilation)
+- Java JDK (only for running tests - not needed for compilation)
 - Optional: Nix/direnv for reproducible environment
 
 ### Quick Start
