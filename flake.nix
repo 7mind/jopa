@@ -68,7 +68,7 @@
         # Package definition for building Jopa with CMake
         packages.default = pkgs.stdenv.mkDerivation {
           pname = "jopa";
-          version = "1.22-java7";
+          version = "2.0";
 
           src = ./.;
 

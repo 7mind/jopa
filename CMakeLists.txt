@@ -16,15 +16,16 @@ if(NOT DEFINED CMAKE_C_COMPILER AND NOT DEFINED CMAKE_CXX_COMPILER)
     endif()
 endif()
 
-# Read version from flake.nix
-file(READ "${CMAKE_SOURCE_DIR}/flake.nix" FLAKE_NIX_CONTENT)
-string(REGEX MATCH "version = \"([^\"]+)\"" _ "${FLAKE_NIX_CONTENT}")
+# Read version from flake.nix (before project() so we can use it there)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/flake.nix" FLAKE_NIX_CONTENT)
+string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+)" _ "${FLAKE_NIX_CONTENT}")
 set(JOPA_VERSION "${CMAKE_MATCH_1}")
 if(NOT JOPA_VERSION)
     message(FATAL_ERROR "Could not extract version from flake.nix")
 endif()
+message(STATUS "JOPA version: ${JOPA_VERSION}")
 
-project(jopa VERSION 1.22 LANGUAGES CXX)
+project(jopa VERSION ${JOPA_VERSION} LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
