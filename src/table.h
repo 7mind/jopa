@@ -2,164 +2,112 @@
 
 #include "platform.h"
 #include "symbol.h"
-
+#include <cstring>
+#include <vector>
 
 namespace Jopa { // Open namespace Jopa block
-class VariableShadowSymbol
+
+// Wrapper around std::vector that provides Length() for backward compatibility
+template<typename T>
+class SymbolPool : public std::vector<T>
 {
 public:
-    VariableSymbol* variable_symbol;
+    unsigned Length() const { return static_cast<unsigned>(this->size()); }
+};
 
-    VariableShadowSymbol(VariableSymbol* variable_symbol_)
-        : variable_symbol(variable_symbol_),
-          conflict(NULL)
+// Template base class for shadow symbols - eliminates code duplication
+// across VariableShadowSymbol, MethodShadowSymbol, and TypeShadowSymbol
+template<typename SymbolT>
+class ShadowSymbolBase
+{
+public:
+    SymbolT* symbol;
+
+    explicit ShadowSymbolBase(SymbolT* symbol_)
+        : symbol(symbol_)
     {}
 
-    ~VariableShadowSymbol()
+    ~ShadowSymbolBase()
     {
-        delete conflict;
+        // conflicts vector handles its own cleanup
     }
 
-    VariableSymbol* Conflict(unsigned i) const { return (*conflict)[i]; }
+    SymbolT* Conflict(unsigned i) const { return conflicts[i]; }
 
-    inline unsigned NumConflicts() const
+    unsigned NumConflicts() const { return static_cast<unsigned>(conflicts.size()); }
+
+    void AddConflict(SymbolT* conflict_symbol)
     {
-        return conflict ? conflict -> Length() : 0;
+        if (symbol != conflict_symbol && !Find(conflict_symbol))
+            conflicts.push_back(conflict_symbol);
     }
-    inline void AddConflict(VariableSymbol* conflict_symbol)
+
+    void CompressSpace()
     {
-        if (variable_symbol != conflict_symbol && ! Find(conflict_symbol))
-            conflict -> Next() = conflict_symbol;
+        conflicts.shrink_to_fit();
     }
-    inline void CompressSpace()
+
+protected:
+    std::vector<SymbolT*> conflicts;
+
+    bool Find(const SymbolT* conflict_symbol)
     {
-        if (conflict)
-            conflict -> Array();
+        for (SymbolT* s : conflicts)
+            if (s == conflict_symbol)
+                return true;
+        return false;
     }
+};
+
+class VariableShadowSymbol : public ShadowSymbolBase<VariableSymbol>
+{
+public:
+    VariableSymbol* variable_symbol;  // Alias for backward compatibility
+
+    explicit VariableShadowSymbol(VariableSymbol* variable_symbol_)
+        : ShadowSymbolBase(variable_symbol_), variable_symbol(variable_symbol_)
+    {}
 
 private:
     friend class ExpandedFieldTable;
-    VariableShadowSymbol* next;
-
-    ConvertibleArray<VariableSymbol*>* conflict;
-
-    bool Find(const VariableSymbol* conflict_symbol)
-    {
-        if (! conflict)
-            conflict = new ConvertibleArray<VariableSymbol*>(4);
-        for (unsigned k = 0; k < conflict -> Length(); k++)
-            if ((*conflict)[k] == conflict_symbol)
-                return true;
-        return false;
-    }
+    VariableShadowSymbol* next = nullptr;
 };
 
 
-class MethodShadowSymbol
+class MethodShadowSymbol : public ShadowSymbolBase<MethodSymbol>
 {
 public:
-    MethodSymbol* method_symbol;
-    MethodShadowSymbol* next_method;
+    MethodSymbol* method_symbol;  // Alias for backward compatibility
+    MethodShadowSymbol* next_method = nullptr;
 
-    MethodShadowSymbol(MethodSymbol* method_symbol_)
-        : method_symbol(method_symbol_),
-          conflict(NULL)
+    explicit MethodShadowSymbol(MethodSymbol* method_symbol_)
+        : ShadowSymbolBase(method_symbol_), method_symbol(method_symbol_)
     {}
-
-    ~MethodShadowSymbol()
-    {
-        delete conflict;
-    }
-
-    MethodSymbol* Conflict(unsigned i) const { return (*conflict)[i]; }
-
-    inline unsigned NumConflicts() const
-    {
-        return conflict ? conflict -> Length() : 0;
-    }
-    inline void AddConflict(MethodSymbol* conflict_symbol)
-    {
-        if (method_symbol != conflict_symbol && ! Find(conflict_symbol))
-            conflict -> Next() = conflict_symbol;
-    }
-
-    inline void CompressSpace()
-    {
-        if (conflict)
-            conflict -> Array();
-    }
 
 private:
     friend class ExpandedMethodTable;
-    MethodShadowSymbol* next;
-
-    ConvertibleArray<MethodSymbol*>* conflict;
-
-    bool Find(const MethodSymbol* conflict_symbol)
-    {
-        if (! conflict)
-            conflict = new ConvertibleArray<MethodSymbol*>(4);
-        for (unsigned k = 0; k < conflict -> Length(); k++)
-            if ((*conflict)[k] == conflict_symbol)
-                return true;
-        return false;
-    }
+    MethodShadowSymbol* next = nullptr;
 };
 
 
-class TypeShadowSymbol
+class TypeShadowSymbol : public ShadowSymbolBase<TypeSymbol>
 {
 public:
-    TypeSymbol* type_symbol;
+    TypeSymbol* type_symbol;  // Alias for backward compatibility
 
-    TypeShadowSymbol(TypeSymbol* type_symbol_)
-        : type_symbol(type_symbol_),
-          conflict(NULL)
+    explicit TypeShadowSymbol(TypeSymbol* type_symbol_)
+        : ShadowSymbolBase(type_symbol_), type_symbol(type_symbol_)
     {}
-
-    ~TypeShadowSymbol()
-    {
-        delete conflict;
-    }
-
-    TypeSymbol* Conflict(unsigned i) const { return (*conflict)[i]; }
-
-    inline unsigned NumConflicts() const
-    {
-        return conflict ? conflict -> Length() : 0;
-    }
-
-    inline void AddConflict(TypeSymbol* conflict_symbol)
-    {
-        if (type_symbol != conflict_symbol && ! Find(conflict_symbol))
-            conflict -> Next() = conflict_symbol;
-    }
-
-    inline void CompressSpace()
-    {
-        if (conflict)
-            conflict -> Array();
-    }
 
 private:
     friend class ExpandedTypeTable;
-    TypeShadowSymbol* next;
-
-    ConvertibleArray<TypeSymbol*>* conflict;
-
-    bool Find(const TypeSymbol* conflict_symbol)
-    {
-        if (! conflict)
-            conflict = new ConvertibleArray<TypeSymbol*>(4);
-        for (unsigned k = 0; k < conflict -> Length(); k++)
-            if ((*conflict)[k] == conflict_symbol)
-                return true;
-        return false;
-    }
+    TypeShadowSymbol* next = nullptr;
 };
 
 
-class ExpandedTypeTable
+// Template base class for expanded tables - eliminates code duplication
+template<typename ShadowT, typename SymbolT>
+class ExpandedTableBase
 {
 public:
     enum
@@ -168,284 +116,207 @@ public:
         MAX_HASH_SIZE = 509
     };
 
-    ConvertibleArray<TypeShadowSymbol*> symbol_pool;
+    SymbolPool<ShadowT*> symbol_pool;
 
-    inline void CompressSpace()
+    explicit ExpandedTableBase(unsigned hash_size_ = DEFAULT_HASH_SIZE)
     {
-        hash_size = symbol_pool.Length();
+        hash_size = hash_size_ <= 0 ? 1 : hash_size_ > MAX_HASH_SIZE
+            ? static_cast<unsigned>(MAX_HASH_SIZE) : hash_size_;
+        base.resize(hash_size, nullptr);
+    }
+
+    virtual ~ExpandedTableBase()
+    {
+        for (ShadowT* s : symbol_pool)
+            delete s;
+    }
+
+protected:
+    std::vector<ShadowT*> base;
+    unsigned hash_size;
+
+    void RehashBase()
+    {
+        hash_size = static_cast<unsigned>(symbol_pool.size());
         hash_size = hash_size <= 0 ? 1 : hash_size > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size;
-        delete [] base;
-        base = (TypeShadowSymbol**)
-            memset(new TypeShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(TypeShadowSymbol*));
+            ? static_cast<unsigned>(MAX_HASH_SIZE) : hash_size;
+        base.assign(hash_size, nullptr);
+    }
+};
 
-        TypeShadowSymbol** array = symbol_pool.Array();
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
+
+class ExpandedTypeTable : public ExpandedTableBase<TypeShadowSymbol, TypeSymbol>
+{
+public:
+    explicit ExpandedTypeTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
+        : ExpandedTableBase(hash_size_)
+    {}
+
+    void CompressSpace()
+    {
+        RehashBase();
+        for (TypeShadowSymbol* shadow : symbol_pool)
         {
-            array[i] -> CompressSpace();
-
-            unsigned k =
-                array[i] -> type_symbol -> name_symbol -> index % hash_size;
-            array[i] -> next = base[k];
-            base[k] = array[i];
+            shadow->CompressSpace();
+            unsigned k = shadow->type_symbol->name_symbol->index % hash_size;
+            shadow->next = base[k];
+            base[k] = shadow;
         }
     }
 
-    ExpandedTypeTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
-        : symbol_pool(10, 4)
+    TypeShadowSymbol* InsertTypeShadowSymbol(TypeSymbol* type_symbol)
     {
-        hash_size = hash_size_ <= 0 ? 1 : hash_size_ > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size_;
-        base = (TypeShadowSymbol**)
-            memset(new TypeShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(TypeShadowSymbol*));
-    }
-
-    ~ExpandedTypeTable()
-    {
-        for (unsigned k = 0; k < symbol_pool.Length(); k++)
-            delete symbol_pool[k];
-        delete [] base;
-    }
-
-    inline TypeShadowSymbol* InsertTypeShadowSymbol(TypeSymbol* type_symbol)
-    {
-        unsigned i = type_symbol -> name_symbol -> index % hash_size;
+        unsigned i = type_symbol->name_symbol->index % hash_size;
         TypeShadowSymbol* p = new TypeShadowSymbol(type_symbol);
-        p -> next = base[i];
+        p->next = base[i];
         base[i] = p;
-        symbol_pool.Next() = p;
-
+        symbol_pool.push_back(p);
         return p;
     }
 
-    inline TypeShadowSymbol* FindTypeShadowSymbol(const NameSymbol* name_symbol)
+    TypeShadowSymbol* FindTypeShadowSymbol(const NameSymbol* name_symbol)
     {
-        TypeShadowSymbol* p;
-        for (p = base[name_symbol -> index % hash_size]; p; p = p -> next)
-             if (p -> type_symbol -> name_symbol == name_symbol)
-                 break;
-        return p;
+        for (TypeShadowSymbol* p = base[name_symbol->index % hash_size]; p; p = p->next)
+            if (p->type_symbol->name_symbol == name_symbol)
+                return p;
+        return nullptr;
     }
-
-private:
-    TypeShadowSymbol** base;
-    unsigned hash_size;
 };
 
-class ExpandedFieldTable
+
+class ExpandedFieldTable : public ExpandedTableBase<VariableShadowSymbol, VariableSymbol>
 {
 public:
-    enum
+    explicit ExpandedFieldTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
+        : ExpandedTableBase(hash_size_)
+    {}
+
+    void CompressSpace()
     {
-        DEFAULT_HASH_SIZE = 251,
-        MAX_HASH_SIZE = 509
-    };
-
-    ConvertibleArray<VariableShadowSymbol*> symbol_pool;
-
-    inline void CompressSpace()
-    {
-        hash_size = symbol_pool.Length();
-        hash_size = hash_size <= 0 ? 1 : hash_size > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size;
-        delete [] base;
-        base = (VariableShadowSymbol**)
-            memset(new VariableShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(VariableShadowSymbol*));
-
-        VariableShadowSymbol** array = symbol_pool.Array();
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
+        RehashBase();
+        for (VariableShadowSymbol* shadow : symbol_pool)
         {
-            array[i] -> CompressSpace();
-
-            unsigned k = array[i] -> variable_symbol -> name_symbol -> index %
-                hash_size;
-            array[i] -> next = base[k];
-            base[k] = array[i];
+            shadow->CompressSpace();
+            unsigned k = shadow->variable_symbol->name_symbol->index % hash_size;
+            shadow->next = base[k];
+            base[k] = shadow;
         }
     }
 
-    ExpandedFieldTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
-        : symbol_pool(10, 4)
+    VariableShadowSymbol* InsertVariableShadowSymbol(VariableSymbol* variable_symbol)
     {
-        hash_size = hash_size_ <= 0 ? 1 : hash_size_ > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size_;
-        base = (VariableShadowSymbol**)
-            memset(new VariableShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(VariableShadowSymbol*));
-    }
-    ~ExpandedFieldTable()
-    {
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-            delete symbol_pool[i];
-        delete [] base;
-    }
-
-    inline VariableShadowSymbol* InsertVariableShadowSymbol(VariableSymbol* variable_symbol)
-    {
-        unsigned i = variable_symbol -> name_symbol -> index % hash_size;
+        unsigned i = variable_symbol->name_symbol->index % hash_size;
         VariableShadowSymbol* p = new VariableShadowSymbol(variable_symbol);
-        p -> next = base[i];
+        p->next = base[i];
         base[i] = p;
-        symbol_pool.Next() = p;
-
+        symbol_pool.push_back(p);
         return p;
     }
 
-    inline VariableShadowSymbol* FindVariableShadowSymbol(const NameSymbol* name_symbol)
+    VariableShadowSymbol* FindVariableShadowSymbol(const NameSymbol* name_symbol)
     {
-        VariableShadowSymbol* p;
-        for (p = base[name_symbol -> index % hash_size]; p; p = p -> next)
-            if (p -> variable_symbol -> name_symbol == name_symbol)
-                break;
-        return p;
+        for (VariableShadowSymbol* p = base[name_symbol->index % hash_size]; p; p = p->next)
+            if (p->variable_symbol->name_symbol == name_symbol)
+                return p;
+        return nullptr;
     }
-
-private:
-    VariableShadowSymbol** base;
-    unsigned hash_size;
 };
 
 
-class ExpandedMethodTable
+class ExpandedMethodTable : public ExpandedTableBase<MethodShadowSymbol, MethodSymbol>
 {
 public:
-    enum
+    explicit ExpandedMethodTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
+        : ExpandedTableBase(hash_size_)
+    {}
+
+    void CompressSpace()
     {
-        DEFAULT_HASH_SIZE = 251,
-        MAX_HASH_SIZE = 509
-    };
-
-    ConvertibleArray<MethodShadowSymbol*> symbol_pool;
-
-    inline void CompressSpace()
-    {
-        hash_size = symbol_pool.Length();
-        hash_size = hash_size <= 0 ? 1 : hash_size > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size;
-        delete [] base;
-        base = (MethodShadowSymbol**)
-            memset(new MethodShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(MethodShadowSymbol*));
-
-        MethodShadowSymbol** array = symbol_pool.Array();
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
+        RehashBase();
+        for (MethodShadowSymbol* shadow : symbol_pool)
         {
-            array[i] -> CompressSpace();
-
-            const NameSymbol* name_symbol =
-                array[i] -> method_symbol -> name_symbol;
-            MethodShadowSymbol* base_shadow =
-                FindMethodShadowSymbol(name_symbol);
-            if (! base_shadow)
+            shadow->CompressSpace();
+            const NameSymbol* name_symbol = shadow->method_symbol->name_symbol;
+            MethodShadowSymbol* base_shadow = FindMethodShadowSymbol(name_symbol);
+            if (!base_shadow)
             {
-                unsigned k = name_symbol -> index % hash_size;
-                array[i] -> next = base[k];
-                base[k] = array[i];
-                array[i] -> next_method = NULL;
+                unsigned k = name_symbol->index % hash_size;
+                shadow->next = base[k];
+                base[k] = shadow;
+                shadow->next_method = nullptr;
             }
             else
             {
-                array[i] -> next_method = base_shadow -> next_method;
-                base_shadow -> next_method = array[i];
+                shadow->next_method = base_shadow->next_method;
+                base_shadow->next_method = shadow;
             }
         }
     }
 
-    ExpandedMethodTable(unsigned hash_size_ = DEFAULT_HASH_SIZE)
-        : symbol_pool(10, 4)
+    MethodShadowSymbol* FindMethodShadowSymbol(const NameSymbol* name_symbol)
     {
-        hash_size = hash_size_ <= 0 ? 1 : hash_size_ > MAX_HASH_SIZE
-            ? (unsigned) MAX_HASH_SIZE : hash_size_;
-        base = (MethodShadowSymbol**)
-            memset(new MethodShadowSymbol*[hash_size], 0,
-                   hash_size * sizeof(MethodShadowSymbol*));
-    }
-    ~ExpandedMethodTable()
-    {
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-            delete symbol_pool[i];
-       delete [] base;
+        for (MethodShadowSymbol* p = base[name_symbol->index % hash_size]; p; p = p->next)
+            if (p->method_symbol->name_symbol == name_symbol)
+                return p;
+        return nullptr;
     }
 
-    inline MethodShadowSymbol* FindMethodShadowSymbol(const NameSymbol* name_symbol)
+    MethodShadowSymbol* InsertMethodShadowSymbol(MethodSymbol* method_symbol)
     {
-        MethodShadowSymbol* p;
-        for (p = base[name_symbol -> index % hash_size]; p; p = p -> next)
-            if (p -> method_symbol -> name_symbol == name_symbol)
-                break;
-        return p;
-    }
-
-    inline MethodShadowSymbol* InsertMethodShadowSymbol(MethodSymbol* method_symbol)
-    {
-        unsigned i = method_symbol -> name_symbol -> index % hash_size;
+        unsigned i = method_symbol->name_symbol->index % hash_size;
         MethodShadowSymbol* p = new MethodShadowSymbol(method_symbol);
-        p -> next_method = NULL;
-        p -> next = base[i];
+        p->next_method = nullptr;
+        p->next = base[i];
         base[i] = p;
-        symbol_pool.Next() = p;
-
+        symbol_pool.push_back(p);
         return p;
     }
 
-    inline void Overload(MethodShadowSymbol* base_shadow,
-                         MethodSymbol* overload_method)
+    void Overload(MethodShadowSymbol* base_shadow, MethodSymbol* overload_method)
     {
-        //
-        // Insert the new overload as the second list element, to preserve
-        // the existing base, while making Overload(MethodSymbol*) work.
-        //
         MethodShadowSymbol* shadow = new MethodShadowSymbol(overload_method);
-        symbol_pool.Next() = shadow;
-        shadow -> next_method = base_shadow -> next_method;
-        base_shadow -> next_method = shadow;
+        symbol_pool.push_back(shadow);
+        shadow->next_method = base_shadow->next_method;
+        base_shadow->next_method = shadow;
     }
 
-    inline MethodShadowSymbol* Overload(MethodSymbol* overload_method)
+    MethodShadowSymbol* Overload(MethodSymbol* overload_method)
     {
         MethodShadowSymbol* base_shadow =
-            FindMethodShadowSymbol(overload_method -> name_symbol);
-        if (! base_shadow)
+            FindMethodShadowSymbol(overload_method->name_symbol);
+        if (!base_shadow)
             return InsertMethodShadowSymbol(overload_method);
         Overload(base_shadow, overload_method);
-        //
-        // Return the newly created overload; this relies on the current
-        // behavior of Overload(MethodSymbol*, MethodSymbol*).
-        //
-        return base_shadow -> next_method;
+        return base_shadow->next_method;
     }
 
     MethodShadowSymbol* FindOverloadMethodShadow(MethodSymbol* overload_method,
                                                  Semantic* sem, TokenIndex tok)
     {
-        if (! overload_method -> IsTyped())
-            overload_method -> ProcessMethodSignature(sem, tok);
+        if (!overload_method->IsTyped())
+            overload_method->ProcessMethodSignature(sem, tok);
 
-        MethodShadowSymbol* method_shadow;
-        for (method_shadow = FindMethodShadowSymbol(overload_method ->
-                                                    name_symbol);
+        for (MethodShadowSymbol* method_shadow = FindMethodShadowSymbol(
+                 overload_method->name_symbol);
              method_shadow;
-             method_shadow = method_shadow -> next_method)
+             method_shadow = method_shadow->next_method)
         {
-            MethodSymbol* method = method_shadow -> method_symbol;
+            MethodSymbol* method = method_shadow->method_symbol;
 
             if (overload_method == method)
                 return method_shadow;
 
-            if (! method -> IsTyped())
-                method -> ProcessMethodSignature(sem, tok);
+            if (!method->IsTyped())
+                method->ProcessMethodSignature(sem, tok);
 
-            if (overload_method -> NumFormalParameters() ==
-                method -> NumFormalParameters())
+            if (overload_method->NumFormalParameters() ==
+                method->NumFormalParameters())
             {
                 int i;
-                for (i = static_cast<int>(method -> NumFormalParameters()) - 1; i >= 0; i--)
+                for (i = static_cast<int>(method->NumFormalParameters()) - 1; i >= 0; i--)
                 {
-                    if (method -> FormalParameter(i) -> Type() !=
-                        overload_method -> FormalParameter(i) -> Type())
+                    if (method->FormalParameter(i)->Type() !=
+                        overload_method->FormalParameter(i)->Type())
                     {
                         break;
                     }
@@ -456,14 +327,9 @@ public:
             }
         }
 
-        return method_shadow;
+        return nullptr;
     }
-
-private:
-    MethodShadowSymbol** base;
-    unsigned hash_size;
 };
 
 
 } // Close namespace Jopa block
-
