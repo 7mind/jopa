@@ -13,6 +13,7 @@ JOPA is a Java compiler written in C++.
 
 - Clang-based C++ project using CMake
 - Standard build: `cmake -S . -B build && cmake --build build`
+- Compiler build: `cmake --build build --target jopa`
 - Run tests: `ctest --test-dir build --output-on-failure`
 - Bootstrap build: `cmake --build build --target vendor_jvm`
 

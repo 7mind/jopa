@@ -17,7 +17,7 @@ JOPA can build a fully self-contained Java development kit without any prebuilt 
 
 - **JOPA** (C++) - Java compiler, built from source
 - **JamVM** (C) - Java Virtual Machine, built from source
-- **GNU Classpath** - Java runtime library (classes compiled by system javac, will be fixed)
+- **GNU Classpath** - Java runtime library, **compiled by JOPA itself**
 - **JamVM classes** - Bootstrap classes for JamVM, **compiled by JOPA itself**
 
 This creates a complete Java toolchain where all Java bytecode is compiled from source using JOPA, making it suitable for reproducible and auditable builds.
