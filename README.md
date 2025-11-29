@@ -93,6 +93,15 @@ Java 7 language features are fully supported for parsing, semantic analysis, and
 
 **Note:** Targets 1.5 and 1.6 pass the full test suite with strict JVM verification. Target 1.7 (class version 51.0) has known StackMapTable limitations with complex boolean expressions used as method arguments (e.g., `test("name", a == b)`). For most code, target 1.7 works correctly; alternatively, use `-target 1.5` or `-target 1.6` for maximum compatibility. Generated class files require at least the corresponding JVM major version.
 
+### JDK Compliance Snapshot
+
+| JDK Version | Total whitelisted tests | Passing parser tests | Passing parser tests % | Passing Typer tests | Passing Typer tests % | Passing Bytecode tests | Passing bytecode tests % |
+|-------------|-------------------------|----------------------|------------------------|---------------------|------------------------|-------------------------|---------------------------|
+| JDK 8       | 4501                    | 4222                 | 93.8%                  | 744                 | 52.1%                  | N/A                     | N/A                       |
+| JDK 7       | 3029                    | 2983                 | 98.5%                  | 568                 | 66.9%                  | N/A                     | N/A                       |
+
+Bytecode test columns are `N/A` because we currently only compile the JDK tests via `scripts/test-java8-compliance.sh` / `scripts/test-java7-compliance.sh` and do not execute a separate bytecode validation suite yet.
+
 ### Advanced Generics Support
 The compiler fully supports complex generic type signatures including:
 - ✅ **Type Token Pattern** - Gafter's pattern for capturing generic types at runtime
