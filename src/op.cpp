@@ -458,7 +458,6 @@ void Operators::OpDmp(const ConstantPool& constant_pool, const Tuple<u1>& code)
             {
                 i4 def;
                 i4 npairs;
-                i4 len;
                 i4 match;
                 i4 offset;
                 // account for padding
@@ -481,7 +480,6 @@ void Operators::OpDmp(const ConstantPool& constant_pool, const Tuple<u1>& code)
                         (int) def, (unsigned) def + pc_start, (int) npairs);
                 OpLine(constant_pool, ' ', pc_start, name,
                        argdesc, desc, info_kind, info_index);
-                len = npairs;
                 while (npairs)
                 {
                     unsigned pcb = pc;

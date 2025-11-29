@@ -1785,7 +1785,7 @@ public:
         }
 
 #ifdef JOPA_DEBUG
-        void Print(const ConstantPool& constant_pool) const
+        void Print(const ConstantPool& /*constant_pool*/) const
         {
             switch (tag)
             {

@@ -5966,7 +5966,7 @@ void Semantic::ProcessStaticInitializers(AstClassBody* class_body)
 
                     // int ordinal argument - create integer literal
                     AstIntegerLiteral* ordinal_arg = ast_pool -> GenIntegerLiteral(loc);
-                    ordinal_arg -> value = control.int_pool.FindOrInsert(enum_constant -> ordinal);
+                    ordinal_arg -> value = control.int_pool.FindOrInsert((i4)enum_constant -> ordinal);
                     ordinal_arg -> symbol = control.int_type;
                     creation -> arguments -> AddArgument(ordinal_arg);
 
