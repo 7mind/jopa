@@ -34,7 +34,7 @@ Usage patterns:
 - Be in the loop, monitor what the agent does, think and steer it towards the goal.
 - Record important patters into your [CLAUDE.md](./CLAUDE.md). Try to be precise, 
 - It might help to setup one model (Codex in my case) as a reviewer, so it would steer another (Claude) towards the goal. Unfortunately, there is no nice and convenient tool to organize such setup (there are some though), so at this point in time it's a good idea to be creative and write (vibe-code) your own.
-- Always ensure that your model is working in reproducible environment (like Nix), instruct it to use your environment and tooling, start by writing tests and implementing reproducible builds. Toolings and environments are extremely important for model efficiency. Make your tests and builds fast. Apply TDD. Insist that the model should always run tests and ensure they all pass.
+- Always ensure that your model is working in reproducible environment (like Nix), instruct it to use your environment and tooling, start by writing tests and implementing reproducible builds. Toolings and environments are extremely important for model efficiency. Make your tests and builds fast. Apply TDD. Insist that the model should always run tests and ensure they all pass. It helped a lot to switch build to `CMake` early, add `cpptrace` into the compiler, switch to `CLang` and turn on sanitizers.
 - Run models in [FireJail](https://github.com/netblue30/firejail) without their own sandboxes, that's the only way to be at least a bit productive.
 
 And also:
