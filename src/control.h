@@ -371,6 +371,13 @@ public:                                                         \
         parameterized_types.push_back(ptype);
     }
 
+    // Register an ast_pool for cleanup when Control is destroyed.
+    // This is called when a compilation unit is successfully parsed.
+    void RegisterAstPool(StoragePool* pool)
+    {
+        ast_pools_to_delete.push_back(pool);
+    }
+
     Control(char**, Option&);
     ~Control();
 
@@ -509,6 +516,12 @@ private:
     // Storage for ParameterizedType objects that must outlive individual file cleanup.
     //
     std::vector<ParameterizedType*> parameterized_types;
+
+    //
+    // Storage for StoragePool objects (ast_pools) that must be cleaned up at the end.
+    // These are registered when compilation units are created and deleted in the destructor.
+    //
+    std::vector<StoragePool*> ast_pools_to_delete;
 
     //
     // Cache of system packages. lang and unnamed are always valid, because of

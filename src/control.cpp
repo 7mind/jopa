@@ -675,6 +675,12 @@ Control::~Control()
         delete [] bad_input_filenames[i];
     for (i = 0; i < unreadable_input_filenames.Length(); i++)
         delete [] unreadable_input_filenames[i];
+
+    // Clean up all registered ast_pools.
+    // These are registered when compilation units are created.
+    for (StoragePool* pool : ast_pools_to_delete)
+        delete pool;
+
     for (i = 0; i < system_directories.Length(); i++)
         delete system_directories[i];
 
@@ -1116,8 +1122,13 @@ void Control::ProcessHeaders(FileSymbol* file_symbol)
     if (file_symbol -> lex_stream) // do we have a successful scan!
     {
         if (! file_symbol -> compilation_unit)
+        {
             file_symbol -> compilation_unit =
                 parser -> HeaderParse(file_symbol -> lex_stream);
+            // Register ast_pool for cleanup when Control is destroyed
+            if (file_symbol -> compilation_unit)
+                RegisterAstPool(file_symbol -> compilation_unit -> ast_pool);
+        }
         //
         // If we have a compilation unit, analyze it, process its types.
         //
