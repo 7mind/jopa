@@ -4,7 +4,7 @@
 [![License: IBM-PL 1.0](https://img.shields.io/github/license/7mind/jopa)](LICENSE)
 [![Built with Nix](https://img.shields.io/badge/built%20with-nix-5277C3?logo=nixos&logoColor=white)](https://nixos.org/)
 
-A totally Claude'd effort in modernizing `jikes`, the historical independent `javac` implementation in C++.
+A totally Claude'd effort in modernizing [`jikes`](https://github.com/daveshields/jikes), the historical independent `javac` implementation in C++.
 
 Fully supports Java 5, 6 and 7 both in syntax and bytecode. Can emit older bytecode versions for newer syntax (e.g. Java 5 bytecode for Java 7 programs).
 Java 8 support is limited to default methods; other Java 8 features are intentionally not implemented.
