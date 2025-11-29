@@ -5941,12 +5941,15 @@ void Semantic::ProcessNOT(AstPreUnaryExpression* expr)
     ProcessExpression(expr -> expression);
 
     TypeSymbol* type = expr -> expression -> Type();
-    // In Java 5+, Boolean can be unboxed to boolean
-    bool is_boolean = type == control.boolean_type ||
-                      (control.option.source >= JopaOption::SDK1_5 &&
-                       type == control.Boolean());
 
-    if (! is_boolean)
+    // Java 5: Unbox Boolean to boolean
+    if (type == control.Boolean())
+    {
+        expr -> expression = ConvertToType(expr -> expression, control.boolean_type);
+        type = control.boolean_type;
+    }
+
+    if (type != control.boolean_type)
     {
         if (expr -> expression -> symbol != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -7504,6 +7507,18 @@ void Semantic::ProcessAND(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
+    // Java 5: Unbox Boolean to boolean
+    if (left_type == control.Boolean())
+    {
+        expr -> left_expression = ConvertToType(expr -> left_expression, control.boolean_type);
+        left_type = control.boolean_type;
+    }
+    if (right_type == control.Boolean())
+    {
+        expr -> right_expression = ConvertToType(expr -> right_expression, control.boolean_type);
+        right_type = control.boolean_type;
+    }
+
     if (left_type == control.boolean_type ||
         right_type == control.boolean_type)
     {
@@ -7595,6 +7610,18 @@ void Semantic::ProcessXOR(AstBinaryExpression* expr)
 
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
+
+    // Java 5: Unbox Boolean to boolean
+    if (left_type == control.Boolean())
+    {
+        expr -> left_expression = ConvertToType(expr -> left_expression, control.boolean_type);
+        left_type = control.boolean_type;
+    }
+    if (right_type == control.Boolean())
+    {
+        expr -> right_expression = ConvertToType(expr -> right_expression, control.boolean_type);
+        right_type = control.boolean_type;
+    }
 
     if (left_type == control.boolean_type ||
         right_type == control.boolean_type)
@@ -7688,6 +7715,18 @@ void Semantic::ProcessIOR(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
+    // Java 5: Unbox Boolean to boolean
+    if (left_type == control.Boolean())
+    {
+        expr -> left_expression = ConvertToType(expr -> left_expression, control.boolean_type);
+        left_type = control.boolean_type;
+    }
+    if (right_type == control.Boolean())
+    {
+        expr -> right_expression = ConvertToType(expr -> right_expression, control.boolean_type);
+        right_type = control.boolean_type;
+    }
+
     if (left_type == control.boolean_type ||
         right_type == control.boolean_type)
     {
@@ -7780,15 +7819,19 @@ void Semantic::ProcessAND_AND(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
-    // Java 5: Allow Boolean wrapper type (auto-unboxing)
-    bool left_ok = left_type == control.boolean_type ||
-        (control.option.source >= JopaOption::SDK1_5 &&
-         left_type == control.Boolean());
-    bool right_ok = right_type == control.boolean_type ||
-        (control.option.source >= JopaOption::SDK1_5 &&
-         right_type == control.Boolean());
+    // Java 5: Unbox Boolean to boolean
+    if (left_type == control.Boolean())
+    {
+        expr -> left_expression = ConvertToType(expr -> left_expression, control.boolean_type);
+        left_type = control.boolean_type;
+    }
+    if (right_type == control.Boolean())
+    {
+        expr -> right_expression = ConvertToType(expr -> right_expression, control.boolean_type);
+        right_type = control.boolean_type;
+    }
 
-    if (! left_ok)
+    if (left_type != control.boolean_type)
     {
         if (left_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -7797,7 +7840,7 @@ void Semantic::ProcessAND_AND(AstBinaryExpression* expr)
                            left_type -> ExternalName());
         expr -> symbol = control.no_type;
     }
-    if (! right_ok)
+    if (right_type != control.boolean_type)
     {
         if (right_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -7831,15 +7874,19 @@ void Semantic::ProcessOR_OR(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
-    // Java 5: Allow Boolean wrapper type (auto-unboxing)
-    bool left_ok = left_type == control.boolean_type ||
-        (control.option.source >= JopaOption::SDK1_5 &&
-         left_type == control.Boolean());
-    bool right_ok = right_type == control.boolean_type ||
-        (control.option.source >= JopaOption::SDK1_5 &&
-         right_type == control.Boolean());
+    // Java 5: Unbox Boolean to boolean
+    if (left_type == control.Boolean())
+    {
+        expr -> left_expression = ConvertToType(expr -> left_expression, control.boolean_type);
+        left_type = control.boolean_type;
+    }
+    if (right_type == control.Boolean())
+    {
+        expr -> right_expression = ConvertToType(expr -> right_expression, control.boolean_type);
+        right_type = control.boolean_type;
+    }
 
-    if (! left_ok)
+    if (left_type != control.boolean_type)
     {
         if (left_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -7848,7 +7895,7 @@ void Semantic::ProcessOR_OR(AstBinaryExpression* expr)
                            left_type -> ExternalName());
         expr -> symbol = control.no_type;
     }
-    if (! right_ok)
+    if (right_type != control.boolean_type)
     {
         if (right_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
@@ -8464,6 +8511,14 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
     TypeSymbol* false_type =
         conditional_expression -> false_expression -> Type();
 
+    // Java 5: Unbox Boolean to boolean for condition
+    if (test_type == control.Boolean())
+    {
+        conditional_expression -> test_expression =
+            ConvertToType(conditional_expression -> test_expression, control.boolean_type);
+        test_type = control.boolean_type;
+    }
+
     if (test_type != control.boolean_type)
     {
         if (test_type != control.no_type)
@@ -8973,6 +9028,13 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
         case AstAssignmentExpression::AND_EQUAL:
         case AstAssignmentExpression::XOR_EQUAL:
         case AstAssignmentExpression::IOR_EQUAL:
+            // Java 5: Unbox Boolean to boolean for RHS
+            if (right_type == control.Boolean())
+            {
+                assignment_expression -> expression =
+                    ConvertToType(assignment_expression -> expression, control.boolean_type);
+                right_type = control.boolean_type;
+            }
             if (left_type == control.boolean_type)
             {
                 if (right_type != control.boolean_type)
@@ -8986,6 +9048,18 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
             }
             else
             {
+                // Java 5: Unbox numeric wrapper types before checking
+                if (control.option.source >= JopaOption::SDK1_5)
+                {
+                    TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
+                    if (unboxed_right && unboxed_right != right_type &&
+                        control.IsIntegral(unboxed_right))
+                    {
+                        assignment_expression -> expression =
+                            ConvertToType(assignment_expression -> expression, unboxed_right);
+                        right_type = unboxed_right;
+                    }
+                }
                 if (! control.IsIntegral(left_type))
                 {
                     ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
