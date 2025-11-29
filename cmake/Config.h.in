@@ -93,3 +93,4 @@
 #cmakedefine JOPA_ICONV_NEEDS_BYTE_SWAP
 
 #cmakedefine JOPA_HAS_CPPTRACE
+#cmakedefine JOPA_DISABLE_LEAK_SANITIZER

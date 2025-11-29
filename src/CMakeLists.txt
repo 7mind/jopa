@@ -197,6 +197,9 @@ if(JOPA_ENABLE_SANITIZERS)
         -fno-sanitize-recover=all
         -fno-omit-frame-pointer
     )
+    if(NOT JOPA_ENABLE_LEAK_SANITIZER)
+        set(JOPA_DISABLE_LEAK_SANITIZER 1)
+    endif()
 endif()
 
 configure_file(
