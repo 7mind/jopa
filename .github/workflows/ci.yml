@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
@@ -28,7 +30,15 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
-      - name: Run Primary Tests (Release, Full Matrix)
+      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Release)
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release.log
+          '
+
+      - name: Run Primary Tests (Release)
         run: |
           nix develop --command bash ./scripts/test-primary.sh --release
 
@@ -51,6 +61,7 @@ jobs:
           path: |
             build/test/*.class
             build/Testing/Temporary/LastTest.log
+            /tmp/build-release.log
           retention-days: 7
 
   build-debug:
@@ -60,6 +71,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
@@ -70,7 +83,15 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Run Primary Tests (Debug + Sanitizers, Full Matrix)
+      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Debug + Sanitizers)
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
+            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
+          '
+
+      - name: Run Primary Tests (Debug + Sanitizers)
         run: |
           nix develop --command bash ./scripts/test-primary.sh --sanitizers
 
@@ -93,12 +114,12 @@ jobs:
           path: |
             build/test/*.class
             build/Testing/Temporary/LastTest.log
+            /tmp/build-debug.log
           retention-days: 7
 
   parser-tests-jdk7:
-    name: JDK7 Parser Tests
+    name: JDK7 Parser Tests (99% threshold)
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -119,6 +140,35 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java7-parser.sh --build
 
+      - name: Check JDK7 Success Threshold (99%)
+        run: |
+          source build/parser_jdk7_results.env
+          echo "JDK7 Parser Results:"
+          echo "  Passed: ${PARSER_PASSED}"
+          echo "  Whitelisted: ${PARSER_WHITELISTED}"
+
+          if [ "$PARSER_WHITELISTED" -eq 0 ]; then
+            echo "ERROR: No tests were whitelisted"
+            exit 1
+          fi
+
+          SUCCESS_RATE=$(echo "scale=4; $PARSER_PASSED * 100 / $PARSER_WHITELISTED" | bc)
+          echo "  Success rate: ${SUCCESS_RATE}%"
+          echo ""
+
+          # Check if success rate is at least 99%
+          THRESHOLD=99
+          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+
+          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
+            echo "SUCCESS: JDK7 parser tests passed threshold (>= ${THRESHOLD}%)"
+          else
+            echo "FAILURE: JDK7 parser tests below threshold"
+            echo "Expected: >= ${THRESHOLD}%"
+            echo "Actual: ${SUCCESS_RATE}%"
+            exit 1
+          fi
+
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -130,9 +180,8 @@ jobs:
           retention-days: 7
 
   parser-tests-jdk8:
-    name: JDK8 Parser Tests
+    name: JDK8 Parser Tests (80% threshold)
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - name: Checkout repository
@@ -153,6 +202,35 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java8-parser.sh --build
 
+      - name: Check JDK8 Success Threshold (80%)
+        run: |
+          source build/parser_jdk8_results.env
+          echo "JDK8 Parser Results:"
+          echo "  Passed: ${PARSER_PASSED}"
+          echo "  Whitelisted: ${PARSER_WHITELISTED}"
+
+          if [ "$PARSER_WHITELISTED" -eq 0 ]; then
+            echo "ERROR: No tests were whitelisted"
+            exit 1
+          fi
+
+          SUCCESS_RATE=$(echo "scale=4; $PARSER_PASSED * 100 / $PARSER_WHITELISTED" | bc)
+          echo "  Success rate: ${SUCCESS_RATE}%"
+          echo ""
+
+          # Check if success rate is at least 80%
+          THRESHOLD=80
+          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+
+          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
+            echo "SUCCESS: JDK8 parser tests passed threshold (>= ${THRESHOLD}%)"
+          else
+            echo "FAILURE: JDK8 parser tests below threshold"
+            echo "Expected: >= ${THRESHOLD}%"
+            echo "Actual: ${SUCCESS_RATE}%"
+            exit 1
+          fi
+
       - name: Upload test artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -161,4 +239,55 @@ jobs:
           path: |
             build/parser_results.txt
             build/parser_jdk8_results.env
+          retention-days: 7
+
+  build-debug-with-leak-sanitizer:
+    name: Build (Debug + All Sanitizers incl. Leak)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Debug + All Sanitizers)
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=ON
+            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug-leak.log
+          ' || echo "Build with leak sanitizer failed (expected)"
+
+      - name: Run Primary Tests (Debug + All Sanitizers)
+        continue-on-error: true
+        run: |
+          nix develop --command bash ./scripts/test-primary.sh --sanitizers || echo "Tests with leak sanitizer failed (expected)"
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo '## Debug Build with Leak Sanitizer (Experimental)' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo 'This job is expected to fail - leak sanitizer is for future improvement.' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-debug-leak
+          path: |
+            build/test/*.class
+            build/Testing/Temporary/LastTest.log
+            /tmp/build-debug-leak.log
           retention-days: 7
