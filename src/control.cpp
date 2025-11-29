@@ -306,11 +306,13 @@ Control::Control(char** arguments, Option& option_)
         system_semantic ->
             ReportSemError(SemanticError::CANNOT_OPEN_PATH_DIRECTORY,
                            BAD_TOKEN, bad_dirnames[i]);
+        delete [] bad_dirnames[i];
     }
     for (i = 0; i < bad_zip_filenames.Length(); i++)
     {
         system_semantic -> ReportSemError(SemanticError::CANNOT_OPEN_ZIP_FILE,
                                           BAD_TOKEN, bad_zip_filenames[i]);
+        delete [] bad_zip_filenames[i];
     }
     for (i = 0; i < general_io_warnings.Length(); i++)
     {
@@ -1537,4 +1539,3 @@ void Control::CleanUp(FileSymbol* file_symbol)
 
 
 } // Close namespace Jopa block
-
