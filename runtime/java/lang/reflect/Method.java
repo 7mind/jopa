@@ -2,7 +2,7 @@ package java.lang.reflect;
 
 import java.lang.annotation.Annotation;
 
-public class Method {
+public class Method implements AnnotatedElement {
     private Method() {}
 
     public native String getName();
@@ -16,5 +16,6 @@ public class Method {
     public native void setAccessible(boolean flag);
     public native Annotation[] getDeclaredAnnotations();
     public native Annotation[] getAnnotations();
-    public native Annotation getAnnotation(Class annotationType);
+    public native <T extends Annotation> T getAnnotation(Class<T> annotationType);
+    public native boolean isAnnotationPresent(Class<? extends Annotation> annotationClass);
 }

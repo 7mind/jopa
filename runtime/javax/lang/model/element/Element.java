@@ -14,4 +14,5 @@ public interface Element {
     List<? extends Element> getEnclosedElements();
     List<? extends AnnotationMirror> getAnnotationMirrors();
     <A extends Annotation> A getAnnotation(Class<A> annotationType);
+    <R, P> R accept(ElementVisitor<R, P> v, P p);
 }

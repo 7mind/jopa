@@ -3,6 +3,7 @@ package com.sun.mirror.declaration;
 import java.util.Collection;
 import com.sun.mirror.type.DeclaredType;
 import com.sun.mirror.type.InterfaceType;
+import com.sun.mirror.util.DeclarationVisitor;
 
 public interface TypeDeclaration extends MemberDeclaration {
     PackageDeclaration getPackage();
