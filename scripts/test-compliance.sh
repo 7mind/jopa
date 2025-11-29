@@ -34,11 +34,15 @@ if [[ "$JDK_VERSION" == "jdk7" ]]; then
     ASSETS_DIR="${SUBMODULE_DIR}/test"
     WHITELIST_FILE="${PROJECT_DIR}/test/jdk7_compliance_whitelist.txt"
     SOURCE_VERSION="1.7"
+    # Test library directories (JavadocTester, etc.)
+    LIB_DIRS="${ASSETS_DIR}/com/sun/javadoc/lib:${ASSETS_DIR}/tools/javac/lib"
 else
     SUBMODULE_DIR="${PROJECT_DIR}/assets/jdk8u_langtools"
     ASSETS_DIR="${SUBMODULE_DIR}/test"
     WHITELIST_FILE="${PROJECT_DIR}/test/jdk8_compliance_whitelist.txt"
     SOURCE_VERSION="1.8"
+    # Test library directories
+    LIB_DIRS="${ASSETS_DIR}/com/sun/javadoc/lib:${ASSETS_DIR}/tools/javac/lib"
 fi
 
 # Check that the required submodule is initialized
@@ -128,6 +132,7 @@ cat "$WHITELIST_FILE" | xargs -P "$NPROC" -I {} sh -c '
     mkdir -p "$test_out" 2>/dev/null || true
     if timeout '"$TEST_TIMEOUT"' "'"$JOPA"'" -source "'"$SOURCE_VERSION"'" -target 1.5 \
         -classpath "'"$RUNTIME_JAR"'" \
+        -sourcepath "'"$LIB_DIRS"'" \
         -d "$test_out" \
         "$java_file" >/dev/null 2>&1; then
         echo "PASS $rel_path"

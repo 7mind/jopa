@@ -301,8 +301,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 50%
-          THRESHOLD=50
+          # Check if success rate is at least 62%
+          THRESHOLD=62
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
