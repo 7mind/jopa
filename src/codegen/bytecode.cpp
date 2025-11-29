@@ -533,12 +533,13 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     }
 
     //
-    // Add Signature attribute for generic methods
+    // Add Signature attribute for generic methods (Java 5+)
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
     // 2. Return type is a class type parameter (return_type_param_index >= 0)
     //
-    if (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0)
+    if (control.option.target >= JopaOption::SDK1_5 &&
+        (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0))
     {
         msym -> SetGenericSignature(control);
         if (msym -> GenericSignature())
@@ -551,8 +552,10 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     }
 
     //
-    // Process RuntimeVisibleAnnotations for methods
+    // Process RuntimeVisibleAnnotations for methods (Java 5+)
     //
+    if (control.option.target >= JopaOption::SDK1_5)
+    {
     AstMethodDeclaration* method_decl = msym -> declaration ? msym -> declaration -> MethodDeclarationCast() : NULL;
     AstConstructorDeclaration* constructor_decl = (!method_decl && msym -> declaration) ? msym -> declaration -> ConstructorDeclarationCast() : NULL;
     AstModifiers* mods = method_decl ? method_decl -> modifiers_opt :
@@ -935,6 +938,7 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
             methods[method_index] -> AddAttribute(annotations_attr);
         }
     }
+    } // end SDK1_5+ annotations guard
 
     //
     // here if need code and associated attributes.
@@ -8788,9 +8792,10 @@ void ByteCode::FinishCode()
         AddAttribute(CreateEnclosingMethodAttribute(enclosing));
     }
 
-    // Add Signature attribute for generic classes and classes with parameterized superclasses
+    // Add Signature attribute for generic classes and classes with parameterized superclasses (Java 5+)
     // (the latter is needed for TypeToken pattern and similar reflection-based code)
-    if (unit_type -> IsGeneric() || unit_type -> HasParameterizedSuper())
+    if (control.option.target >= JopaOption::SDK1_5 &&
+        (unit_type -> IsGeneric() || unit_type -> HasParameterizedSuper()))
     {
         unit_type -> SetGenericSignature(control);
         if (unit_type -> GenericSignature())
@@ -8802,8 +8807,10 @@ void ByteCode::FinishCode()
     }
 
     //
-    // Process RuntimeVisibleAnnotations for classes
+    // Process RuntimeVisibleAnnotations for classes (Java 5+)
     //
+    if (control.option.target >= JopaOption::SDK1_5)
+    {
     AstClassDeclaration* class_decl = NULL;
     AstInterfaceDeclaration* interface_decl = NULL;
     AstEnumDeclaration* enum_decl = NULL;
@@ -9202,6 +9209,7 @@ void ByteCode::FinishCode()
             AddAttribute(annotations_attr);
         }
     }
+    } // end SDK1_5+ annotations guard
 
     //
     // In case they weren't referenced elsewhere, make sure all nested types
