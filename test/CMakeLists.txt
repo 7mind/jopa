@@ -179,6 +179,10 @@ add_jopa_run_test(EnumConstructorTest "${TEST_DIR}/generics/EnumConstructorTest.
 add_jopa_run_test(DoPrivilegedTest "${TEST_DIR}/generics/DoPrivilegedTest.java" "DoPrivilegedTest")
 add_jopa_run_test(GenericMethodTest "${TEST_DIR}/generics/GenericMethodTest.java" "GenericMethodTest")
 add_jopa_run_test(InterfaceTypeArgTest "${TEST_DIR}/generics/InterfaceTypeArgTest.java" "InterfaceTypeArgTest")
+add_jopa_run_test(ChainedGenericsTest "${TEST_DIR}/generics/ChainedGenericsTest.java" "ChainedGenericsTest")
+add_jopa_run_test(InheritedGenericTest "${TEST_DIR}/generics/InheritedGenericTest.java" "InheritedGenericTest")
+add_jopa_run_test(PassthroughGenericTest "${TEST_DIR}/generics/PassthroughGenericTest.java" "PassthroughGenericTest")
+add_jopa_run_test(InheritedInterfaceTest "${TEST_DIR}/generics/InheritedInterfaceTest.java" "InheritedInterfaceTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
@@ -299,6 +303,7 @@ endif()
 add_jopa_run_test(AnonymousClassTest "${TEST_DIR}/anonymous/AnonymousClassTest.java" "AnonymousClassTest")
 add_jopa_run_test(AnonymousGenericTest "${TEST_DIR}/anonymous/AnonymousGenericTest.java" "AnonymousGenericTest")
 add_jopa_run_test(TypeTokenTest "${TEST_DIR}/anonymous/TypeTokenTest.java" "TypeTokenTest")
+add_jopa_run_test(CapturedIteratorTest "${TEST_DIR}/anonymous/CapturedIteratorTest.java" "CapturedIteratorTest")
 
 # Chained Generic Return Type Test
 add_jopa_run_test(ChainedGenericReturnType "${TEST_DIR}/ChainedGenericReturnType.java" "ChainedGenericReturnType")
