@@ -39,4 +39,9 @@ public abstract class ClassLoader {
     public static ClassLoader getSystemClassLoader() {
         return null;
     }
+
+    public void setDefaultAssertionStatus(boolean enabled) {}
+    public void setPackageAssertionStatus(String packageName, boolean enabled) {}
+    public void setClassAssertionStatus(String className, boolean enabled) {}
+    public void clearAssertionStatus() {}
 }
