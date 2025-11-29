@@ -6,15 +6,13 @@
 # 3. Build JamVM (C code + classes.zip compiled by JOPA)
 #
 # Result: Complete Java toolchain with no prebuilt Java bytecode blobs
+# Note: No system JDK required - we use 'zip' instead of 'jar' for packaging
 
 include(ExternalProject)
 
 find_program(MAKE_COMMAND make REQUIRED)
 find_program(TAR_COMMAND tar REQUIRED)
-
-# We still need system Java for the 'jar' tool (JOPA doesn't provide one)
-# and potentially for runtime operations during build
-find_package(Java COMPONENTS Development REQUIRED)
+find_program(ZIP_COMMAND zip REQUIRED)
 
 set(VENDOR_PREFIX "${CMAKE_BINARY_DIR}/vendor-install")
 file(MAKE_DIRECTORY "${VENDOR_PREFIX}")
@@ -65,15 +63,15 @@ endif()
 set(JOPA_EXECUTABLE "${CMAKE_BINARY_DIR}/src/jopa")
 set(JOPA_RUNTIME_JAR "${CMAKE_BINARY_DIR}/runtime/jopa-stub-rt.jar")
 
-# Clean Java environment to prevent system javac from leaking in
+# Clean Java environment to prevent any system Java from leaking in
 set(CLEAN_JAVA_ENV_VARS
     "--unset=JAVA_HOME"
     "--unset=JDK_HOME"
     "--unset=CLASSPATH"
+    "--unset=JAVA"
+    "--unset=JAVAC"
+    "--unset=JAR"
 )
-
-# Get path to system jar tool (still needed for packaging)
-get_filename_component(JAVA_BIN_DIR "${Java_JAVAC_EXECUTABLE}" DIRECTORY)
 
 # ============================================================================
 # GNU Classpath Build - compiled with JOPA
@@ -90,16 +88,17 @@ ExternalProject_Add(gnu_classpath
     # This provides java.lang.Object, String, etc. needed for compilation
     # -nowarn:unchecked suppresses raw type warnings (GNU Classpath uses pre-generics style)
     # Using ASAN build with UBSAN errors and leak detection suppressed
+    # --with-jar=no forces use of ZIP instead of jar tool (no JDK dependency)
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "JAVA=${Java_JAVA_EXECUTABLE}"
-        "JAR=${JAVA_BIN_DIR}/jar"
+        "ZIP=${ZIP_COMMAND}"
         "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
+            --with-jar=no
             --disable-gtk-peer
             --disable-gconf-peer
             --disable-plugin
@@ -112,8 +111,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "JAVA=${Java_JAVA_EXECUTABLE}"
-        "JAR=${JAVA_BIN_DIR}/jar"
+        "ZIP=${ZIP_COMMAND}"
         ${MAKE_COMMAND} -j${NPROC}
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
