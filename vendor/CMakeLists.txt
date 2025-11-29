@@ -126,16 +126,6 @@ ExternalProject_Add(gnu_classpath
 # GNU Classpath depends on JOPA and runtime.jar being built first
 ExternalProject_Add_StepDependencies(gnu_classpath configure jopa jopa-stub-rt)
 
-# GNU Classpath 0.99 Makefile references 'sun' directory in glibj.zip creation
-# but has no sun/ source files. jar silently ignores missing dirs, zip fails.
-# Create empty sun directory to work around this GNU Classpath bug.
-ExternalProject_Add_Step(gnu_classpath create_sun_dir
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${CLASSPATH_BUILD_DIR}/lib/sun"
-    DEPENDEES configure
-    DEPENDERS build
-    COMMENT "Creating missing sun directory for GNU Classpath glibj.zip"
-)
-
 set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PARENT_SCOPE)
 
 # ============================================================================
