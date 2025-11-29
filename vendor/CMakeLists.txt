@@ -106,13 +106,15 @@ ExternalProject_Add(gnu_classpath
             --disable-Werror
             --disable-gjdoc
 
+    # Note: Using -j1 for GNU Classpath build because JOPA is single-threaded
+    # and parallel make causes race conditions with the glibj.zip creation
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "ZIP=${ZIP_COMMAND}"
-        ${MAKE_COMMAND} -j${NPROC}
+        ${MAKE_COMMAND} -j1
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
