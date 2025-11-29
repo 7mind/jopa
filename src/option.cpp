@@ -937,7 +937,7 @@ Option::Option(ArgumentExpander& arguments,
     // arguments in reverse order, we reverse the order here again to get
     // the original list...
     //
-    for (int k = filename_index.Length() - 1; k >= 0; k--)
+    for (int k = static_cast<int>(filename_index.Length()) - 1; k >= 0; k--)
     {
         first_file_index--;
 
