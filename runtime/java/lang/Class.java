@@ -81,4 +81,10 @@ public final class Class<T> implements java.lang.reflect.Type {
 
     // Enum methods
     public native T[] getEnumConstants();
+
+    // Class loading
+    public native ClassLoader getClassLoader();
+    public native java.security.ProtectionDomain getProtectionDomain();
+    public native java.net.URL getResource(String name);
+    public native java.io.InputStream getResourceAsStream(String name);
 }

@@ -5,6 +5,8 @@ public class FileInputStream extends InputStream {
 
     public FileInputStream(File file) throws FileNotFoundException {}
 
+    public FileInputStream(FileDescriptor fdObj) {}
+
     public int read() throws IOException {
         return 0;
     }
