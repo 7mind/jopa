@@ -180,7 +180,7 @@ jobs:
           retention-days: 7
 
   parser-tests-jdk8:
-    name: JDK8 Parser Tests (80% threshold)
+    name: JDK8 Parser Tests (90% threshold)
     runs-on: ubuntu-latest
 
     steps:
@@ -202,7 +202,7 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java8-parser.sh --build
 
-      - name: Check JDK8 Success Threshold (80%)
+      - name: Check JDK8 Success Threshold (90%)
         run: |
           source build/parser_jdk8_results.env
           echo "JDK8 Parser Results:"
@@ -218,8 +218,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 80%
-          THRESHOLD=80
+          # Check if success rate is at least 90%
+          THRESHOLD=90
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
