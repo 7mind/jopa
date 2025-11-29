@@ -260,6 +260,138 @@ jobs:
             build/parser_jdk8_results.env
           retention-days: 7
 
+  compliance-tests-jdk7:
+    name: JDK7 Compliance Tests (48% threshold)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Run JDK7 Compliance Tests
+        run: |
+          nix develop --command bash ./scripts/test-java7-compliance.sh --build
+
+      - name: Check JDK7 Success Threshold (48%)
+        run: |
+          source build/compliance_jdk7_results.env
+          echo "JDK7 Compliance Results:"
+          echo "  Passed: ${COMPLIANCE_PASSED}"
+          echo "  Whitelisted: ${COMPLIANCE_WHITELISTED}"
+          echo "  Failed: ${COMPLIANCE_FAILED}"
+          echo "  Timeout: ${COMPLIANCE_TIMEOUT}"
+
+          if [ "$COMPLIANCE_WHITELISTED" -eq 0 ]; then
+            echo "ERROR: No tests were whitelisted"
+            exit 1
+          fi
+
+          SUCCESS_RATE=$(echo "scale=4; $COMPLIANCE_PASSED * 100 / $COMPLIANCE_WHITELISTED" | bc)
+          echo "  Success rate: ${SUCCESS_RATE}%"
+          echo ""
+
+          # Check if success rate is at least 48%
+          THRESHOLD=48
+          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+
+          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
+            echo "SUCCESS: JDK7 compliance tests passed threshold (>= ${THRESHOLD}%)"
+          else
+            echo "FAILURE: JDK7 compliance tests below threshold"
+            echo "Expected: >= ${THRESHOLD}%"
+            echo "Actual: ${SUCCESS_RATE}%"
+            exit 1
+          fi
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-jdk7
+          path: |
+            build/compliance_jdk7/results.txt
+            build/compliance_jdk7/failed.txt
+            build/compliance_jdk7/timeout.txt
+            build/compliance_jdk7_results.env
+          retention-days: 7
+
+  compliance-tests-jdk8:
+    name: JDK8 Compliance Tests (39% threshold)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Run JDK8 Compliance Tests
+        run: |
+          nix develop --command bash ./scripts/test-java8-compliance.sh --build
+
+      - name: Check JDK8 Success Threshold (39%)
+        run: |
+          source build/compliance_jdk8_results.env
+          echo "JDK8 Compliance Results:"
+          echo "  Passed: ${COMPLIANCE_PASSED}"
+          echo "  Whitelisted: ${COMPLIANCE_WHITELISTED}"
+          echo "  Failed: ${COMPLIANCE_FAILED}"
+          echo "  Timeout: ${COMPLIANCE_TIMEOUT}"
+
+          if [ "$COMPLIANCE_WHITELISTED" -eq 0 ]; then
+            echo "ERROR: No tests were whitelisted"
+            exit 1
+          fi
+
+          SUCCESS_RATE=$(echo "scale=4; $COMPLIANCE_PASSED * 100 / $COMPLIANCE_WHITELISTED" | bc)
+          echo "  Success rate: ${SUCCESS_RATE}%"
+          echo ""
+
+          # Check if success rate is at least 39%
+          THRESHOLD=39
+          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+
+          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
+            echo "SUCCESS: JDK8 compliance tests passed threshold (>= ${THRESHOLD}%)"
+          else
+            echo "FAILURE: JDK8 compliance tests below threshold"
+            echo "Expected: >= ${THRESHOLD}%"
+            echo "Actual: ${SUCCESS_RATE}%"
+            exit 1
+          fi
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-results-jdk8
+          path: |
+            build/compliance_jdk8/results.txt
+            build/compliance_jdk8/failed.txt
+            build/compliance_jdk8/timeout.txt
+            build/compliance_jdk8_results.env
+          retention-days: 7
+
   build-release-jamvm:
     name: Build and Test (Release + JamVM)
     runs-on: ubuntu-latest
