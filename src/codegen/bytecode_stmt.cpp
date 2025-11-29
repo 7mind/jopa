@@ -504,6 +504,50 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
         }
     }
 
+    //
+    // Mark locally defined variables as out-of-scope in the StackMapGenerator.
+    // This is critical for correct StackMapTable generation at merge points.
+    // When paths merge (e.g., after if-else blocks), the frame should only include
+    // locals that are defined on ALL paths. By truncating here, we ensure that
+    // UseLabel/DefineLabel intersection logic computes the correct minimum locals.
+    //
+    if (stack_map_generator && block -> NumLocallyDefinedVariables() > 0)
+    {
+        // Find the lowest local variable index defined in this block
+        unsigned lowest_index = UINT_MAX;
+        for (unsigned i = 0; i < block -> NumLocallyDefinedVariables(); i++)
+        {
+            VariableSymbol* variable = block -> LocallyDefinedVariable(i);
+            unsigned idx = variable -> LocalVariableIndex();
+            if (idx < lowest_index)
+                lowest_index = idx;
+        }
+        // Truncate all locals from this index onwards
+        // This marks them as Top (undefined/out-of-scope)
+        if (lowest_index != UINT_MAX)
+        {
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+                Coutput << "EmitBlockStatement: TruncateLocals from " << lowest_index
+                        << " at pc " << code_attribute->CodeLength() << endl;
+#endif
+            stack_map_generator->TruncateLocals(lowest_index);
+
+            //
+            // After truncating, explicitly record a frame at the current PC.
+            // This is crucial for fall-through paths from blocks with local variables.
+            // Without this, a same_frame would inherit the pre-truncation locals count,
+            // causing verification errors when merging with other paths.
+            //
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+                Coutput << "EmitBlockStatement: RecordFrameWithLocals after truncation at pc "
+                        << code_attribute->CodeLength() << endl;
+#endif
+            stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), NULL);
+        }
+    }
+
     method_stack -> Pop();
     return abrupt;
 }
