@@ -1390,7 +1390,11 @@ static void CheckAndCreateBridge(
     MethodSymbol* bridge = new MethodSymbol(method -> Identity());
     bridge -> SetContainingType(type);
     bridge -> SetType(inherited_method -> Type());
-    bridge -> SetFlags((method -> Flags() & ~AccessFlags::ACCESS_ABSTRACT) |
+    // Clear ACCESS_ABSTRACT and ACCESS_NATIVE from bridge flags:
+    // - Bridge methods have bytecode, so they can't be abstract
+    // - Bridge methods have their own bytecode that calls the target,
+    //   so they can't be native even if the target method is native
+    bridge -> SetFlags((method -> Flags() & ~AccessFlags::ACCESS_ABSTRACT & ~AccessFlags::ACCESS_NATIVE) |
                        AccessFlags::ACCESS_SYNTHETIC | AccessFlags::ACCESS_BRIDGE);
     bridge -> SetBridgeTarget(method);
     unsigned num_params = inherited_method -> NumFormalParameters();

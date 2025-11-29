@@ -1,6 +1,6 @@
 package java.lang;
 
-public final class String implements java.io.Serializable, CharSequence {
+public final class String implements java.io.Serializable, Comparable<String>, CharSequence {
     public String() {}
 
     public String(char[] value) {}
