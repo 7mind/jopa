@@ -157,6 +157,13 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                 return abrupt;
             }
             Label& continue_label = method_stack -> TopContinueLabel();
+            // Save locals state before loop body for StackMapTable generation
+            // This is needed because inner-scope variables declared in the loop body
+            // should not be included in the continue_label's frame.
+            Tuple<StackMapGenerator::VerificationType>* saved_loop_locals = NULL;
+            if (stack_map_generator)
+                saved_loop_locals = stack_map_generator->SaveLocals();
+
             if (wp -> expression -> IsConstant())
             {
                 // must be true, or internal statement would be
@@ -171,6 +178,15 @@ bool ByteCode::EmitStatement(AstStatement* statement)
             u2 begin_pc = code_attribute -> CodeLength();
             abrupt |= EmitBlockStatement(wp -> statement);
             bool empty = (begin_pc == code_attribute -> CodeLength());
+
+            // For continue_label, record frame with pre-loop-body locals
+            // This ensures inner-scope variables don't pollute the frame
+            if (stack_map_generator && saved_loop_locals)
+            {
+                stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), saved_loop_locals);
+                delete saved_loop_locals;
+                saved_loop_locals = NULL;
+            }
             DefineLabel(continue_label);
             assert(stack_depth == 0);
 
@@ -221,10 +237,26 @@ bool ByteCode::EmitStatement(AstStatement* statement)
         {
             AstForStatement* for_statement = statement -> ForStatementCast();
             bool abrupt = false;
+
+            // Save locals state BEFORE for-init to restore when loop ends.
+            // This is needed for StackMapTable - break/continue targets after the loop
+            // should not include for-init variables.
+            Tuple<StackMapGenerator::VerificationType>* saved_pre_loop_locals = NULL;
+            if (stack_map_generator)
+                saved_pre_loop_locals = stack_map_generator->SaveLocals();
+
             for (unsigned i = 0; i < for_statement -> NumForInitStatements(); i++)
                 EmitStatement(for_statement -> ForInitStatement(i));
             Label begin_label;
             Label test_label;
+
+            // Save locals state after for-init but before loop body for StackMapTable generation
+            // This is needed because inner-scope variables declared in the loop body
+            // should not be included in the continue_label/test_label's frame.
+            Tuple<StackMapGenerator::VerificationType>* saved_loop_locals = NULL;
+            if (stack_map_generator)
+                saved_loop_locals = stack_map_generator->SaveLocals();
+
             //
             // The loop test is placed after the body, unless the body
             // always completes abruptly, to save an additional jump.
@@ -254,6 +286,13 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                 }
                 EmitBlockStatement(for_statement -> statement);
                 assert(stack_depth == 0);
+                // Restore pre-loop locals before returning
+                if (stack_map_generator && saved_pre_loop_locals)
+                {
+                    stack_map_generator->RestoreLocals(saved_pre_loop_locals);
+                    delete saved_pre_loop_locals;
+                }
+                delete saved_loop_locals;
                 return abrupt;
             }
             Label& continue_label = method_stack -> TopContinueLabel();
@@ -271,11 +310,23 @@ bool ByteCode::EmitStatement(AstStatement* statement)
             u2 begin_pc = code_attribute -> CodeLength();
             abrupt |= EmitBlockStatement(for_statement -> statement);
             bool empty = (begin_pc == code_attribute -> CodeLength());
+
+            // For continue_label, record frame with pre-loop-body locals
+            if (stack_map_generator && saved_loop_locals)
+            {
+                stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), saved_loop_locals);
+            }
             DefineLabel(continue_label);
             for (unsigned j = 0;
                  j < for_statement -> NumForUpdateStatements(); j++)
             {
                 EmitStatement(for_statement -> ForUpdateStatement(j));
+            }
+            // For test_label, also record frame with pre-loop-body locals
+            // This is needed when test_label is a jump target from before the loop body
+            if (stack_map_generator && saved_loop_locals)
+            {
+                stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), saved_loop_locals);
             }
             DefineLabel(test_label);
             CompleteLabel(test_label);
@@ -301,6 +352,16 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                             for_statement -> statement);
             CompleteLabel(continue_label);
             CompleteLabel(begin_label);
+
+            // Restore pre-loop locals to reset for-init variables.
+            // This ensures break targets after the loop don't include for-init variables.
+            if (stack_map_generator && saved_pre_loop_locals)
+            {
+                stack_map_generator->RestoreLocals(saved_pre_loop_locals);
+                delete saved_pre_loop_locals;
+            }
+
+            delete saved_loop_locals;
             return abrupt && ! for_statement -> can_complete_normally;
         }
     case Ast::FOREACH: // JSR 201
@@ -440,6 +501,50 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
                                  RegisterName(variable -> ExternalIdentity()),
                                  RegisterUtf8(variable -> Type() -> signature),
                                  variable -> LocalVariableIndex());
+        }
+    }
+
+    //
+    // Mark locally defined variables as out-of-scope in the StackMapGenerator.
+    // This is critical for correct StackMapTable generation at merge points.
+    // When paths merge (e.g., after if-else blocks), the frame should only include
+    // locals that are defined on ALL paths. By truncating here, we ensure that
+    // UseLabel/DefineLabel intersection logic computes the correct minimum locals.
+    //
+    if (stack_map_generator && block -> NumLocallyDefinedVariables() > 0)
+    {
+        // Find the lowest local variable index defined in this block
+        unsigned lowest_index = UINT_MAX;
+        for (unsigned i = 0; i < block -> NumLocallyDefinedVariables(); i++)
+        {
+            VariableSymbol* variable = block -> LocallyDefinedVariable(i);
+            unsigned idx = variable -> LocalVariableIndex();
+            if (idx < lowest_index)
+                lowest_index = idx;
+        }
+        // Truncate all locals from this index onwards
+        // This marks them as Top (undefined/out-of-scope)
+        if (lowest_index != UINT_MAX)
+        {
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+                Coutput << "EmitBlockStatement: TruncateLocals from " << lowest_index
+                        << " at pc " << code_attribute->CodeLength() << endl;
+#endif
+            stack_map_generator->TruncateLocals(lowest_index);
+
+            //
+            // After truncating, explicitly record a frame at the current PC.
+            // This is crucial for fall-through paths from blocks with local variables.
+            // Without this, a same_frame would inherit the pre-truncation locals count,
+            // causing verification errors when merging with other paths.
+            //
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+                Coutput << "EmitBlockStatement: RecordFrameWithLocals after truncation at pc "
+                        << code_attribute->CodeLength() << endl;
+#endif
+            stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), NULL);
         }
     }
 
@@ -1957,18 +2062,14 @@ void ByteCode::EmitBranch(Opcode opc, Label& lab, AstStatement* over)
     // we're jumping over. If the statement is large enough, either change
     // to the 4-byte branch opcode or write out a branch around a goto_w for
     // branch opcodes that don't have a long form.
+    //
+    // NOTE: We do NOT pop types from StackMapGenerator for branch operands here
+    // because the operands (e.g., comparison values from EmitExpression) are not
+    // tracked in the StackMapGenerator. Only method call arguments are tracked,
+    // and popping here would incorrectly remove those tracked types.
     int sizeHeuristic = over ? over -> RightToken() - over -> LeftToken() : 0;
     if (sizeHeuristic < TOKEN_WIDTH_REQUIRING_GOTOW) {
         PutOp(opc);
-        // Update StackMapGenerator for branch operands consumed
-        // This must be done after PutOp but before UseLabel saves the stack state
-        if (stack_map_generator)
-        {
-            // Pop the appropriate number of values based on the branch opcode
-            int effect = stack_effect[opc];
-            for (int i = 0; i < -effect; i++)
-                stack_map_generator->PopType();
-        }
         UseLabel(lab, 2, 1);
         return;
     }
@@ -1988,13 +2089,6 @@ void ByteCode::EmitBranch(Opcode opc, Label& lab, AstStatement* over)
     // goto_w lab
     // label2:
     PutOp(InvertIfOpCode(opc));
-    // Update StackMapGenerator for branch operands consumed
-    if (stack_map_generator)
-    {
-        int effect = stack_effect[InvertIfOpCode(opc)];
-        for (int i = 0; i < -effect; i++)
-            stack_map_generator->PopType();
-    }
     Label label2;
     UseLabel(label2, 2, 1);
     PutOp(OP_GOTO_W);
