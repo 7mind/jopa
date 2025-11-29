@@ -261,7 +261,7 @@ jobs:
           retention-days: 7
 
   compliance-tests-jdk7:
-    name: JDK7 Compliance Tests (49% threshold)
+    name: JDK7 Compliance Tests (66% threshold)
     runs-on: ubuntu-latest
 
     steps:
