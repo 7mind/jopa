@@ -15,6 +15,16 @@
 #include <cpptrace/cpptrace.hpp>
 #endif
 
+#ifdef JOPA_DISABLE_LEAK_SANITIZER
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+extern "C" const char *__asan_default_options() {
+    return "detect_leaks=0";
+}
+#endif
+#endif
+#endif
+
 using namespace Jopa;
 
 int main(int argc, char *argv[])

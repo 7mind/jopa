@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
+# Default to Debug build if not specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type (Debug/Release)" FORCE)
+    message(STATUS "Build type not specified, defaulting to Debug")
+endif()
+
 # Use clang as the default compiler if not specified
 if(NOT DEFINED CMAKE_C_COMPILER AND NOT DEFINED CMAKE_CXX_COMPILER)
     find_program(CLANG_C_COMPILER clang)
@@ -26,7 +32,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Determine if this is a debug build
 string(TOUPPER "${CMAKE_BUILD_TYPE}" _BUILD_TYPE_UPPER)
-if(_BUILD_TYPE_UPPER STREQUAL "DEBUG" OR _BUILD_TYPE_UPPER STREQUAL "")
+if(_BUILD_TYPE_UPPER STREQUAL "DEBUG")
     set(_IS_DEBUG_BUILD TRUE)
 else()
     set(_IS_DEBUG_BUILD FALSE)
@@ -37,6 +43,7 @@ option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON
 option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
+option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" OFF)
 
 # JamVM bootstrap options
 option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" ON)
