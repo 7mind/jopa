@@ -43,7 +43,7 @@ option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON
 option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
-option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" OFF)
+option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" ${_IS_DEBUG_BUILD})
 
 # JamVM bootstrap options
 option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" ON)

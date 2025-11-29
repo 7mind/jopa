@@ -36,15 +36,15 @@ JAVAC=valgrind --error-exitcode=1 --log-file=${CMAKE_BINARY_DIR}/valgrind-%p.log
 ```
 
 ### Debug Build with Sanitizers
-Debug builds automatically enable ASAN and UBSAN. Leak detection is disabled by default.
+Debug builds automatically enable ASAN, UBSAN, and leak detection.
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
 cmake --build build
 ```
 
-To opt-in to leak detection:
+To opt-out of leak detection:
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_LEAK_SANITIZER=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_LEAK_SANITIZER=OFF
 ```
 
 For bootstrap builds, UBSAN errors are non-fatal by default in vendor/CMakeLists.txt.

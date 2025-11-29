@@ -87,7 +87,7 @@ jobs:
         run: |
           nix develop --command bash -c '
             set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
             cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
 
@@ -347,53 +347,3 @@ jobs:
             /tmp/build-debug-jamvm.log
           retention-days: 7
 
-  build-debug-with-leak-sanitizer:
-    name: Build (Debug + All Sanitizers incl. Leak)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Debug + All Sanitizers)
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=ON
-            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug-leak.log
-          ' || echo "Build with leak sanitizer failed (expected)"
-
-      - name: Run Primary Tests (Debug + All Sanitizers)
-        continue-on-error: true
-        run: |
-          nix develop --command bash ./scripts/test-primary.sh --sanitizers || echo "Tests with leak sanitizer failed (expected)"
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo '## Debug Build with Leak Sanitizer (Experimental)' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'This job is expected to fail - leak sanitizer is for future improvement.' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-debug-leak
-          path: |
-            build/test/*.class
-            build/Testing/Temporary/LastTest.log
-            /tmp/build-debug-leak.log
-          retention-days: 7
