@@ -14,11 +14,6 @@ find_program(MAKE_COMMAND make REQUIRED)
 find_program(TAR_COMMAND tar REQUIRED)
 find_program(ZIP_COMMAND zip REQUIRED)
 
-# Wrapper script for zip that filters out non-existent directories
-# jar silently ignores missing directories, but zip fails with Error 15
-set(ZIP_WRAPPER_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/zip-wrapper.sh")
-set(ZIP_WRAPPER "${ZIP_WRAPPER_SCRIPT} ${ZIP_COMMAND}")
-
 set(VENDOR_PREFIX "${CMAKE_BINARY_DIR}/vendor-install")
 file(MAKE_DIRECTORY "${VENDOR_PREFIX}")
 
@@ -99,7 +94,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_WRAPPER}"
+        "ZIP=${ZIP_COMMAND}"
         "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
@@ -118,7 +113,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_WRAPPER}"
+        "ZIP=${ZIP_COMMAND}"
         ${MAKE_COMMAND} -j1
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
@@ -130,6 +125,16 @@ ExternalProject_Add(gnu_classpath
 
 # GNU Classpath depends on JOPA and runtime.jar being built first
 ExternalProject_Add_StepDependencies(gnu_classpath configure jopa jopa-stub-rt)
+
+# GNU Classpath 0.99 Makefile references 'sun' directory in glibj.zip creation
+# but has no sun/ source files. jar silently ignores missing dirs, zip fails.
+# Create empty sun directory to work around this GNU Classpath bug.
+ExternalProject_Add_Step(gnu_classpath create_sun_dir
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CLASSPATH_BUILD_DIR}/lib/sun"
+    DEPENDEES configure
+    DEPENDERS build
+    COMMENT "Creating missing sun directory for GNU Classpath glibj.zip"
+)
 
 set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PARENT_SCOPE)
 
