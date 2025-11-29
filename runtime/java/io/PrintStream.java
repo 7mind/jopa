@@ -1,7 +1,16 @@
 package java.io;
 
-// Stub PrintStream class for testing
-public class PrintStream {
+public class PrintStream extends OutputStream {
+    public PrintStream(OutputStream out) {}
+
+    public PrintStream(OutputStream out, boolean autoFlush) {}
+
+    public PrintStream(String fileName) throws FileNotFoundException {}
+
+    public PrintStream(File file) throws FileNotFoundException {}
+
+    public void write(int b) {}
+
     public void print(String s) {
         // Native implementation
     }
