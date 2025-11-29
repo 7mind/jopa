@@ -11,7 +11,7 @@ Java 8 support is limited to default methods; other Java 8 features are intentio
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
-How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which run real program on real Hotspot JVM without `noverify`.
+How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot), but the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
 
