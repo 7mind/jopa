@@ -124,7 +124,7 @@ ExternalProject_Add(gnu_classpath
 )
 
 # GNU Classpath depends on JOPA and runtime.jar being built first
-ExternalProject_Add_StepDependencies(gnu_classpath configure jopa runtime)
+ExternalProject_Add_StepDependencies(gnu_classpath configure jopa jopa-stub-rt)
 
 set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PARENT_SCOPE)
 
@@ -175,8 +175,8 @@ ExternalProject_Add(jamvm
 set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
 set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
 
-# vendor_jvm is the main target for building the complete JVM stack
-add_custom_target(vendor_jvm DEPENDS jamvm)
+# jamvm_with_gnucp is the main target for building the complete JVM stack
+add_custom_target(jamvm_with_gnucp DEPENDS jamvm)
 
 # JamVM implicitly depends on jopa through gnu_classpath dependency chain
 

@@ -141,16 +141,16 @@ cmake --install build --prefix /usr/local
 |--------|-------------|--------|
 | *(default)* | Compiler + stub runtime | `build/src/jopa`, `build/runtime/jopa-stub-rt.jar` |
 | `jopa` | Compiler only | `build/src/jopa` |
-| `runtime` | Stub runtime JAR | `build/runtime/jopa-stub-rt.jar` |
-| `vendor_jvm` | Bootstrap JamVM + GNU Classpath | `build/vendor-install/` |
+| `jopa-stub-rt` | Stub runtime JAR | `build/runtime/jopa-stub-rt.jar` |
+| `jamvm_with_gnucp` | Bootstrap JamVM + GNU Classpath | `build/vendor-install/` |
 | `devjopak` | Distribution archive | `build/devjopak-<version>.tar.gz` |
 
 ```bash
-cmake --build build                      # Default: compiler + runtime
-cmake --build build --target jopa        # Compiler only
-cmake --build build --target vendor_jvm  # Bootstrap (compiles GNU Classpath with JOPA)
-cmake --build build --target devjopak    # Create distribution archive
-ctest --test-dir build                   # Run tests
+cmake --build build                              # Default: compiler + runtime
+cmake --build build --target jopa                # Compiler only
+cmake --build build --target jamvm_with_gnucp    # Bootstrap (compiles GNU Classpath with JOPA)
+cmake --build build --target devjopak            # Create distribution archive
+ctest --test-dir build                           # Run tests
 ```
 
 ### CMake Options

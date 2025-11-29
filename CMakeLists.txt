@@ -119,7 +119,7 @@ if(JOPA_BUILD_JAMVM)
 
     add_custom_command(
         OUTPUT "${JAVA_WRAPPER}"
-        DEPENDS "${DEVJOPAK_DIR}/bin/.created" vendor_jvm "${CMAKE_SOURCE_DIR}/scripts/devjopak-java.sh.in"
+        DEPENDS "${DEVJOPAK_DIR}/bin/.created" jamvm_with_gnucp "${CMAKE_SOURCE_DIR}/scripts/devjopak-java.sh.in"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/scripts/devjopak-java.sh.in" "${JAVA_WRAPPER}"
         COMMAND chmod +x "${JAVA_WRAPPER}"
         COMMENT "Creating java wrapper script"
@@ -134,14 +134,14 @@ if(JOPA_BUILD_JAMVM)
 
     add_custom_command(
         OUTPUT "${DEVJOPAK_DIR}/lib/jamvm"
-        DEPENDS vendor_jvm "${DEVJOPAK_DIR}/bin/.created"
+        DEPENDS jamvm_with_gnucp "${DEVJOPAK_DIR}/bin/.created"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/jamvm/bin/jamvm" "${DEVJOPAK_DIR}/lib/jamvm"
         COMMENT "Copying JamVM runtime"
     )
 
     add_custom_command(
         OUTPUT "${DEVJOPAK_DIR}/lib/classes.zip"
-        DEPENDS vendor_jvm "${DEVJOPAK_DIR}/bin/.created"
+        DEPENDS jamvm_with_gnucp "${DEVJOPAK_DIR}/bin/.created"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/jamvm/share/jamvm/classes.zip" "${DEVJOPAK_DIR}/lib/classes.zip"
         COMMENT "Copying JamVM classes (compiled by JOPA)"
     )
