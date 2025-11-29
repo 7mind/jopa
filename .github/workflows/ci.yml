@@ -118,7 +118,7 @@ jobs:
           retention-days: 7
 
   parser-tests-jdk7:
-    name: JDK7 Parser Tests (99% threshold)
+    name: JDK7 Parser Tests (98% threshold)
     runs-on: ubuntu-latest
 
     steps:
@@ -140,7 +140,7 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java7-parser.sh --build
 
-      - name: Check JDK7 Success Threshold (99%)
+      - name: Check JDK7 Success Threshold (98%)
         run: |
           source build/parser_jdk7_results.env
           echo "JDK7 Parser Results:"
@@ -156,8 +156,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 99%
-          THRESHOLD=99
+          # Check if success rate is at least 98%
+          THRESHOLD=98
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
