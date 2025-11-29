@@ -1,6 +1,6 @@
 package java.lang;
 
-public final class String {
+public final class String implements java.io.Serializable, CharSequence {
     public String() {}
 
     public String(char[] value) {}
@@ -29,6 +29,10 @@ public final class String {
 
     public native String substring(int beginIndex, int endIndex);
 
+    public CharSequence subSequence(int start, int end) {
+        return substring(start, end);
+    }
+
     public native int indexOf(int ch);
 
     public native int indexOf(String str);
@@ -52,6 +56,24 @@ public final class String {
     public native boolean isEmpty();
 
     public native String replace(char oldChar, char newChar);
+
+    public native String replace(CharSequence target, CharSequence replacement);
+
+    public native String intern();
+
+    public native int compareTo(String anotherString);
+
+    public native int compareToIgnoreCase(String str);
+
+    public native boolean contains(CharSequence s);
+
+    public native boolean equalsIgnoreCase(String anotherString);
+
+    public native boolean matches(String regex);
+
+    public native String replaceAll(String regex, String replacement);
+
+    public native String replaceFirst(String regex, String replacement);
 
     public native String[] split(String regex);
 

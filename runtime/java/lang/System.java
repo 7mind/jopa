@@ -22,4 +22,32 @@ public final class System {
     public static void arraycopy(Object src, int srcPos, Object dest, int destPos, int length) {
         // Native implementation
     }
+
+    public static String getProperty(String key) {
+        return null;
+    }
+
+    public static String getProperty(String key, String def) {
+        return def;
+    }
+
+    public static String setProperty(String key, String value) {
+        return null;
+    }
+
+    public static String getenv(String name) {
+        return null;
+    }
+
+    public static int identityHashCode(Object x) {
+        return 0;
+    }
+
+    public static String lineSeparator() {
+        return "\n";
+    }
+
+    public static SecurityManager getSecurityManager() {
+        return null;
+    }
 }
