@@ -19,6 +19,6 @@ add_custom_command(
     VERBATIM
 )
 
-add_custom_target(runtime ALL
+add_custom_target(jopa-stub-rt ALL
     DEPENDS ${RUNTIME_JAR}
 )

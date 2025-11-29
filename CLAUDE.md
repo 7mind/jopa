@@ -15,7 +15,7 @@ JOPA is a Java compiler written in C++.
 - Standard build: `cmake -S . -B build && cmake --build build`
 - Compiler build: `cmake --build build --target jopa`
 - Run tests: `ctest --test-dir build --output-on-failure`
-- Bootstrap build: `cmake --build build --target vendor_jvm`
+- Bootstrap build: `cmake --build build --target jamvm_with_gnucp`
 
 ## Debugging
 
@@ -35,19 +35,19 @@ Replace JAVAC command in `vendor/CMakeLists.txt`:
 JAVAC=valgrind --error-exitcode=1 --log-file=${CMAKE_BINARY_DIR}/valgrind-%p.log ${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}
 ```
 
-### ASAN/UBSAN Build (recommended for memory issues)
-Configure with sanitizers and debug info:
+### Debug Build with Sanitizers
+Debug builds automatically enable ASAN and UBSAN. Leak detection is disabled by default.
 ```bash
-cmake -S . -B build \
-  -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
-  -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -g" \
-  -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
 ```
 
-For bootstrap builds, set env vars to continue past non-fatal errors:
-- `ASAN_OPTIONS=detect_leaks=0` (leak detection fails configure checks)
-- `UBSAN_OPTIONS=halt_on_error=0` (some UB is tolerable during bootstrap)
+To opt-in to leak detection:
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_LEAK_SANITIZER=ON
+```
+
+For bootstrap builds, UBSAN errors are non-fatal by default in vendor/CMakeLists.txt.
 
 ## Testing
 
