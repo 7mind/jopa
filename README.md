@@ -172,7 +172,7 @@ Java 7 language features are fully supported for parsing, semantic analysis, and
 | Exception suppression | ✅ Works | ✅ Works | ✅ Works |
 | Binary/underscore literals | ✅ Works | ✅ Works | ✅ Works |
 
-**Note:** All target versions work correctly for the vast majority of code. Target 1.7 (class version 51.0) generates StackMapTable attributes required by Java 7+ verification. Targets 1.5 and 1.6 pass 100% of tests. Target 1.7 passes 99% of tests (208/211); 3 tests with complex exception handler patterns in try-with-resources and similar constructs have known StackMapTable limitations. Use `-target 1.5` or `-target 1.6` for maximum compatibility if verification errors occur. Generated class files require at least the corresponding JVM major version.
+**Note:** All target versions work correctly for the vast majority of code. Target 1.7 (class version 51.0) generates StackMapTable attributes required by Java 7+ verification. Targets 1.5 and 1.6 pass 100% of tests. Target 1.7 passes 99% of tests (209/211); 2 tests with complex control flow patterns (try-with-resources with nested exception handling) have known StackMapTable limitations. Use `-target 1.5` or `-target 1.6` for maximum compatibility if verification errors occur. Generated class files require at least the corresponding JVM major version.
 
 ### JDK Compliance Snapshot
 
