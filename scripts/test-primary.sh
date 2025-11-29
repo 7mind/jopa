@@ -9,6 +9,7 @@ set -euo pipefail
 #   --quick        Only run with default target (1.5), skip matrix
 #   --sanitizers   Enable AddressSanitizer and UBSan (Debug build)
 #   --release      Use Release build (default is Debug)
+#   --jamvm        Run tests with JamVM instead of system JVM
 #   --help         Show this help
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,6 +22,7 @@ CLEAN_BUILD=false
 QUICK_MODE=false
 SANITIZERS=false
 BUILD_TYPE="Debug"
+USE_JAMVM=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -41,6 +43,10 @@ while [[ $# -gt 0 ]]; do
             BUILD_TYPE="Release"
             shift
             ;;
+        --jamvm)
+            USE_JAMVM=true
+            shift
+            ;;
         --help)
             echo "Usage: test-primary.sh [OPTIONS]"
             echo ""
@@ -49,6 +55,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --quick        Only run with default target (1.5), skip matrix"
             echo "  --sanitizers   Enable AddressSanitizer and UBSan (Debug build)"
             echo "  --release      Use Release build (default is Debug)"
+            echo "  --jamvm        Run tests with JamVM instead of system JVM"
             echo "  --help         Show this help"
             exit 0
             ;;
@@ -74,6 +81,7 @@ echo "Build:   ${BUILD_DIR}"
 echo "Parallel jobs: ${NPROC}"
 echo "Build type: ${BUILD_TYPE}"
 echo "Sanitizers: ${SANITIZERS}"
+echo "JamVM: ${USE_JAMVM}"
 echo ""
 
 # Target versions to test
@@ -100,6 +108,10 @@ if $SANITIZERS; then
 else
     CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=OFF)
     CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=OFF)
+fi
+
+if $USE_JAMVM; then
+    CMAKE_OPTS+=(-DJOPA_USE_JAMVM_TESTS=ON)
 fi
 
 FAILED=false
@@ -157,7 +169,7 @@ echo "========================================"
 echo "           SUMMARY"
 echo "========================================"
 echo ""
-echo "Build: ${BUILD_TYPE}, Sanitizers: ${SANITIZERS}"
+echo "Build: ${BUILD_TYPE}, Sanitizers: ${SANITIZERS}, JamVM: ${USE_JAMVM}"
 echo ""
 for RESULT in "${RESULTS[@]}"; do
     echo "  $RESULT"

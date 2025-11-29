@@ -241,6 +241,112 @@ jobs:
             build/parser_jdk8_results.env
           retention-days: 7
 
+  build-release-jamvm:
+    name: Build and Test (Release + JamVM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA, stub runtime, GNU Classpath, JamVM, and DevJopaK (Release)
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release-jamvm.log
+          '
+
+      - name: Run Primary Tests on JamVM (Release)
+        run: |
+          nix develop --command bash ./scripts/test-primary.sh --release --jamvm
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo '## Release Build + JamVM Test Results' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6 (running on JamVM)' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-release-jamvm
+          path: |
+            build/test/*.class
+            build/Testing/Temporary/LastTest.log
+            /tmp/build-release-jamvm.log
+          retention-days: 7
+
+  build-debug-jamvm:
+    name: Build and Test (Debug + Sanitizers + JamVM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA, stub runtime, GNU Classpath, JamVM, and DevJopaK (Debug + Sanitizers)
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
+            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug-jamvm.log
+          '
+
+      - name: Run Primary Tests on JamVM (Debug + Sanitizers)
+        run: |
+          nix develop --command bash ./scripts/test-primary.sh --sanitizers --jamvm
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo '## Debug Build + JamVM Test Results (with Sanitizers)' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6 (running on JamVM)' >> $GITHUB_STEP_SUMMARY
+          echo '' >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-debug-jamvm
+          path: |
+            build/test/*.class
+            build/Testing/Temporary/LastTest.log
+            /tmp/build-debug-jamvm.log
+          retention-days: 7
+
   build-debug-with-leak-sanitizer:
     name: Build (Debug + All Sanitizers incl. Leak)
     runs-on: ubuntu-latest
