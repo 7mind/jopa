@@ -113,42 +113,59 @@ The compiler fully supports complex generic type signatures including:
 
 ## Building
 
-- Quick start (nix/direnv):
-  ```bash
-  nix develop
-  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-  direnv exec . cmake --build build -j"$(nproc)"
-  direnv exec . sh -c "cd build && ctest --output-on-failure"
-  ```
+### Requirements
+- CMake 3.20+ and a C++17 compiler (Clang recommended)
+- libzip
+- iconv and/or ICU (uc) for encoding support
+- Java JDK (only for running tests and `jar` tool - not needed for compilation)
+- Optional: Nix/direnv for reproducible environment
 
-- Requirements:
-  - CMake 3.20+ and a C++17 compiler
-  - iconv and/or ICU (uc) if encoding support stays enabled
-  - Use the repo's nix/direnv setup (`direnv exec . <cmd>`) when available
+### Quick Start
 
-- With Nix:
-  ```bash
-  nix develop
-  direnv exec . cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-  direnv exec . cmake --build build -j"$(nproc)"
-  direnv exec . sh -c "cd build && ctest --output-on-failure"
-  direnv exec . cmake --install build --prefix /usr/local
-  ```
+```bash
+# With Nix (recommended)
+nix develop
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
 
-- Generic CMake:
-  ```bash
-  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-  cmake --build build
-  cmake --install build --prefix /usr/local
-  ```
+# Generic CMake
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+cmake --install build --prefix /usr/local
+```
 
-- Useful CMake options:
-  - `-DJIKES_ENABLE_DEBUG=ON` — Enable internal compiler debugging hooks
-  - `-DJIKES_ENABLE_NATIVE_FP=OFF` — Force emulated floating point
-  - `-DJIKES_ENABLE_ENCODING=OFF` — Skip iconv/ICU; otherwise CMake fails if neither is present
-  - `-DJOPA_ENABLE_JVM_TESTS=OFF` — Disable runtime validation tests (javap/JVM execution)
-  - `-DJOPA_USE_NOVERIFY=OFF` — Disable `-noverify` flag for JVM tests (requires StackMapTable)
-  - `-DJOPA_TARGET_VERSION=1.5` — Bytecode target version for tests (1.5, 1.6, or 1.7; default: 1.5)
+### Build Targets
+
+| Target | Description | Output |
+|--------|-------------|--------|
+| *(default)* | Compiler + stub runtime | `build/src/jopa`, `build/runtime/jopa-stub-rt.jar` |
+| `jopa` | Compiler only | `build/src/jopa` |
+| `runtime` | Stub runtime JAR | `build/runtime/jopa-stub-rt.jar` |
+| `vendor_jvm` | Bootstrap JamVM + GNU Classpath | `build/vendor-install/` |
+| `devjopak` | Distribution archive | `build/devjopak-<version>.tar.gz` |
+
+```bash
+cmake --build build                      # Default: compiler + runtime
+cmake --build build --target jopa        # Compiler only
+cmake --build build --target vendor_jvm  # Bootstrap (compiles GNU Classpath with JOPA)
+cmake --build build --target devjopak    # Create distribution archive
+ctest --test-dir build                   # Run tests
+```
+
+### CMake Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `JOPA_ENABLE_DEBUG` | OFF | Enable internal compiler debugging traces |
+| `JOPA_ENABLE_NATIVE_FP` | ON | Use native floating point (vs emulation) |
+| `JOPA_ENABLE_ENCODING` | ON | Enable `-encoding` support via iconv/ICU |
+| `JOPA_ENABLE_SANITIZERS` | Debug builds | Enable ASan/UBSan |
+| `JOPA_ENABLE_LEAK_SANITIZER` | OFF | Enable memory leak detection (requires `JOPA_ENABLE_SANITIZERS`) |
+| `JOPA_BUILD_JAMVM` | ON | Enable JamVM + GNU Classpath bootstrap targets |
+| `JOPA_ENABLE_JVM_TESTS` | ON | Enable runtime validation tests |
+| `JOPA_USE_JAMVM_TESTS` | OFF | Run tests with JamVM instead of system JVM |
+| `JOPA_TARGET_VERSION` | 1.5 | Bytecode target version for tests (1.5, 1.6, 1.7) |
 
 jikes
 =====

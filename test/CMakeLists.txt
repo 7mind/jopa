@@ -190,6 +190,8 @@ add_jopa_run_test(AutoboxingTest "${TEST_DIR}/autoboxing/AutoboxingTest.java" "A
 add_jopa_run_test(MethodBoxingSimple "${TEST_DIR}/autoboxing/MethodBoxingSimple.java" "MethodBoxingSimple")
 add_jopa_run_test(ReturnBoxingSimple "${TEST_DIR}/autoboxing/ReturnBoxingSimple.java" "ReturnBoxingSimple")
 add_jopa_run_test(ArithmeticBoxingSimple "${TEST_DIR}/autoboxing/ArithmeticBoxingSimple.java" "ArithmeticBoxingSimple")
+add_jopa_run_test(NumericBitwiseBoxingTest "${TEST_DIR}/autoboxing/NumericBitwiseBoxingTest.java" "NumericBitwiseBoxingTest")
+add_jopa_run_test(BooleanOperatorBoxingTest "${TEST_DIR}/autoboxing/BooleanOperatorBoxingTest.java" "BooleanOperatorBoxingTest")
 
 # Varargs Tests
 add_jopa_run_test(VarargsMethodTest "${TEST_DIR}/varargs/VarargsMethodTest.java" "VarargsMethodTest")
