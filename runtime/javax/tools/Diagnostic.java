@@ -1,0 +1,25 @@
+package javax.tools;
+
+import java.util.Locale;
+
+public interface Diagnostic<S> {
+    enum Kind {
+        ERROR,
+        WARNING,
+        MANDATORY_WARNING,
+        NOTE,
+        OTHER
+    }
+
+    Kind getKind();
+    S getSource();
+    long getPosition();
+    long getStartPosition();
+    long getEndPosition();
+    long getLineNumber();
+    long getColumnNumber();
+    String getCode();
+    String getMessage(Locale locale);
+
+    public static final long NOPOS = -1;
+}

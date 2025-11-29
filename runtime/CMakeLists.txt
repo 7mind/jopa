@@ -13,7 +13,7 @@ file(GLOB_RECURSE RUNTIME_SOURCES "${RUNTIME_SRC_DIR}/*.java")
 add_custom_command(
     OUTPUT ${RUNTIME_JAR}
     COMMAND $<TARGET_FILE:jopa> --nowarn:unchecked -source 1.5 -sourcepath "${RUNTIME_SRC_DIR}" -d "${RUNTIME_OUTPUT_DIR}/classes" ${RUNTIME_SOURCES}
-    COMMAND jar cf "${RUNTIME_JAR}" -C "${RUNTIME_OUTPUT_DIR}/classes" java
+    COMMAND jar cf "${RUNTIME_JAR}" -C "${RUNTIME_OUTPUT_DIR}/classes" .
     DEPENDS jopa ${RUNTIME_SOURCES}
     COMMENT "Building Jopa runtime JAR"
     VERBATIM
