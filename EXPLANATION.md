@@ -1,7 +1,7 @@
 # Deep dive to JOPA
 
 I wanted to better understand capabilites and applicability ceilings of the latest generation of models (Opus 4.5, Sonnet 4.5, gpt-5.1-codex-max, Gemini 2.5 Pro) 
-and learn how can I use them better. When I tasked Claude to refresh Jikes, I dind't expect it to succeed at all. It outperformed my expectations.
+and learn the ways to use them efficiently. When I tasked Claude to refresh Jikes, I dind't expect it to succeed at all. It outperformed my expectations.
 
 Good things I've learned:
 
