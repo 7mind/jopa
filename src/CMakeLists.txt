@@ -13,7 +13,10 @@ set(JOPA_SOURCES
     double.cpp
     dump.cpp
     error.cpp
-    expr.cpp
+    expr_lookup.cpp
+    expr_names.cpp
+    expr_primary.cpp
+    expr_ops.cpp
     incrmnt.cpp
     init.cpp
     jikes.cpp
@@ -40,8 +43,11 @@ set(JOPA_SOURCES
     parser/scanner.cpp
     parser/stream.cpp
 
-    # Code generation
-    codegen/bytecode.cpp
+    # Code generation (bytecode split for maintainability)
+    codegen/bytecode_init.cpp
+    codegen/bytecode_stmt.cpp
+    codegen/bytecode_expr.cpp
+    codegen/bytecode_ops.cpp
     codegen/class.cpp
     codegen/segment.cpp
 

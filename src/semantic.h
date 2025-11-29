@@ -1038,11 +1038,11 @@ private:
     void ProcessInstanceInitializers(AstClassBody*);
     MethodSymbol* GetStaticInitializerMethod(unsigned estimate = 0);
 
-    // Implemented in expr.cpp - expression processing
-    inline bool CanWideningPrimitiveConvert(const TypeSymbol*,
-                                            const TypeSymbol*);
-    inline bool CanNarrowingPrimitiveConvert(const TypeSymbol*,
-                                             const TypeSymbol*);
+    // Implemented in expr_ops.cpp - expression processing
+    bool CanWideningPrimitiveConvert(const TypeSymbol*,
+                                     const TypeSymbol*);
+    bool CanNarrowingPrimitiveConvert(const TypeSymbol*,
+                                      const TypeSymbol*);
     bool CanCastConvert(TypeSymbol*, TypeSymbol*, TokenIndex = 0);
     bool CanMethodInvocationConvert(const TypeSymbol*, const TypeSymbol*);
     bool CanSubtypeConvert(const TypeSymbol*, const TypeSymbol*);
