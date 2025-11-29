@@ -1780,14 +1780,22 @@ void Semantic::DefiniteSetup()
 
 void Semantic::DefiniteCleanUp()
 {
-    assert (FinalFields());
+    // Make cleanup idempotent - safe to call even if setup wasn't done
+    // or if cleanup was already called
+    if (! FinalFields())
+        return;
     delete FinalFields();
     FinalFields() = NULL;
     delete Universe();
+    Universe() = NULL;
     delete DefinitelyAssignedVariables();
+    DefinitelyAssignedVariables() = NULL;
     delete DefiniteFinalAssignments();
+    DefiniteFinalAssignments() = NULL;
     delete BlankFinals();
+    BlankFinals() = NULL;
     delete ReachableAssignments();
+    ReachableAssignments() = NULL;
 }
 
 

@@ -348,6 +348,13 @@ public:
     ~SemanticEnvironment()
     {
         delete next; // if there was any clone, get rid of it
+        // Clean up definite analysis data if not already cleaned
+        delete final_fields;
+        delete universe;
+        delete definitely_assigned_variables;
+        delete definite_final_assignment_stack;
+        delete blank_finals;
+        delete reachable_assignments;
     }
 
     //
