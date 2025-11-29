@@ -12,7 +12,8 @@ include(ExternalProject)
 
 find_program(MAKE_COMMAND make REQUIRED)
 find_program(TAR_COMMAND tar REQUIRED)
-find_program(ZIP_COMMAND zip REQUIRED)
+# Use wrapper script that closes stdin to prevent zip from hanging on clean builds
+set(ZIP_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/zip-wrapper.sh")
 
 set(VENDOR_PREFIX "${CMAKE_BINARY_DIR}/vendor-install")
 file(MAKE_DIRECTORY "${VENDOR_PREFIX}")
@@ -42,6 +43,11 @@ if(NOT EXISTS "${CLASSPATH_SOURCE_DIR}/configure")
     if(NOT TAR_RESULT EQUAL 0)
         message(FATAL_ERROR "Failed to extract GNU Classpath archive")
     endif()
+    # Patch Makefile.in to remove > /dev/null so we can see zip output for debugging
+    execute_process(
+        COMMAND sed -i -e "s|> /dev/null||g" "${CLASSPATH_SOURCE_DIR}/lib/Makefile.in"
+        RESULT_VARIABLE SED_RESULT
+    )
 endif()
 
 # Extract JamVM if not present
@@ -94,7 +100,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_COMMAND}"
+        "ZIP=${ZIP_WRAPPER}"
         "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
@@ -108,13 +114,14 @@ ExternalProject_Add(gnu_classpath
 
     # Note: Using -j1 for GNU Classpath build because JOPA is single-threaded
     # and parallel make causes race conditions with the glibj.zip creation
+    # V=1 enables verbose mode to show actual commands being executed (useful for CI debugging)
     BUILD_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_COMMAND}"
-        ${MAKE_COMMAND} -j1
+        "ZIP=${ZIP_WRAPPER}"
+        ${MAKE_COMMAND} -j1 V=1
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
