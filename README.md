@@ -11,6 +11,10 @@ Java 8 support is limited to default methods; other Java 8 features are intentio
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
+How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which run real program on real Hotspot JVM without `noverify`.
+Also we partially check for JDK [compliance](#jdk-compliance-snapshot), but the parser, the typer and the bytecode generator are definitely buggy.
+The original compiler had many bugs too.
+
 ## DevJopaK: No-Blob Bootstrap Java Development Kit
 
 JOPA can build a fully self-contained Java development kit without any prebuilt binary blobs in the chain:
@@ -21,6 +25,37 @@ JOPA can build a fully self-contained Java development kit without any prebuilt 
 - **JamVM classes** - Bootstrap classes for JamVM, **compiled by JOPA itself**
 
 This creates a complete Java toolchain where all Java bytecode is compiled from source using JOPA, making it suitable for reproducible and auditable builds.
+
+## Motivation
+
+I wanted to better understand capabilites and applicability ceilings of the latest generation of models (Opus 4.5, Sonnet 4.5, gpt-5.1-codex-max, Gemini 2.5 Pro) 
+and learn how can I use them better. When I tasked Claude to refresh Jikes, I dind't expect it to succeed at all. It outperformed my expectations.
+
+Good things I've learned:
+
+- Today (in 2025) models can do much more than 2 years ago. In 2023 I hoped that I could get a single compilation unit done with an agent, now I can think about compilers.
+- Models can help us revitalize ancient codebases which humans cannot handle
+- Models can work with C++ and produce code which doesn't fail on any sanitizers, including memory leak sanitizers.
+- The best language for the models is Python, they deliver much faster when they work with Python codebase.
+- Models can debug, read logs and use all the utilities in your toolchain with extremely high efficiency. They are much more knowledgeable than any engineer out there and sometimes they can happily debug Java bytecode by hexdumps.
+
+Bad things:
+
+- Models cannot abstract well and cannot generalize well. They are like humans and tend to deliver solutions for specific problems they see, but they generalize much less.
+- When unsupervised, they fail spectacularly in large refactorings and cannot design at all (again, incapable of generalization). I've tried to modularize this compiler, replace the parser, I've tried to do many other transformations, all that failed, Claude is incapable of deep thinking and planning.
+- They tend to take any shortcuts possible and behave like a bad genie.
+- Codex and Gemini are MUCH less capable, on projects of this scale (~50000 C++ lines) they cannot produce coherent output at all. Claude is MUCH better.
+- Claude can easily get sidetracked and forget main goal
+- Claude's CLI tool has insane memory leaks, the experience is very painful
+- Frequently, Claude cannot see "obvious" solutions
+- Claude loves to tell you that something alike to "we did a lot, let's make a coffee break". It's hard to make it work in a loop until it delivers.
+- Codex and Geminin cannot work in a loop at all. Despite all the effort, they stop fast.
+- You have to be always in the loop (more on that below). You cannot leave them unsupervised - they won't deliver.
+
+Usage patterns:
+
+- Be in the loop, monitor what the agent does, think and steer it towards the goal
+- Record important patters into your [CLAUDE.md](./CLAUDE.md)
 
 ### Building DevJopaK
 
