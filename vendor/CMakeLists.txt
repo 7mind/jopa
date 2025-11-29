@@ -14,6 +14,11 @@ find_program(MAKE_COMMAND make REQUIRED)
 find_program(TAR_COMMAND tar REQUIRED)
 find_program(ZIP_COMMAND zip REQUIRED)
 
+# Wrapper script for zip that filters out non-existent directories
+# jar silently ignores missing directories, but zip fails with Error 15
+set(ZIP_WRAPPER_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/zip-wrapper.sh")
+set(ZIP_WRAPPER "${ZIP_WRAPPER_SCRIPT} ${ZIP_COMMAND}")
+
 set(VENDOR_PREFIX "${CMAKE_BINARY_DIR}/vendor-install")
 file(MAKE_DIRECTORY "${VENDOR_PREFIX}")
 
@@ -94,7 +99,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_COMMAND}"
+        "ZIP=${ZIP_WRAPPER}"
         "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
@@ -113,7 +118,7 @@ ExternalProject_Add(gnu_classpath
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
         "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
-        "ZIP=${ZIP_COMMAND}"
+        "ZIP=${ZIP_WRAPPER}"
         ${MAKE_COMMAND} -j1
 
     INSTALL_COMMAND ${CMAKE_COMMAND} -E env
