@@ -272,56 +272,83 @@ void Control::FindPathsToDirectory(PackageSymbol* package)
                 if (directory_symbol)
                     package -> directory.Next() = directory_symbol;
             }
+        }
+    }
 
-            //
-            // Also check unnamed_package directories. These may have been
-            // registered by ProcessPackageDeclaration for source files
-            // passed on the command line with absolute paths.
-            //
-            for (unsigned i = 0; i < unnamed_package -> directory.Length(); i++)
+    //
+    // Always check unnamed_package directories for source files.
+    // These may have been registered by ProcessPackageDeclaration for source
+    // files passed on the command line. We do this outside the directory.Length() == 0
+    // check because source root registration may happen after initial package lookup.
+    // For subpackages, we walk up the package hierarchy to find the full path.
+    //
+    {
+        for (unsigned i = 0; i < unnamed_package -> directory.Length(); i++)
+        {
+            DirectorySymbol* root_dir = unnamed_package -> directory[i];
+            if (root_dir -> IsZip())
+                continue;
+
+            // Build the full directory path: root_dir + "/" + package_path
+            // PackageName() returns slashes (e.g., "gnu/classpath/tools")
+            int pkg_path_len = package -> PackageNameLength();
+            int length = root_dir -> DirectoryNameLength() + pkg_path_len + 1;
+            char* directory_name = new char[length + 1];
+            strcpy(directory_name, root_dir -> DirectoryName());
+            if (root_dir -> DirectoryName()[root_dir -> DirectoryNameLength() - 1] != U_SLASH)
+                strcat(directory_name, StringConstant::U8S_SL);
+
+            // Append package path (converting wchar_t to char)
+            const wchar_t* pkg_path = package -> PackageName();
+            char* ptr = directory_name + strlen(directory_name);
+            for (int j = 0; j < pkg_path_len; j++)
+                *ptr++ = (char) pkg_path[j];
+            *ptr = '\0';
+
+            if (SystemIsDirectory(directory_name))
             {
-                DirectorySymbol* root_dir = unnamed_package -> directory[i];
-                DirectorySymbol* subdirectory_symbol =
-                    root_dir -> FindDirectorySymbol(package -> Identity());
-                if (! root_dir -> IsZip())
+                // Walk down the directory hierarchy creating DirectorySymbols
+                DirectorySymbol* dir = root_dir;
+                const wchar_t* p = pkg_path;
+                while (p < pkg_path + pkg_path_len)
                 {
-                    if (! subdirectory_symbol)
+                    // Find next component
+                    const wchar_t* start = p;
+                    while (p < pkg_path + pkg_path_len && *p != U_SLASH)
+                        p++;
+                    unsigned comp_len = p - start;
+                    if (comp_len > 0)
                     {
-                        int length = root_dir -> DirectoryNameLength() +
-                            package -> Utf8NameLength() + 1; // +1 for '/'
-                        char* directory_name = new char[length + 1];
-                        strcpy(directory_name, root_dir -> DirectoryName());
-                        if (root_dir -> DirectoryName()[root_dir -> DirectoryNameLength() - 1] != U_SLASH)
-                            strcat(directory_name, StringConstant::U8S_SL);
-                        strcat(directory_name, package -> Utf8Name());
-
-                        if (SystemIsDirectory(directory_name))
-                            subdirectory_symbol = root_dir ->
-                                InsertDirectorySymbol(package -> Identity(),
-                                                      root_dir -> IsSourceDirectory());
-                        delete [] directory_name;
+                        NameSymbol* name_sym = FindOrInsertName(start, comp_len);
+                        DirectorySymbol* subdir = dir -> FindDirectorySymbol(name_sym);
+                        if (! subdir)
+                            subdir = dir -> InsertDirectorySymbol(name_sym,
+                                                                  root_dir -> IsSourceDirectory());
+                        dir = subdir;
                     }
-
-                    if (subdirectory_symbol)
-                        subdirectory_symbol -> ReadDirectory();
+                    if (p < pkg_path + pkg_path_len)
+                        p++; // skip slash
                 }
 
-                if (subdirectory_symbol)
+                if (dir && dir != root_dir)
                 {
+                    dir -> ReadDirectory();
+
                     // Check if already added
                     bool found = false;
                     for (unsigned j = 0; j < package -> directory.Length(); j++)
                     {
-                        if (package -> directory[j] == subdirectory_symbol)
+                        if (package -> directory[j] == dir)
                         {
                             found = true;
                             break;
                         }
                     }
                     if (! found)
-                        package -> directory.Next() = subdirectory_symbol;
+                        package -> directory.Next() = dir;
                 }
             }
+            delete [] directory_name;
         }
     }
 }
