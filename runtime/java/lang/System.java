@@ -2,9 +2,14 @@ package java.lang;
 
 // Stub System class for testing
 public final class System {
-    // Standard streams
-    public static final java.io.PrintStream out = null;
-    public static final java.io.PrintStream err = null;
+    // Standard streams - not final so they can be redirected
+    public static java.io.PrintStream out = null;
+    public static java.io.PrintStream err = null;
+    public static java.io.InputStream in = null;
+
+    public static void setOut(java.io.PrintStream out) {}
+    public static void setErr(java.io.PrintStream err) {}
+    public static void setIn(java.io.InputStream in) {}
 
     // Prevent instantiation
     private System() {}
