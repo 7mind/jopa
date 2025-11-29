@@ -183,6 +183,7 @@ add_jopa_run_test(ChainedGenericsTest "${TEST_DIR}/generics/ChainedGenericsTest.
 add_jopa_run_test(InheritedGenericTest "${TEST_DIR}/generics/InheritedGenericTest.java" "InheritedGenericTest")
 add_jopa_run_test(PassthroughGenericTest "${TEST_DIR}/generics/PassthroughGenericTest.java" "PassthroughGenericTest")
 add_jopa_run_test(InheritedInterfaceTest "${TEST_DIR}/generics/InheritedInterfaceTest.java" "InheritedInterfaceTest")
+add_jopa_run_test(MultiInterfaceGenericsTest "${TEST_DIR}/generics/MultiInterfaceGenericsTest.java" "generics/MultiInterfaceGenericsTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")

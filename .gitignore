@@ -18,6 +18,7 @@ vgcore.*
 # Build artifacts
 /build/
 /build-*/
+/build_*/
 /cmake-build-*/
 /CMakeFiles/
 /CMakeCache.txt
