@@ -85,8 +85,8 @@ echo "JamVM: ${USE_JAMVM}"
 echo ""
 
 # Target versions to test
-# Note: Target 1.7 has known StackMapTable limitations with complex boolean
-# expressions used as method arguments. Tests pass with targets 1.5 and 1.6.
+# Note: Boolean expressions as method arguments and ternary expressions work correctly
+# with target 1.7. Some complex nested control flow patterns still have known issues.
 if $QUICK_MODE; then
     TARGETS=("1.5")
     echo "Mode: Quick (target 1.5 only)"

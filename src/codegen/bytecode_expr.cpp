@@ -1712,19 +1712,36 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             //   MERGE:                ; result on stack
             //
             // At MERGE, both paths have: [...stuff, int] where int is 0 or 1.
-            // This pattern has only ONE branch target (MERGE), not two.
             //
-            // For Java 7+ bytecode, we mark this as no_frame because the stack
-            // tracking for internal expression labels is incomplete. Tests pass
-            // with strict verification for targets 1.5 and 1.6.
+            // For Java 7+ StackMapTable generation, we save the stack state before
+            // the pattern (which includes types from any prior method arguments),
+            // and record a frame with that saved stack plus Integer at the merge label.
             Label label;
-            label.no_frame = true;
+
+            // For Java 7+ StackMapTable generation:
+            // 1. Push Integer type for iconst_0 to StackMapGenerator (so internal labels
+            //    created by EmitBranchIfExpression will have the correct stack state)
+            // 2. After the expression, the stack should still have the Integer on top
+            //    (from either iconst_0 or iconst_1), so we leave it tracked
+
             PutOp(OP_ICONST_0); // push false (assume false)
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
+
             EmitBranchIfExpression(expression, false, label);
+
             PutOp(OP_POP); // pop the false
             PutOp(OP_ICONST_1); // push true
+            // Note: The stack type is still Integer after pop+iconst_1, so no change needed
+
             DefineLabel(label);
             CompleteLabel(label);
+
+            // Pop the Integer type we tracked. If this expression is a method argument,
+            // the method invocation tracking will push the argument type after EmitExpression
+            // returns, so we don't want to double-track it.
+            if (stack_map_generator)
+                stack_map_generator->PopType();
         }
         return 1;
     default:
@@ -2211,14 +2228,26 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
                 if (left -> value == right -> value + 1)
                 {
                     EmitExpression(expression -> test_expression);
+                    // Track the test_expression for StackMapGenerator (it's a boolean value 0/1)
+                    // so nested patterns see correct stack state
+                    if (stack_map_generator)
+                        stack_map_generator->PushType(control.int_type);
                     EmitExpression(expression -> false_expression);
+                    if (stack_map_generator)
+                        stack_map_generator->PopType();
                     PutOp(OP_IADD);
                     return 1;
                 }
                 if (left -> value == right -> value - 1)
                 {
                     EmitExpression(expression -> false_expression);
+                    // Track the false_expression for StackMapGenerator so nested
+                    // boolean-to-int patterns record correct frame with base on stack
+                    if (stack_map_generator)
+                        stack_map_generator->PushType(expression -> false_expression -> Type());
                     EmitExpression(expression -> test_expression);
+                    if (stack_map_generator)
+                        stack_map_generator->PopType();
                     PutOp(OP_ISUB);
                     return 1;
                 }
@@ -2235,14 +2264,30 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
             //
             Label label;
             if (need_value)
+            {
                 PutOp(IsZero(expression -> true_expression)
                       ? OP_ICONST_0 : OP_ICONST_1);
+                // Track constant for StackMapTable - merge label needs this
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
+            }
             EmitBranchIfExpression(expression -> test_expression, true, label);
             if (need_value)
+            {
+                // Pop tracked constant since we're replacing it with expression result
+                if (stack_map_generator)
+                    stack_map_generator->PopType();
                 PutOp(OP_POP);
+            }
             EmitExpression(expression -> false_expression, need_value);
+            // Track expression result for consistency
+            if (stack_map_generator && need_value)
+                stack_map_generator->PushType(expression -> Type());
             DefineLabel(label);
             CompleteLabel(label);
+            // Pop tracked type
+            if (stack_map_generator && need_value)
+                stack_map_generator->PopType();
             return need_value ? 1 : 0;
         }
     }
@@ -2257,28 +2302,68 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
         //
         Label label;
         if (need_value)
+        {
             PutOp(IsZero(expression -> false_expression)
                   ? OP_ICONST_0 : OP_ICONST_1);
+            // Track constant for StackMapTable - merge label needs this
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
+        }
         EmitBranchIfExpression(expression -> test_expression, false, label);
         if (need_value)
+        {
+            // Pop tracked constant since we're replacing it with expression result
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             PutOp(OP_POP);
+        }
         EmitExpression(expression -> true_expression, need_value);
+        // Track expression result for consistency
+        if (stack_map_generator && need_value)
+            stack_map_generator->PushType(expression -> Type());
         DefineLabel(label);
         CompleteLabel(label);
+        // Pop tracked type
+        if (stack_map_generator && need_value)
+            stack_map_generator->PopType();
         return need_value ? 1 : 0;
     }
     Label lab1,
         lab2;
     EmitBranchIfExpression(expression -> test_expression, false, lab1);
     EmitExpression(expression -> true_expression, need_value);
+
+    // For StackMapTable generation: track the result type so the merge label
+    // will have the correct stack state saved. The result type must be on the
+    // tracked stack when UseLabel saves the state for lab2.
+    if (stack_map_generator && need_value)
+        stack_map_generator->PushType(expression -> Type());
+
     EmitBranch(OP_GOTO, lab2);
+
+    // Pop the tracked result type since we're now on the else path
+    // (the ChangeStack below adjusts the bytecode stack counter)
+    if (stack_map_generator && need_value)
+        stack_map_generator->PopType();
+
     if (need_value) // restore the stack size
         ChangeStack(- GetTypeWords(expression -> Type()));
     DefineLabel(lab1);
     EmitExpression(expression -> false_expression, need_value);
+
+    // Track the false branch result type for consistency
+    // (DefineLabel(lab2) will use the saved state from the goto, not this)
+    if (stack_map_generator && need_value)
+        stack_map_generator->PushType(expression -> Type());
+
     DefineLabel(lab2);
     CompleteLabel(lab2);
     CompleteLabel(lab1);
+
+    // Pop the tracked result type (caller will handle the actual stack value)
+    if (stack_map_generator && need_value)
+        stack_map_generator->PopType();
+
     return GetTypeWords(expression -> true_expression -> Type());
 }
 
@@ -2308,6 +2393,9 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
     AstExpression* base = method_call -> base_opt;
     bool is_super = false; // set if super call
 
+    // Track number of types pushed to stack_map_generator for cleanup after invoke
+    unsigned types_pushed = 0;
+
     if (msym -> ACC_STATIC())
     {
         //
@@ -2336,8 +2424,23 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             //
             is_super = base -> SuperExpressionCast() != NULL;
             EmitExpression(base);
+            // Track receiver type for StackMapTable generation
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(base->Type());
+                types_pushed++;
+            }
         }
-        else PutOp(OP_ALOAD_0);
+        else
+        {
+            PutOp(OP_ALOAD_0);
+            // Track 'this' type for StackMapTable generation
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(unit_type);
+                types_pushed++;
+            }
+        }
     }
 
     int stack_words = 0; // words on stack needed for arguments
@@ -2349,20 +2452,34 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
         // Varargs method - emit fixed args, then create array for varargs
         unsigned num_fixed = num_formals > 0 ? num_formals - 1 : 0;
 
-        // Emit fixed arguments
+        // Emit fixed arguments with type tracking
         for (unsigned i = 0; i < num_fixed && i < num_args; i++)
-            stack_words += EmitExpression(method_call -> arguments -> Argument(i));
+        {
+            AstExpression* arg = method_call -> arguments -> Argument(i);
+            stack_words += EmitExpression(arg);
+            // Track argument type for StackMapTable generation
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(arg->Type());
+                types_pushed++;
+            }
+        }
 
         // Emit or create the varargs array
+        TypeSymbol* varargs_type = msym -> FormalParameter(num_formals - 1) -> Type();
         if (num_args >= num_formals)
         {
             // Array was already created by MethodInvocationConversion
             stack_words += EmitExpression(method_call -> arguments -> Argument(num_fixed));
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(varargs_type);
+                types_pushed++;
+            }
         }
         else
         {
             // Create empty array for missing varargs
-            TypeSymbol* varargs_type = msym -> FormalParameter(num_formals - 1) -> Type();
             assert(varargs_type -> IsArray());
             TypeSymbol* component_type = varargs_type -> ArraySubtype();
             assert(component_type && "component_type is null for varargs array");
@@ -2388,13 +2505,29 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             }
             ChangeStack(0); // iconst_0 (+1), newarray/anewarray uses it and produces array (+0 net)
             stack_words++;
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(varargs_type);
+                types_pushed++;
+            }
         }
     }
     else
     {
-        // Non-varargs method - emit all arguments
+        // Non-varargs method - emit all arguments with type tracking
+        // This is critical for proper StackMapTable generation when boolean
+        // expressions with branches are used as method arguments.
         for (unsigned i = 0; i < num_args; i++)
-            stack_words += EmitExpression(method_call -> arguments -> Argument(i));
+        {
+            AstExpression* arg = method_call -> arguments -> Argument(i);
+            stack_words += EmitExpression(arg);
+            // Track argument type for StackMapTable generation
+            if (stack_map_generator)
+            {
+                stack_map_generator->PushType(arg->Type());
+                types_pushed++;
+            }
+        }
     }
 
     TypeSymbol* type = MethodTypeResolution(method_call -> base_opt, msym);
@@ -2402,7 +2535,17 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
           : (is_super || msym -> ACC_PRIVATE()) ? OP_INVOKESPECIAL
           : type -> ACC_INTERFACE() ? OP_INVOKEINTERFACE
           : OP_INVOKEVIRTUAL);
+
+    // Clear tracked types from StackMapGenerator (invoke consumes receiver + all arguments)
+    if (stack_map_generator)
+        stack_map_generator->PopTypes(types_pushed);
+
     int result = CompleteCall(msym, stack_words, need_value, type);
+
+    // Note: We do NOT track return types because:
+    // 1. Return values are often consumed by operations like istore which we don't track
+    // 2. The tracking is specifically for method ARGUMENTS to support boolean expressions
+    // 3. Tracking return types would cause type accumulation in current_stack
 
     // Java 5+: For generic methods, emit checkcast if the method's erased return type
     // (e.g., Object) differs from the expression's declared type (e.g., Integer).

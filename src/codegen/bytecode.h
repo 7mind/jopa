@@ -179,6 +179,14 @@ public:
     void RecordFrameWithSavedStack(u2 pc, Tuple<VerificationType>* saved_stack);
 
     //
+    // Record a frame at the given PC with BOTH saved locals and saved stack.
+    // This is used for forward branch targets where inner-scope variables may
+    // have been declared between the branch and the target.
+    //
+    void RecordFrameWithSavedLocalsAndStack(u2 pc, Tuple<VerificationType>* saved_locals,
+                                            Tuple<VerificationType>* saved_stack);
+
+    //
     // Record a frame at the given PC with the current locals, saved stack,
     // plus an additional Integer type on top of the saved stack.
     // This is used for boolean-to-value patterns where the merge point
@@ -243,12 +251,18 @@ public:
     int saved_stack_depth;
     bool stack_saved;
 
+    // Saved locals types at definition time (for StackMapTable generation)
+    // This captures the locals state when the label is defined, before inner-scope
+    // variables are declared. Used for backward branch targets (like loop headers).
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_locals_types;
+    bool locals_saved;
+
     // If true, don't record a StackMapTable frame at this label.
     // Used for internal labels within expressions (like boolean-to-value pattern)
     // where the verifier can infer the stack state from fallthrough.
     bool no_frame;
 
-    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false) {}
+    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), saved_locals_types(NULL), locals_saved(false), no_frame(false) {}
 
     //
     // All used labels should have been completed and reset, otherwise a goto
@@ -264,6 +278,7 @@ public:
             uses.Reset();
         }
         delete saved_stack_types;
+        delete saved_locals_types;
     }
 
     void Reset()
@@ -275,6 +290,9 @@ public:
        saved_stack_types = NULL;
        saved_stack_depth = 0;
        stack_saved = false;
+       delete saved_locals_types;
+       saved_locals_types = NULL;
+       locals_saved = false;
        no_frame = false;
     }
 };

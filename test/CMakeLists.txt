@@ -304,6 +304,9 @@ add_jopa_run_test(EnumConstantsTest "${TEST_DIR}/EnumConstantsTest.java" "EnumCo
 # generation for Java 7+ bytecode (class version 51.0+).
 add_jopa_run_test(StackMapTableTest "${TEST_DIR}/stackmap/StackMapTableTest.java" "StackMapTableTest")
 
+# Boolean expression as method argument test (previously known limitation)
+add_jopa_run_test(BooleanExprAsArgTest "${TEST_DIR}/stackmap/BooleanExprAsArgTest.java" "BooleanExprAsArgTest")
+
 # Java 7 Tests (diamond, multi-catch, try-with-resources, string switch)
 
 # Diamond Operator Test

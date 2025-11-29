@@ -1076,30 +1076,95 @@ void ByteCode::DefineLabel(Label& lab)
         last_label_pc = lab.definition;
 
     //
+    // Save the current locals state at definition time (for backward branches).
+    // This captures the locals before any inner-scope variables are declared.
+    // When a backward branch is made to this label later, we use this saved
+    // state instead of the current state which may include out-of-scope locals.
+    //
+    if (stack_map_generator && !lab.no_frame && !lab.locals_saved)
+    {
+        lab.saved_locals_types = stack_map_generator->SaveLocals();
+        lab.locals_saved = true;
+    }
+
+    //
     // Record StackMapTable frame at branch targets (Java 7+)
     // A label with forward references (uses) indicates a branch target that
     // needs a stack map frame for verification.
     // Skip if no_frame is set (internal expression labels like boolean-to-value pattern).
     //
+    // For forward branches, we have saved_locals from the earliest branch point.
+    // We also have current_locals at the definition point.
+    // Use the SHORTER of the two - this handles:
+    // 1. If-else: saved_locals has fewer (before if-branch vars) - use saved
+    // 2. Break from catch: saved_locals has more (includes exception) - use current
+    //
     if (stack_map_generator && lab.uses.Length() > 0 && !lab.no_frame)
     {
-        if (lab.stack_saved && lab.saved_stack_types)
+        Tuple<StackMapTableAttribute::VerificationTypeInfo>* current_locals = stack_map_generator->SaveLocals();
+        Tuple<StackMapTableAttribute::VerificationTypeInfo>* locals_to_use = NULL;
+
+        // Compute the intersection of saved_locals and current_locals.
+        // At a merge point, each local slot must be valid on ALL paths.
+        // If any path has Top (undefined) at a slot, the result must be Top.
+        // We also want the minimum "effective length" - the last slot that is
+        // defined (non-Top) on ALL paths.
+        if (lab.locals_saved && lab.saved_locals_types)
         {
-            // Use the saved stack types from the branch point
-            // This handles all cases: empty stack, non-empty stack with any types
-            stack_map_generator->RecordFrameWithSavedStack(lab.definition, lab.saved_stack_types);
-        }
-        else if (lab.stack_saved && lab.saved_stack_depth == 0)
-        {
-            // Most common case: stack is empty at branch target
-            stack_map_generator->ClearStack();
-            stack_map_generator->RecordFrame(lab.definition);
+            // Create intersection result
+            unsigned min_len = (lab.saved_locals_types->Length() < current_locals->Length())
+                ? lab.saved_locals_types->Length() : current_locals->Length();
+
+            locals_to_use = new Tuple<StackMapTableAttribute::VerificationTypeInfo>(min_len, 8);
+
+            // Find the last slot where BOTH have non-Top types
+            unsigned effective_len = 0;
+            for (unsigned i = 0; i < min_len; i++)
+            {
+                StackMapTableAttribute::VerificationTypeInfo saved_type = (*lab.saved_locals_types)[i];
+                StackMapTableAttribute::VerificationTypeInfo current_type = (*current_locals)[i];
+
+                // If either is Top, result should be Top (or we can stop here for effective length)
+                if (saved_type.Tag() == StackMapTableAttribute::VerificationTypeInfo::TYPE_Top ||
+                    current_type.Tag() == StackMapTableAttribute::VerificationTypeInfo::TYPE_Top)
+                {
+                    // Include Top entries only if there are more non-Top entries after
+                    // For simplicity, we compute effective_len separately below
+                    locals_to_use->Next() = StackMapTableAttribute::VerificationTypeInfo(
+                        StackMapTableAttribute::VerificationTypeInfo::TYPE_Top);
+                }
+                else
+                {
+                    // Both have defined types - use one of them (they should match for valid code)
+                    locals_to_use->Next() = current_type;
+                    effective_len = i + 1;
+                }
+            }
+
+            // Trim to effective length (last non-Top entry + 1)
+            // This removes trailing Top entries from the frame
+            while (locals_to_use->Length() > effective_len)
+                locals_to_use->Reset(locals_to_use->Length() - 1);
         }
         else
         {
-            // Fallback: use current state (may need refinement for complex expressions)
-            stack_map_generator->RecordFrame(lab.definition);
+            locals_to_use = current_locals;
+            current_locals = NULL; // Don't delete, we're using it
         }
+
+        if (lab.stack_saved && lab.saved_stack_types)
+        {
+            stack_map_generator->RecordFrameWithSavedLocalsAndStack(
+                lab.definition, locals_to_use, lab.saved_stack_types);
+        }
+        else
+        {
+            stack_map_generator->RecordFrameWithLocals(lab.definition, locals_to_use);
+        }
+        if (locals_to_use != current_locals)
+            delete locals_to_use;
+        if (current_locals)
+            delete current_locals;
     }
 }
 
@@ -1170,11 +1235,25 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
     // should reflect the stack types at the branch point (before the branch instruction
     // pops its operands).
     //
+    // Also save locals on the FIRST forward branch use. This captures the locals
+    // at the earliest branch source, before any block-scoped variables are declared
+    // in subsequent code. For if-else branches, this ensures the else-branch frame
+    // has correct locals (without if-branch variables).
+    //
+    // Exception handlers are a special case - they set no_frame to skip frame recording,
+    // or handle frames specially through EmitBranch's exception_label parameter.
+    //
     if (stack_map_generator && !lab.defined && !lab.stack_saved)
     {
         lab.saved_stack_depth = stack_depth;
         lab.saved_stack_types = stack_map_generator->SaveStack();
         lab.stack_saved = true;
+    }
+    // Save locals on first forward branch use (before block-scoped variables exist)
+    if (stack_map_generator && !lab.defined && !lab.locals_saved)
+    {
+        lab.saved_locals_types = stack_map_generator->SaveLocals();
+        lab.locals_saved = true;
     }
 
     //
@@ -1182,15 +1261,27 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
     // at the target if one hasn't been recorded already. This is critical for
     // loop back-edges where the target was defined before any branches to it.
     //
+    // IMPORTANT: Use the saved locals state from when the label was defined,
+    // NOT the current state. The current state may include inner-scope variables
+    // that don't exist on all paths to the label (e.g., loop variables declared
+    // inside a loop body when branching back to the loop header).
+    //
     if (stack_map_generator && lab.defined && !lab.no_frame)
     {
-        // Record a frame at the backward branch target.
-        // Use the current locals state but with an empty stack (typical for loop back-edges).
-        // The frame recording function will handle duplicate detection.
+        // Record a frame at the backward branch target with empty stack
         if (!stack_map_generator->HasFrameAt(lab.definition))
         {
-            stack_map_generator->ClearStack();
-            stack_map_generator->RecordFrame(lab.definition);
+            if (lab.locals_saved && lab.saved_locals_types)
+            {
+                // Use the locals state from when the label was defined
+                stack_map_generator->RecordFrameWithLocals(lab.definition, lab.saved_locals_types);
+            }
+            else
+            {
+                // Fallback: use current state (should rarely happen)
+                stack_map_generator->ClearStack();
+                stack_map_generator->RecordFrame(lab.definition);
+            }
         }
     }
 
@@ -2495,6 +2586,55 @@ void StackMapGenerator::RecordFrameWithSavedStack(u2 pc, Tuple<VerificationType>
     // Copy current locals
     for (unsigned i = 0; i < current_locals.Length(); i++)
         entry->locals.Next() = current_locals[i];
+
+    // Copy saved stack
+    if (saved_stack)
+    {
+        for (unsigned i = 0; i < saved_stack->Length(); i++)
+            entry->stack.Next() = (*saved_stack)[i];
+    }
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+void StackMapGenerator::RecordFrameWithSavedLocalsAndStack(u2 pc, Tuple<VerificationType>* saved_locals,
+                                                           Tuple<VerificationType>* saved_stack)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy saved locals
+    if (saved_locals)
+    {
+        for (unsigned i = 0; i < saved_locals->Length(); i++)
+            entry->locals.Next() = (*saved_locals)[i];
+    }
 
     // Copy saved stack
     if (saved_stack)
