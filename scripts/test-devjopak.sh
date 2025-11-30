@@ -96,7 +96,7 @@ cat > "$TEST_DIR/build.xml" <<EOF
             <include name="HelloTest.java"/>
             <classpath>
                 <pathelement path="classes"/>
-                <fileset dir="\\${ant.home}/lib">
+                <fileset dir="\${ant.home}/lib">
                     <include name="junit.jar"/>
                 </fileset>
             </classpath>
