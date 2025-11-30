@@ -47,3 +47,7 @@ And also:
 - In terms of compiler development and the development culture - we live in a much better world than before. We don't need to optimize compilers for memory and performance, we can use nice parser and multiple versions of immutable syntax trees, one per phase, we can run complex recursive alghoritms and we do write tests - previous generations used to live in a much less pleasant environment, the original compiler is a mess if we look at it from 2025.
 - It's funny and sad, that GNU Classpath, Jikes and other ancient tools like JamVM are the only way to bootstrap OpenJDK in our days. If these small project didn't exist, the bootstrap won't be possible at all.
 - It's sad that GNU and hacker culture is dying. Most of the stuff we do isn't fun at all.
+
+## Updates
+
+I've tested Gemini 3 Pro and it obliterates Claude in terms of generalization abilities. It has funny flaws, like Claude can edit 10K LoC large C++ files, Gemini 3 Pro repeatedly fails on much smaller files, but at least it can work around by writing Python scripts which patch the files.
