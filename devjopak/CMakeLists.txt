@@ -337,4 +337,6 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
         DEPENDS "${CMAKE_BINARY_DIR}/${DEVJOPAK_ARCHIVE}"
         COMMENT "DevJopaK - Self-contained Java Development Kit"
     )
+
+    include(ecj_build.cmake)
 endif()
