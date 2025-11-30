@@ -3,24 +3,12 @@
 # ============================================================================
 if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ECJ_VERSION "4.2.1")
-    # We will download the source JAR using ExternalProject
-    set(ECJ_URL "https://archive.eclipse.org/eclipse/downloads/drops4/R-4.2.1-201209141800/ecjsrc-4.2.1.jar")
-    set(ECJ_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/ecj-download")
-    set(ECJ_SOURCE_DIR "${ECJ_DOWNLOAD_DIR}/ecj-src")
+    # Use local source JAR from vendor directory
+    set(ECJ_SOURCE_JAR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/ecjsrc-${ECJ_VERSION}.jar")
     
     set(ECJ_BUILD_DIR "${CMAKE_BINARY_DIR}/ecj-build")
     set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
     set(ECJ_JAR "${ECJ_INSTALL_DIR}/lib/ecj.jar")
-
-    # Use ExternalProject to download and unzip the ECJ source jar
-    ExternalProject_Add(ecj_source_download
-        URL "${ECJ_URL}"
-        DOWNLOAD_DIR "${ECJ_DOWNLOAD_DIR}"
-        SOURCE_DIR "${ECJ_SOURCE_DIR}"
-        CONFIGURE_COMMAND ""
-        BUILD_COMMAND ""
-        INSTALL_COMMAND ""
-    )
 
     # Script to generate sources list safely
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh"
@@ -30,21 +18,28 @@ find \"$1\" -name '*.java' > \"$2\"
 
     add_custom_command(
         OUTPUT "${ECJ_JAR}"
-        DEPENDS jamvm_with_gnucp ecj_source_download
+        DEPENDS jamvm_with_gnucp "${ECJ_SOURCE_JAR}"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_BUILD_DIR}/classes"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_INSTALL_DIR}/lib"
         
-        # 1. Copy sources to a temporary build src directory
+        # 1. Prepare source directory
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${ECJ_BUILD_DIR}/src"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${ECJ_SOURCE_DIR}" "${ECJ_BUILD_DIR}/src"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_BUILD_DIR}/src"
         
-        # 2. Remove problematic sources that depend on missing APIs (javax.tools, javax.annotation.processing)
+        # 2. Extract source JAR to build directory
+        # We use 'unzip' if available or cmake -E tar (which supports zip in newer cmake, but might be flaky on some old versions)
+        # Let's try cmake -E tar xf first as it is portable
+        COMMAND ${CMAKE_COMMAND} -E chdir "${ECJ_BUILD_DIR}/src" ${CMAKE_COMMAND} -E tar xf "${ECJ_SOURCE_JAR}"
+        
+        # 3. Remove problematic sources that depend on missing APIs (javax.tools, javax.annotation.processing)
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/internal/compiler/tool"
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/internal/compiler/apt"
         COMMAND ${CMAKE_COMMAND} -E remove "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/core/JDTCompilerAdapter.java"
         
-        # 3. Compile starting from the main batch compiler class
-        # JOPA/javac will automatically find and compile dependencies in sourcepath
+        # 4. Compile the remaining sources
+        # We use a helper script to generate the list of files to avoid shell quoting issues in CMake
+        COMMAND sh "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh" "${ECJ_BUILD_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
+        
         COMMAND ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
             "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh"
@@ -52,15 +47,14 @@ find \"$1\" -name '*.java' > \"$2\"
             -source 1.5 -target 1.5
             -encoding ISO-8859-1
             -nowarn
-            -sourcepath "${ECJ_BUILD_DIR}/src"
-            "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/internal/compiler/batch/Main.java"
+            "@${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
             
-        # 4. Copy resources (properties, etc.) to classes dir
+        # 5. Copy resources (properties, etc.) to classes dir
         # We reuse the source tree for this, identifying non-java files
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${ECJ_BUILD_DIR}/src" "${ECJ_BUILD_DIR}/classes"
         COMMAND find "${ECJ_BUILD_DIR}/classes" -name "*.java" -delete
 
-        # 5. Package into JAR
+        # 6. Package into JAR
         COMMAND ${CMAKE_COMMAND} -E chdir "${ECJ_BUILD_DIR}/classes" "${ZIP_WRAPPER}" -r "${ECJ_JAR}" .
         
         COMMENT "Building Eclipse Compiler for Java (ECJ) ${ECJ_VERSION}"

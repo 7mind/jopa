@@ -34,6 +34,9 @@ tar -xzf "$DIST_ARCHIVE" -C "$TEST_DIR"
 
 # Adjust path to point to unpacked devjopak-ecj folder
 DEVJOPAK_HOME="$TEST_DIR/devjopak-ecj"
+# Ensure binaries are executable
+chmod -R +x "$DEVJOPAK_HOME/bin"
+
 export JAVA_HOME="$DEVJOPAK_HOME"
 # Note: ECJ distribution doesn't include Ant currently, so we skip ANT_HOME export or checks
 # If you added Ant to DevJopaK-ECJ, uncomment:
