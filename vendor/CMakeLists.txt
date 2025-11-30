@@ -37,7 +37,7 @@ set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
 if(NOT EXISTS "${CLASSPATH_SOURCE_DIR}/configure")
     message(STATUS "Extracting GNU Classpath to ${CLASSPATH_SOURCE_DIR}")
     execute_process(
-        COMMAND ${TAR_COMMAND} -xzf "${CLASSPATH_ARCHIVE}"
+        COMMAND ${TAR_COMMAND} -xzf "${CLASSPATH_ARCHIVE}" --no-same-owner --no-same-permissions
         WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
         RESULT_VARIABLE TAR_RESULT
     )
@@ -61,7 +61,7 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
         message(STATUS "Extracting JamVM to ${JAMVM_SOURCE_DIR}")
         execute_process(
-            COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}"
+            COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}" --no-same-owner --no-same-permissions
             WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
             RESULT_VARIABLE TAR_RESULT
         )
