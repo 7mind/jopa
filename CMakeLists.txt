@@ -210,12 +210,11 @@ if(JOPA_BUILD_JAMVM)
     )
 
     add_custom_command(
-        OUTPUT "${DEVJOPAK_DIR}/lib/ant"
+        OUTPUT "${DEVJOPAK_DIR}/lib/ant.jar"
         DEPENDS apache_ant "${DEVJOPAK_DIR}/bin/.created"
-        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEVJOPAK_DIR}/lib/ant"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_BINARY_DIR}/vendor-install/ant/lib"
-            "${DEVJOPAK_DIR}/lib/ant"
+            "${DEVJOPAK_DIR}/lib"
         COMMENT "Copying Apache Ant libraries"
     )
 
@@ -237,7 +236,7 @@ if(JOPA_BUILD_JAMVM)
             "${DEVJOPAK_DIR}/lib/glibj.zip"
             "${DEVJOPAK_DIR}/lib/native/.created"
             "${DEVJOPAK_DIR}/bin/ant"
-            "${DEVJOPAK_DIR}/lib/ant"
+            "${DEVJOPAK_DIR}/lib/ant.jar"
             "${DEVJOPAK_DIR}/LICENSE"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
         COMMAND ${CMAKE_COMMAND} -E tar czf "${DEVJOPAK_ARCHIVE}" "devjopak"
