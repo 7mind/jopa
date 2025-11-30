@@ -604,6 +604,29 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
                 }
             }
         }
+        // JLS 5.2. Assignment Conversion includes:
+        // - A widening primitive conversion optionally followed by a boxing conversion.
+        // - An unboxing conversion optionally followed by a widening primitive conversion.
+
+        // Case: Unboxing conversion + Widening primitive conversion (wrapper -> primitive -> wider primitive)
+        if (!source_type->Primitive() && target_type->Primitive()) {
+            TypeSymbol* unboxed_source = GetPrimitiveType(source_type); // Try to unbox source to a primitive
+            if (unboxed_source) {
+                // If unboxing is possible, check if the unboxed primitive can be widened to target_type
+                if (CanWideningPrimitiveConvert(target_type, unboxed_source))
+                    return true;
+            }
+        }
+        // Case: Widening primitive conversion + Boxing conversion (primitive -> wider primitive -> wrapper)
+        if (source_type->Primitive() && !target_type->Primitive()) {
+            TypeSymbol* primitive_target = GetPrimitiveType(target_type); // Primitive type of target wrapper
+            if (primitive_target) {
+                // Check if source primitive can be widened to target's primitive type
+                if (CanWideningPrimitiveConvert(primitive_target, source_type)) {
+                    return true; // e.g., int -> long (widening) -> Long (boxing)
+                }
+            }
+        }
     }
 
     return false;

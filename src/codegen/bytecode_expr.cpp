@@ -1903,11 +1903,36 @@ void ByteCode::EmitCast(TypeSymbol* dest_type, TypeSymbol* source_type)
     }
 
     // Java 5: Handle unboxing conversion (wrapper → primitive)
+    // General case: Unbox any wrapper to its primitive, then convert primitive to dest
     if (control.option.source >= JopaOption::SDK1_5 &&
-        semantic.IsUnboxingConversion(source_type, dest_type))
+        !source_type->Primitive() && dest_type->Primitive())
     {
-        EmitUnboxingConversion(source_type, dest_type);
-        return;
+        TypeSymbol* source_primitive = semantic.GetPrimitiveType(source_type);
+        if (source_primitive)
+        {
+            EmitUnboxingConversion(source_type, source_primitive);
+            // If types match, we are done. If not (e.g. byte -> float), emit conversion.
+            if (source_primitive != dest_type)
+                EmitCast(dest_type, source_primitive);
+            return;
+        }
+    }
+
+    // Java 5: General Unboxing (Reference -> Primitive)
+    // Includes casting Object/Number/Interface to wrapper then unboxing
+    // e.g. (int)Object -> CHECKCAST Integer -> intValue()
+    if (control.option.source >= JopaOption::SDK1_5 &&
+        dest_type -> Primitive() && !source_type -> Primitive())
+    {
+        TypeSymbol* wrapper = semantic.GetWrapperType(dest_type);
+        if (wrapper)
+        {
+            // Cast source to wrapper (recursive call will emit CHECKCAST wrapper)
+            EmitCast(wrapper, source_type);
+            // Unbox wrapper to primitive
+            EmitUnboxingConversion(wrapper, dest_type);
+            return;
+        }
     }
 
     if (control.IsSimpleIntegerValueType(source_type))
