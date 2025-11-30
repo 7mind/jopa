@@ -91,28 +91,10 @@ if $QUICK_MODE; then
     TARGETS=("1.5")
     echo "Mode: Quick (target 1.5 only)"
 else
-    TARGETS=("1.5" "1.6")
-    echo "Mode: Full matrix (targets 1.5, 1.6)"
+    TARGETS=("1.5" "1.6" "1.7")
+    echo "Mode: Full matrix (targets 1.5, 1.6, 1.7)"
 fi
 echo ""
-
-# CMake options
-CMAKE_OPTS=(
-    -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
-    -DJOPA_ENABLE_JDK_PARSER_TESTS=OFF
-)
-
-if $SANITIZERS; then
-    CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=ON)
-    CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=ON)
-else
-    CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=OFF)
-    CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=OFF)
-fi
-
-if $USE_JAMVM; then
-    CMAKE_OPTS+=(-DJOPA_USE_JAMVM_TESTS=ON)
-fi
 
 FAILED=false
 RESULTS=()
@@ -122,6 +104,26 @@ for TARGET in "${TARGETS[@]}"; do
     echo "  Testing with -source 1.7 -target ${TARGET}"
     echo "========================================"
     echo ""
+
+    # CMake options
+    CMAKE_OPTS=(
+        -DCMAKE_BUILD_TYPE="${BUILD_TYPE}"
+        -DJOPA_ENABLE_JDK_PARSER_TESTS=OFF
+    )
+
+    # CMAKE_OPTS for target 1.7 are not modified to keep JVM verification enabled
+
+    if $SANITIZERS; then
+        CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=ON)
+        CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=ON)
+    else
+        CMAKE_OPTS+=(-DJOPA_ENABLE_SANITIZERS=OFF)
+        CMAKE_OPTS+=(-DJOPA_ENABLE_CPPTRACE=OFF)
+    fi
+
+    if $USE_JAMVM; then
+        CMAKE_OPTS+=(-DJOPA_USE_JAMVM_TESTS=ON)
+    fi
 
     # Clean test output directories
     rm -rf "${BUILD_DIR}/test/"*/

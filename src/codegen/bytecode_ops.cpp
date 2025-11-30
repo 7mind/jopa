@@ -2339,7 +2339,6 @@ void ByteCode::ChangeStack(int i)
     // Instead of asserting, clamp to 0 to avoid further issues.
     if (stack_depth < 0)
     {
-        // fprintf(stderr, "DEBUG: stack_depth went negative: %d, clamping to 0\n", stack_depth);
         stack_depth = 0;
     }
 
