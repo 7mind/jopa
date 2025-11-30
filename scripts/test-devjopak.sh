@@ -4,15 +4,28 @@ set -e
 # project root
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD_DIR="$ROOT_DIR/build"
-TEST_DIR="$BUILD_DIR/test-devjopak"
+DEVJOPAK_BUILD_DIR="$ROOT_DIR/build-devjopak"
+TEST_DIR="$DEVJOPAK_BUILD_DIR/test-devjopak"
 
-echo "Building DevJopaK..."
-cmake --build "$BUILD_DIR" --target devjopak
+# Clean up previous builds to ensure fresh state
+# rm -rf "$DEVJOPAK_BUILD_DIR"
+
+echo "Building JOPA Compiler..."
+cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$BUILD_DIR" --target jopa jopa-stub-rt
+
+echo "Building DevJopaK Distribution..."
+# Configure devjopak build, pointing to the jopa build artifacts
+cmake -S "$ROOT_DIR/devjopak" -B "$DEVJOPAK_BUILD_DIR" \
+    -DJOPA_BUILD_DIR="$BUILD_DIR" \
+    -DCMAKE_BUILD_TYPE=Release
+
+cmake --build "$DEVJOPAK_BUILD_DIR" --target devjopak
 
 # Find the archive (handling version variations)
-DIST_ARCHIVE=$(find "$BUILD_DIR" -name "devjopak-*.tar.gz" | head -n 1)
+DIST_ARCHIVE=$(find "$DEVJOPAK_BUILD_DIR" -name "devjopak-*.tar.gz" | head -n 1)
 if [ -z "$DIST_ARCHIVE" ]; then
-    echo "Error: Could not find devjopak-*.tar.gz in $BUILD_DIR"
+    echo "Error: Could not find devjopak-*.tar.gz in $DEVJOPAK_BUILD_DIR"
     exit 1
 fi
 echo "Found archive: $DIST_ARCHIVE"
@@ -83,7 +96,7 @@ cat > "$TEST_DIR/build.xml" <<EOF
             <include name="HelloTest.java"/>
             <classpath>
                 <pathelement path="classes"/>
-                <fileset dir="\${ant.home}/lib">
+                <fileset dir="\\${ant.home}/lib">
                     <include name="junit.jar"/>
                 </fileset>
             </classpath>
@@ -99,7 +112,7 @@ cat > "$TEST_DIR/build.xml" <<EOF
             <classpath>
                 <pathelement path="classes"/>
                 <pathelement path="test-classes"/>
-                <fileset dir="\${ant.home}/lib">
+                <fileset dir="\\${ant.home}/lib">
                     <include name="junit.jar"/>
                 </fileset>
             </classpath>
