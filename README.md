@@ -30,26 +30,37 @@ This creates a complete Java toolchain where all Java bytecode is compiled from 
 
 ### Building DevJopaK
 
+DevJopaK is built as a separate CMake project that depends on the main JOPA build.
+
+1. Build JOPA (compiler and stub runtime):
 ```bash
 cmake -B build
-cmake --build build --target devjopak
+cmake --build build
 ```
 
-This creates `devjopak-<version>.tar.gz` containing:
+2. Build DevJopaK (JDK distribution):
+```bash
+cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build
+cmake --build build-devjopak --target devjopak
+```
+
+This creates `build-devjopak/devjopak-<version>.tar.gz` containing:
 *   `bin/javac` (JOPA wrapper)
 *   `bin/java` (JamVM wrapper)
+*   `bin/ant` (Apache Ant wrapper)
 *   `lib/jopa` (compiler binary)
 *   `lib/jamvm` (runtime binary)
 *   `lib/glibj.zip` (GNU Classpath library)
 *   `lib/classes.zip` (JamVM bootstrap classes)
+*   `lib/ant.jar` (Apache Ant libraries)
 
 #### Legacy Classpath Testing
 
-You can select the GNU Classpath version using the `JOPA_CLASSPATH_VERSION` option:
+You can select the GNU Classpath version using the `JOPA_CLASSPATH_VERSION` option when building DevJopaK:
 
 ```bash
-cmake -B build -DJOPA_CLASSPATH_VERSION=0.93
-cmake --build build --target gnu_classpath
+cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DJOPA_CLASSPATH_VERSION=0.93
+cmake --build build-devjopak --target gnu_classpath
 ```
 
 **Note:** Setting version to `0.93` disables JamVM and the `devjopak` target, as JamVM 2.0.0 requires a newer class library. This mode is primarily for historical compatibility testing of the compiler itself.
@@ -61,6 +72,16 @@ tar xzf devjopak-*.tar.gz
 ./devjopak/bin/javac Hello.java
 ./devjopak/bin/java Hello
 ```
+
+### Validation Script
+
+To quickly verify a DevJopaK installation, use the provided validation script:
+
+```bash
+tar xzf devjopak-*.tar.gz
+./devjopak/bin/devjopak-validate
+```
+This script will compile and run a simple "Hello, DevJopaK!" program and check the installed Java and Javac versions.
 
 ## Relevant projects:
 
@@ -167,14 +188,10 @@ cmake --install build --prefix /usr/local
 | *(default)* | Compiler + stub runtime | `build/src/jopa`, `build/runtime/jopa-stub-rt.jar` |
 | `jopa` | Compiler only | `build/src/jopa` |
 | `jopa-stub-rt` | Stub runtime JAR | `build/runtime/jopa-stub-rt.jar` |
-| `jamvm_with_gnucp` | Bootstrap JamVM + GNU Classpath | `build/vendor-install/` |
-| `devjopak` | Distribution archive | `build/devjopak-<version>.tar.gz` |
 
 ```bash
 cmake --build build                              # Default: compiler + runtime
 cmake --build build --target jopa                # Compiler only
-cmake --build build --target jamvm_with_gnucp    # Bootstrap (compiles GNU Classpath with JOPA)
-cmake --build build --target devjopak            # Create distribution archive
 ctest --test-dir build                           # Run tests
 ```
 
@@ -187,9 +204,7 @@ ctest --test-dir build                           # Run tests
 | `JOPA_ENABLE_ENCODING` | ON | Enable `-encoding` support via iconv/ICU |
 | `JOPA_ENABLE_SANITIZERS` | Debug builds | Enable ASan/UBSan |
 | `JOPA_ENABLE_LEAK_SANITIZER` | OFF | Enable memory leak detection (requires `JOPA_ENABLE_SANITIZERS`) |
-| `JOPA_BUILD_JAMVM` | ON | Enable JamVM + GNU Classpath bootstrap targets |
-| `JOPA_ENABLE_JVM_TESTS` | ON | Enable runtime validation tests |
-| `JOPA_USE_JAMVM_TESTS` | OFF | Run tests with JamVM instead of system JVM |
+| `JOPA_ENABLE_JVM_TESTS` | ON | Enable runtime validation tests (uses system Java) |
 | `JOPA_TARGET_VERSION` | 1.5 | Bytecode target version for tests (1.5, 1.6, 1.7) |
 
 jikes

@@ -41,30 +41,15 @@ if(JOPA_ENABLE_JVM_TESTS)
         find_program(Java_JAVAP_EXECUTABLE javap HINTS ${JAVA_BIN_DIR})
     endif()
 
-    # Configure JVM executable based on JOPA_USE_JAMVM_TESTS option
-    if(JOPA_USE_JAMVM_TESTS AND DEFINED JAMVM_EXECUTABLE)
-        set(TEST_JAVA_EXECUTABLE "${JAMVM_EXECUTABLE}")
-        # JamVM needs bootclasspath: jamvm classes.zip MUST come first, then glibj.zip
-        set(JAMVM_CLASSES "${CMAKE_BINARY_DIR}/vendor-install/jamvm/share/jamvm/classes.zip")
-        set(JAMVM_BOOTCP "${CLASSPATH_INSTALL_PREFIX}/share/classpath/glibj.zip")
-        set(JAMVM_NATIVE_LIBS "${CLASSPATH_INSTALL_PREFIX}/lib/classpath")
-        set(TEST_JAVA_BOOTCP_FLAGS "-Xbootclasspath:${JAMVM_CLASSES}:${JAMVM_BOOTCP}" "-Djava.library.path=${JAMVM_NATIVE_LIBS}")
-        # JamVM doesn't support -noverify, so clear JVM_TEST_FLAGS
-        set(JVM_TEST_FLAGS "")
-        # GNU Classpath doesn't have addSuppressed/getSuppressed, use --nosuppressed flag
-        set(JOPA_EXTRA_FLAGS "--nosuppressed")
-        message(STATUS "Tests will run with JamVM: ${JAMVM_EXECUTABLE}")
-        message(STATUS "JamVM bootclasspath: ${JAMVM_BOOTCP}")
+    set(TEST_JAVA_EXECUTABLE "${Java_JAVA_EXECUTABLE}")
+    set(TEST_JAVA_BOOTCP_FLAGS "")
+    set(JOPA_EXTRA_FLAGS "")
+    
+    # Set up JVM flags based on options
+    if(JOPA_USE_NOVERIFY)
+        set(JVM_TEST_FLAGS "-noverify")
     else()
-        set(TEST_JAVA_EXECUTABLE "${Java_JAVA_EXECUTABLE}")
-        set(TEST_JAVA_BOOTCP_FLAGS "")
-        set(JOPA_EXTRA_FLAGS "")
-        # Set up JVM flags based on options (only for non-JamVM)
-        if(JOPA_USE_NOVERIFY)
-            set(JVM_TEST_FLAGS "-noverify")
-        else()
-            set(JVM_TEST_FLAGS "")
-        endif()
+        set(JVM_TEST_FLAGS "")
     endif()
 endif()
 
@@ -404,17 +389,15 @@ if(JOPA_ENABLE_JVM_TESTS)
         LABELS "validate;java7"
         DEPENDS "compile_TryWithResourcesTest"
     )
-    # Skip run test on JamVM since GNU Classpath lacks getSuppressed() which the test uses
-    if(NOT JOPA_USE_JAMVM_TESTS)
-        add_test(
-            NAME "run_TryWithResourcesTest"
-            COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${TryWithResourcesTest_OUTPUT}:${RUNTIME_JAR}" "TryWithResourcesTest"
-        )
-        set_tests_properties("run_TryWithResourcesTest" PROPERTIES
-            LABELS "run;java7"
-            DEPENDS "validate_TryWithResourcesTest"
-        )
-    endif()
+    
+    add_test(
+        NAME "run_TryWithResourcesTest"
+        COMMAND ${TEST_JAVA_EXECUTABLE} ${TEST_JAVA_BOOTCP_FLAGS} ${JVM_TEST_FLAGS} -cp "${TryWithResourcesTest_OUTPUT}:${RUNTIME_JAR}" "TryWithResourcesTest"
+    )
+    set_tests_properties("run_TryWithResourcesTest" PROPERTIES
+        LABELS "run;java7"
+        DEPENDS "validate_TryWithResourcesTest"
+    )
 endif()
 
 # Java 7 String Switch Test

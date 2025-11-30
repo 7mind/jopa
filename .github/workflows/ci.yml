@@ -33,12 +33,14 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
-      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Release)
+      - name: Build JOPA and DevJopaK (Release)
         run: |
           nix develop --command bash -c '
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release.log
+            cmake --build build -j$(nproc)
+            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build-devjopak --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release.log
           '
 
       - name: Verify DevJopaK Distribution
@@ -75,14 +77,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: devjopak
-          path: build/devjopak-*.tar.gz
+          path: build-devjopak/devjopak-*.tar.gz
           retention-days: 30
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/devjopak-*.tar.gz
+          files: build-devjopak/devjopak-*.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
@@ -106,12 +108,14 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Build JOPA, stub runtime, GNU Classpath, and DevJopaK (Debug + Sanitizers)
+      - name: Build JOPA and DevJopaK (Debug + Sanitizers)
         run: |
           nix develop --command bash -c '
             set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
+            cmake --build build -j$(nproc)
+            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build-devjopak --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
 
       - name: Verify DevJopaK Distribution
@@ -423,8 +427,10 @@ jobs:
         run: |
           nix develop --command bash -c '
             set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJOPA_CLASSPATH_VERSION=0.93
-            cmake --build build --target gnu_classpath -j$(nproc) 2>&1 | tee /tmp/build-legacy.log
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -j$(nproc)
+            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release -DJOPA_CLASSPATH_VERSION=0.93
+            cmake --build build-devjopak --target gnu_classpath -j$(nproc) 2>&1 | tee /tmp/build-legacy.log
           '
 
       - name: Upload build log
@@ -433,110 +439,4 @@ jobs:
         with:
           name: build-legacy-log
           path: /tmp/build-legacy.log
-          retention-days: 7
-
-  build-release-jamvm:
-    name: Build and Test (Release + JamVM)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build JOPA, stub runtime, GNU Classpath, JamVM, and DevJopaK (Release)
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release-jamvm.log
-          '
-
-      - name: Run Primary Tests on JamVM (Release)
-        run: |
-          nix develop --command bash ./scripts/test-primary.sh --release --jamvm
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo '## Release Build + JamVM Test Results' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6 (running on JamVM)' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-release-jamvm
-          path: |
-            build/test/*.class
-            build/Testing/Temporary/LastTest.log
-            /tmp/build-release-jamvm.log
-          retention-days: 7
-
-  build-debug-jamvm:
-    name: Build and Test (Debug + Sanitizers + JamVM)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build JOPA, stub runtime, GNU Classpath, JamVM, and DevJopaK (Debug + Sanitizers)
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
-            cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug-jamvm.log
-          '
-
-      - name: Run Primary Tests on JamVM (Debug + Sanitizers)
-        run: |
-          nix develop --command bash ./scripts/test-primary.sh --sanitizers --jamvm
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo '## Debug Build + JamVM Test Results (with Sanitizers)' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6 (running on JamVM)' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-debug-jamvm
-          path: |
-            build/test/*.class
-            build/Testing/Temporary/LastTest.log
-            /tmp/build-debug-jamvm.log
           retention-days: 7
