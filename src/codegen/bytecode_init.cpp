@@ -948,8 +948,12 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     //
     if (! (msym -> ACC_ABSTRACT() || msym -> ACC_NATIVE()))
     {
+        // Increase stack depth to account for inlined finally blocks (Java 7+)
+        // Semantic analysis calculates static nesting depth, but inlining increases
+        // effective nesting depth during code generation.
+        unsigned stack_depth = msym -> max_block_depth + 64;
         method_stack =
-            new MethodStack(msym -> max_block_depth,
+            new MethodStack(stack_depth,
                             msym -> block_symbol -> max_variable_index);
         code_attribute =
             new CodeAttribute(RegisterUtf8(control.Code_literal),

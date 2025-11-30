@@ -50,6 +50,18 @@ option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_E
 option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" ON)
 option(JOPA_USE_JAMVM_TESTS "Run tests with JamVM instead of system JVM" OFF)
 
+# Force disable JamVM if building legacy GNU Classpath 0.93 (incompatible with JamVM 2.0.0)
+# This option must be checked after project() to ensure variables are populated but before subdirectories.
+# We can check the cache variable JOPA_CLASSPATH_VERSION directly or rely on user input.
+# However, JOPA_CLASSPATH_VERSION is defined in vendor/CMakeLists.txt which hasn't run yet.
+# We need to define the option here or check it if passed via command line.
+set(JOPA_CLASSPATH_VERSION "0.99" CACHE STRING "GNU Classpath version to use (0.93 or 0.99)")
+
+if(JOPA_CLASSPATH_VERSION STREQUAL "0.93")
+    set(JOPA_BUILD_JAMVM OFF CACHE BOOL "Force disable JamVM for legacy Classpath 0.93" FORCE)
+    message(STATUS "JamVM build disabled for GNU Classpath 0.93 compatibility")
+endif()
+
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
 set(PACKAGE_NAME "jopa")
 set(PACKAGE_TARNAME "${PACKAGE_NAME}")
@@ -77,6 +89,30 @@ endif()
 
 install(FILES doc/jikes.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")
 install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DOCDIR}")
+
+# =============================================================================
+# Installation Target (Standard)
+# =============================================================================
+# Installs the DevJopaK distribution into CMAKE_INSTALL_PREFIX
+if(JOPA_BUILD_JAMVM)
+    # Wrapper scripts
+    install(PROGRAMS "scripts/devjopak-javac.sh.in" DESTINATION bin RENAME javac)
+    install(PROGRAMS "scripts/devjopak-java.sh.in" DESTINATION bin RENAME java)
+
+    # Binaries (installed to lib/ to match devjopak layout)
+    install(TARGETS jopa DESTINATION lib)
+    install(PROGRAMS "${CMAKE_BINARY_DIR}/vendor-install/jamvm/bin/jamvm" DESTINATION lib)
+
+    # Classpath ZIPs
+    install(FILES "${CMAKE_BINARY_DIR}/vendor-install/jamvm/share/jamvm/classes.zip" DESTINATION lib)
+    install(FILES "${CMAKE_BINARY_DIR}/vendor-install/classpath/share/classpath/glibj.zip" DESTINATION lib)
+
+    # Native libraries
+    install(DIRECTORY "${CMAKE_BINARY_DIR}/vendor-install/classpath/lib/classpath/" DESTINATION lib/native)
+    
+    # LICENSE (also to root for compatibility with devjopak layout, though DOCDIR is standard)
+    install(FILES LICENSE DESTINATION .)
+endif()
 
 # =============================================================================
 # DevJopaK - Self-contained Java Development Kit distribution

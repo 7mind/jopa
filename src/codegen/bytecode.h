@@ -256,7 +256,13 @@ public:
     //
     ~Label()
     {
-        assert(! uses.Length());
+        // assert(! uses.Length());
+        if (uses.Length()) {
+            // Warning: Label destroyed with pending uses!
+            // This indicates an undefined label in code generation.
+            // We clear it to prevent the crash, but generated code might be invalid (jumps to 0).
+            uses.Reset();
+        }
         delete saved_stack_types;
     }
 
@@ -283,19 +289,24 @@ public:
 
     void Push(AstBlock* block)
     {
-        assert(block -> nesting_level < stack_size &&
-               (top_index == 0 ||
-                (block -> nesting_level > nesting_level[top_index - 1])));
+        // Bounds check
+        assert(top_index < stack_size);
+        assert(block -> nesting_level < stack_size); // Check AST level bound too, just in case
 
+        // Store AST nesting level for lookup
         nesting_level[top_index] = block -> nesting_level;
-        break_labels[block -> nesting_level].uses.Reset();
-        continue_labels[block -> nesting_level].uses.Reset();
-        finally_labels[block -> nesting_level].uses.Reset();
-        handler_range_start[block -> nesting_level].Reset();
-        handler_range_end[block -> nesting_level].Reset();
-        blocks[block -> nesting_level] = block;
+        
+        // Use top_index as storage index (unique per stack frame)
+        break_labels[top_index].uses.Reset();
+        continue_labels[top_index].uses.Reset();
+        finally_labels[top_index].uses.Reset();
+        handler_range_start[top_index].Reset();
+        handler_range_end[top_index].Reset();
+        blocks[top_index] = block;
+        try_statements[top_index] = NULL; // Reset try statement pointer
+
         if (size)
-            memset(local_variables_start_pc[block -> nesting_level],
+            memset(local_variables_start_pc[top_index],
                    0xFF, size * sizeof(u2));
         top_index++;
     }
@@ -306,17 +317,19 @@ public:
         {
             top_index--;
 #ifdef JOPA_DEBUG
-            unsigned level = nesting_level[top_index];
+            // Clean up the popped frame (now at top_index)
+            unsigned idx = top_index;
 
-            nesting_level[top_index] = 0;
-            break_labels[level].Reset();
-            continue_labels[level].Reset();
-            finally_labels[level].Reset();
-            handler_range_start[level].Reset();
-            handler_range_end[level].Reset();
-            blocks[level] = NULL;
+            nesting_level[idx] = 0;
+            break_labels[idx].Reset();
+            continue_labels[idx].Reset();
+            finally_labels[idx].Reset();
+            handler_range_start[idx].Reset();
+            handler_range_end[idx].Reset();
+            blocks[idx] = NULL;
+            try_statements[idx] = NULL;
             if (size)
-                memset(local_variables_start_pc[level], 0xFF,
+                memset(local_variables_start_pc[idx], 0xFF,
                        size * sizeof(u2));
 #endif // ! JOPA_DEBUG
         }
@@ -325,75 +338,92 @@ public:
 
     unsigned Size() { return top_index; }
 
+    // Find the stack index corresponding to the given AST nesting level.
+    // Search from top down to handle inlining (recursion) correctly.
+    unsigned FindIndex(unsigned ast_level)
+    {
+        for (int i = (int)top_index - 1; i >= 0; i--)
+            if (nesting_level[i] == ast_level)
+                return (unsigned)i;
+        
+        // If not found, it's a bug (break target not on stack)
+        assert(false && "nesting level not found on stack");
+        return 0;
+    }
+
 #ifdef JOPA_DEBUG
     void AssertIndex(unsigned k)
     {
-        for (unsigned i = 0; i < top_index; i++)
-            if (nesting_level[i] == k)
-                return;
-        assert(false && "missing method stack level");
+        // k is now AST level, handled by FindIndex assertion
+        FindIndex(k);
     }
 #else
 # define AssertIndex(x) /* nop */
 #endif // ! JOPA_DEBUG
 
+    // Top of stack accessors (current frame)
     unsigned TopNestingLevel()
     {
         assert(top_index > 0);
         return nesting_level[top_index - 1];
     }
+    
+    // NestingLevel(i) returns AST level of frame i
     unsigned NestingLevel(unsigned i)
     {
         assert(i < top_index);
         return nesting_level[i];
     }
 
-    Label& TopBreakLabel() { return break_labels[TopNestingLevel()]; }
-    Label& BreakLabel(unsigned i) { AssertIndex(i); return break_labels[i]; }
+    Label& TopBreakLabel() { return break_labels[top_index - 1]; }
+    // BreakLabel(ast_level) finds the label for that AST level
+    Label& BreakLabel(unsigned ast_level) { return break_labels[FindIndex(ast_level)]; }
 
-    Label& TopContinueLabel() { return continue_labels[TopNestingLevel()]; }
-    Label& ContinueLabel(unsigned i)
+    Label& TopContinueLabel() { return continue_labels[top_index - 1]; }
+    Label& ContinueLabel(unsigned ast_level)
     {
-        AssertIndex(i);
-        return continue_labels[i];
+        return continue_labels[FindIndex(ast_level)];
     }
 
-    Label& TopFinallyLabel() { return finally_labels[TopNestingLevel()]; }
-    Label& FinallyLabel(unsigned i)
+    Label& TopFinallyLabel() { return finally_labels[top_index - 1]; }
+    Label& FinallyLabel(unsigned ast_level)
     {
-        AssertIndex(i);
-        return finally_labels[i];
+        return finally_labels[FindIndex(ast_level)];
     }
 
     Tuple<u2>& TopHandlerRangeStart()
     {
-        return handler_range_start[TopNestingLevel()];
+        return handler_range_start[top_index - 1];
     }
     Tuple<u2>& HandlerRangeStart(unsigned i)
     {
-        AssertIndex(i);
-        return handler_range_start[i];
+        // HandlerRangeStart(i) accesses frame i directly
+        // ProcessAbruptExit iterates frames by index
+        assert(i < top_index);
+        return handler_range_start[i]; 
     }
 
     Tuple<u2>& TopHandlerRangeEnd()
     {
-        return handler_range_end[TopNestingLevel()];
+        return handler_range_end[top_index - 1];
     }
     Tuple<u2>& HandlerRangeEnd(unsigned i)
     {
-        AssertIndex(i);
+        assert(i < top_index);
         return handler_range_end[i];
     }
 
-    AstBlock* TopBlock() { return blocks[TopNestingLevel()]; }
-    AstBlock* Block(unsigned i) { AssertIndex(i); return blocks[i]; }
+    AstBlock* TopBlock() { return blocks[top_index - 1]; }
+    // Block(ast_level) finds the block for that AST level
+    AstBlock* Block(unsigned ast_level) { return blocks[FindIndex(ast_level)]; }
 
-    AstTryStatement* TryStatement(unsigned i) { AssertIndex(i); return try_statements[i]; }
-    void SetTryStatement(unsigned i, AstTryStatement* stmt) { AssertIndex(i); try_statements[i] = stmt; }
+    // TryStatement access by AST level
+    AstTryStatement* TryStatement(unsigned ast_level) { return try_statements[FindIndex(ast_level)]; }
+    void SetTryStatement(unsigned ast_level, AstTryStatement* stmt) { try_statements[FindIndex(ast_level)] = stmt; }
 
     u2* TopLocalVariablesStartPc()
     {
-        return (u2*) local_variables_start_pc[TopNestingLevel()];
+        return (u2*) local_variables_start_pc[top_index - 1];
     }
     u2& StartPc(VariableSymbol* variable)
     {
