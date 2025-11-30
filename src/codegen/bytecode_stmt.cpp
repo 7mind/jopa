@@ -87,11 +87,33 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                                if_statement -> false_statement_opt);
 
                 DefineLabel(label1);
+
                 abrupt &= EmitBlockStatement(if_statement ->
                                              false_statement_opt);
 
+                //
+                // After the false block completes, truncate to match the if-branch locals count.
+                // The if-branch saved its locals in label2.saved_locals_types when it did goto label2.
+                // We need to truncate the else-branch locals to match for the merge point.
+                //
+                if (stack_map_generator && !abrupt && label2.saved_locals_types)
+                {
+                    unsigned target_locals = label2.saved_locals_types->Length();
+                    unsigned current_locals_count = stack_map_generator->CurrentLocalsCount();
+                    Coutput << "[STACKMAP DEBUG] IF-ELSE: target_locals=" << target_locals
+                            << " current=" << current_locals_count
+                            << " at pc=" << code_attribute->CodeLength() << endl;
+                    if (current_locals_count > target_locals)
+                    {
+                        Coutput << "[STACKMAP DEBUG] Truncating from " << target_locals << endl;
+                        stack_map_generator->TruncateLocals(target_locals);
+                    }
+                }
+
                 if (! abrupt)
                 {
+                    Coutput << "[STACKMAP DEBUG] About to DefineLabel(label2) at pc="
+                            << code_attribute->CodeLength() << endl;
                     DefineLabel(label2);
                     CompleteLabel(label2);
                 }
@@ -505,15 +527,13 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
     }
 
     //
-    // Mark locally defined variables as out-of-scope in the StackMapGenerator.
-    // This is critical for correct StackMapTable generation at merge points.
-    // When paths merge (e.g., after if-else blocks), the frame should only include
-    // locals that are defined on ALL paths. By truncating here, we ensure that
-    // UseLabel/DefineLabel intersection logic computes the correct minimum locals.
+    // Truncate locals defined in this block before returning.
+    // This is critical for correct StackMapTable at merge points.
+    // When this block ends and control flows to a merge point (e.g., after if-else),
+    // locally-scoped variables should not be visible.
     //
     if (stack_map_generator && block -> NumLocallyDefinedVariables() > 0)
     {
-        // Find the lowest local variable index defined in this block
         unsigned lowest_index = UINT_MAX;
         for (unsigned i = 0; i < block -> NumLocallyDefinedVariables(); i++)
         {
@@ -522,29 +542,11 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
             if (idx < lowest_index)
                 lowest_index = idx;
         }
-        // Truncate all locals from this index onwards
-        // This marks them as Top (undefined/out-of-scope)
         if (lowest_index != UINT_MAX)
         {
-#ifdef JOPA_DEBUG
-            if (control.option.debug_trace_stack_change)
-                Coutput << "EmitBlockStatement: TruncateLocals from " << lowest_index
-                        << " at pc " << code_attribute->CodeLength() << endl;
-#endif
+            Coutput << "[STACKMAP DEBUG] EmitBlockStatement: Truncating from " << lowest_index
+                    << " at pc=" << code_attribute->CodeLength() << endl;
             stack_map_generator->TruncateLocals(lowest_index);
-
-            //
-            // After truncating, explicitly record a frame at the current PC.
-            // This is crucial for fall-through paths from blocks with local variables.
-            // Without this, a same_frame would inherit the pre-truncation locals count,
-            // causing verification errors when merging with other paths.
-            //
-#ifdef JOPA_DEBUG
-            if (control.option.debug_trace_stack_change)
-                Coutput << "EmitBlockStatement: RecordFrameWithLocals after truncation at pc "
-                        << code_attribute->CodeLength() << endl;
-#endif
-            stack_map_generator->RecordFrameWithLocals(code_attribute->CodeLength(), NULL);
         }
     }
 

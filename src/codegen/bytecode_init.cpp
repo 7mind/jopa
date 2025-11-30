@@ -987,14 +987,21 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
         semantic.ReportSemError(SemanticError::ARRAY_OVERFLOW, type);
     }
 
+    Coutput << "[STACKMAP DEBUG] BeginMethod: Checking parameters for " << msym->Name() 
+            << " ptr=" << (unsigned long)msym 
+            << " IsTyped=" << msym->IsTyped() << endl;
+
     VariableSymbol* parameter = NULL;
-    for (unsigned i = 0; i < msym -> NumFormalParameters(); i++)
+    if (msym->IsTyped()) // Added check to avoid crash when type_ is null
     {
-        parameter = msym -> FormalParameter(i);
-        if (parameter -> Type() -> num_dimensions > 255)
+        for (unsigned i = 0; i < msym -> NumFormalParameters(); i++)
         {
-            semantic.ReportSemError(SemanticError::ARRAY_OVERFLOW,
-                                    parameter -> declarator);
+            parameter = msym -> FormalParameter(i);
+            if (parameter -> Type() -> num_dimensions > 255)
+            {
+                semantic.ReportSemError(SemanticError::ARRAY_OVERFLOW,
+                                        parameter -> declarator);
+            }
         }
     }
     if (parameter)

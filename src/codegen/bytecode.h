@@ -218,6 +218,11 @@ public:
     // Debug: Get current stack depth
     //
     unsigned CurrentStackDepth() const { return current_stack.Length(); }
+
+    //
+    // Get current locals count
+    //
+    unsigned CurrentLocalsCount() const { return current_locals.Length(); }
 };
 
 
