@@ -15,6 +15,8 @@ How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which ru
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot), but the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
 
+JOPA has a flaw: its memory consumption might be quiet high (tens of GiBs of RAM) due to the way the generics are implemented.
+
 ## Achievement Unlocked: Bootstrapping ECJ and Ant
 
 JOPA has successfully achieved a significant milestone in bootstrapping:
