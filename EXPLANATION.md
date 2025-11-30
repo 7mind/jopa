@@ -10,7 +10,7 @@ Good things I've learned:
 - Today (in 2025) models can do much more than 2 years ago. In 2023 I hoped that I could get a single compilation unit done with an agent, now I can think about compilers.
 - Models can help us revitalize ancient codebases which humans cannot handle
 - Models can work with C++ and produce code which doesn't fail on any sanitizers, including memory leak sanitizers.
-- The best language for the models is Python, they deliver much faster when they work with Python codebase.
+- The best language for the models is Python, they deliver much faster when they work with Python codebases. They are especially good in handling modern Python with type annotations.
 - Models can debug, read logs and use all the utilities in your toolchain with extremely high efficiency. They are much more knowledgeable than any engineer out there and sometimes they can happily debug Java bytecode by hexdumps.
 - You can work with codebases consisting of tens of thousands of lines. Even C++ lines.
 
