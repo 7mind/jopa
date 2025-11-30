@@ -206,8 +206,10 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
         BUILD_BYPRODUCTS "${JAMVM_INSTALL_DIR}/bin/jamvm"
     )
 
-    set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
-    set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
+    set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm")
+    set(JAMVM_EXECUTABLE "${JAMVM_EXECUTABLE}" PARENT_SCOPE)
+    set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}")
+    set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_PREFIX}" PARENT_SCOPE)
 
     # jamvm_with_gnucp is the main target for building the complete JVM stack
     add_custom_target(jamvm_with_gnucp DEPENDS jamvm)
@@ -244,15 +246,37 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
 "#!/bin/sh
 echo \"ANT_JAVAC args: $@\" >&2
 ls -l \"${CLASSPATH_GLIBJ_ZIP}\" >&2
-\"${JOPA_EXECUTABLE}\" -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
+\"${JOPA_EXECUTABLE}\" -source 1.6 -target 1.6 -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
 ")
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh" 
 "#!/bin/sh
-\"${JAMVM_EXECUTABLE}\" -Dgnu.classpath.boot.library.path=\"${VENDOR_PREFIX}/classpath/lib/classpath\" -Xbootclasspath:\"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
+ulimit -s unlimited
+echo \"ANT_JAVA args: $@\" >&2
+\"${JAMVM_EXECUTABLE}\" -verbose:class -Xms64m -Xmx512m -Xss16m -Dgnu.classpath.boot.library.path=\"${VENDOR_PREFIX}/classpath/lib/classpath\" -Dbuild.compiler=extJavac \"$@\"
 ")
 
     # Make them executable
     execute_process(COMMAND chmod +x "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh")
+
+    # --- JUnit 3.8.2 (Source Build) ---
+    ExternalProject_Add(junit
+        URL "https://repo1.maven.org/maven2/junit/junit/3.8.2/junit-3.8.2-sources.jar"
+        PREFIX "${CMAKE_CURRENT_BINARY_DIR}/junit-prefix"
+        INSTALL_DIR "${VENDOR_PREFIX}/junit"
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ${CMAKE_COMMAND} -E make_directory bin &&
+                      "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" -d bin -source 1.6 -target 1.6 
+                      junit/extensions/*.java 
+                      junit/framework/*.java 
+                      junit/runner/*.java 
+                      junit/textui/*.java 
+                      junit/awtui/*.java 
+                      junit/swingui/*.java &&
+                      "${CMAKE_COMMAND}" -E tar cf junit.jar --format=zip -C bin .
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${VENDOR_PREFIX}/junit/lib" &&
+                        ${CMAKE_COMMAND} -E copy junit.jar "${VENDOR_PREFIX}/junit/lib/junit.jar"
+        BUILD_IN_SOURCE 1
+    )
 
     ExternalProject_Add(apache_ant
         URL "${ANT_ARCHIVE}"
@@ -260,7 +284,7 @@ ls -l \"${CLASSPATH_GLIBJ_ZIP}\" >&2
         BINARY_DIR "${ANT_SOURCE_DIR}" # Build in-source
         INSTALL_DIR "${ANT_INSTALL_DIR}"
         
-        DEPENDS jamvm_with_gnucp # Ensure tools are built
+        DEPENDS jamvm_with_gnucp junit # Ensure tools are built
 
         # Configure is a no-op for Ant bootstrap
         CONFIGURE_COMMAND ""
@@ -268,7 +292,9 @@ ls -l \"${CLASSPATH_GLIBJ_ZIP}\" >&2
         # Bootstrap Ant using JOPA and JamVM
         # We set CLASSPATH to empty to avoid system pollution
         # JAVAC and JAVACMD point to our wrappers
-        BUILD_COMMAND ${CMAKE_COMMAND} -E env
+        BUILD_COMMAND ${CMAKE_COMMAND} -E make_directory lib/optional &&
+                      ${CMAKE_COMMAND} -E copy "${VENDOR_PREFIX}/junit/lib/junit.jar" lib/optional/junit.jar &&
+                      ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
             "JAVAC=${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh"
             "JAVACMD=${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh"
