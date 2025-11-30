@@ -264,15 +264,9 @@ echo \"ANT_JAVA args: $@\" >&2
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/junit-prefix"
         INSTALL_DIR "${VENDOR_PREFIX}/junit"
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${CMAKE_COMMAND} -E make_directory bin &&
-                      "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" -d bin -source 1.6 -target 1.6 
-                      junit/extensions/*.java 
-                      junit/framework/*.java 
-                      junit/runner/*.java 
-                      junit/textui/*.java 
-                      junit/awtui/*.java 
-                      junit/swingui/*.java &&
-                      "${CMAKE_COMMAND}" -E tar cf junit.jar --format=zip -C bin .
+        BUILD_COMMAND sh -c "mkdir -p bin && find junit -name '*.java' > sources.list" &&
+                      "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" -d bin -source 1.6 -target 1.6 @sources.list &&
+                      sh -c "cd bin && \"${CMAKE_COMMAND}\" -E tar cf ../junit.jar --format=zip ."
         INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${VENDOR_PREFIX}/junit/lib" &&
                         ${CMAKE_COMMAND} -E copy junit.jar "${VENDOR_PREFIX}/junit/lib/junit.jar"
         BUILD_IN_SOURCE 1
@@ -304,7 +298,7 @@ echo \"ANT_JAVA args: $@\" >&2
 
         # "Install" by copying the built dist directory
         INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${ANT_INSTALL_DIR}"
-        COMMAND ${CMAKE_COMMAND} -E copy_directory "${ANT_SOURCE_DIR}/dist" "${ANT_INSTALL_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${ANT_SOURCE_DIR}/bootstrap" "${ANT_INSTALL_DIR}"
         
         BUILD_BYPRODUCTS "${ANT_INSTALL_DIR}/bin/ant"
     )
