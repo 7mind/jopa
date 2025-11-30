@@ -11,7 +11,6 @@
 include(ExternalProject)
 
 find_program(MAKE_COMMAND make REQUIRED)
-find_program(TAR_COMMAND tar REQUIRED)
 # Use wrapper script that closes stdin to prevent zip from hanging on clean builds
 set(ZIP_WRAPPER "${CMAKE_CURRENT_SOURCE_DIR}/zip-wrapper.sh")
 
@@ -22,53 +21,6 @@ include(ProcessorCount)
 ProcessorCount(NPROC)
 if(NPROC EQUAL 0)
     set(NPROC 1)
-endif()
-
-# ============================================================================
-# Extract archives to build directory (out-of-tree)
-# ============================================================================
-set(JOPA_CLASSPATH_VERSION "0.99" CACHE STRING "GNU Classpath version to use (0.93 or 0.99)")
-set(CLASSPATH_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/classpath-${JOPA_CLASSPATH_VERSION}.tar.gz")
-set(JAMVM_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/jamvm-2.0.0.tar.gz")
-set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/classpath-${JOPA_CLASSPATH_VERSION}")
-set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
-
-# Extract GNU Classpath if not present
-if(NOT EXISTS "${CLASSPATH_SOURCE_DIR}/configure")
-    message(STATUS "Extracting GNU Classpath to ${CLASSPATH_SOURCE_DIR}")
-    execute_process(
-        COMMAND ${TAR_COMMAND} -xzf "${CLASSPATH_ARCHIVE}" --no-same-owner --no-same-permissions
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-        RESULT_VARIABLE TAR_RESULT
-    )
-    if(NOT TAR_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to extract GNU Classpath archive")
-    endif()
-    # Patch Makefile.in to remove > /dev/null so we can see zip output for debugging
-    execute_process(
-        COMMAND sed -i -e "s|> /dev/null||g" "${CLASSPATH_SOURCE_DIR}/lib/Makefile.in"
-        RESULT_VARIABLE SED_RESULT
-    )
-    # Patch native/fdlibm/dtoa.c to include stdlib.h (for free())
-    execute_process(
-        COMMAND sed -i -e "/#include <string.h>/a #include <stdlib.h>" "${CLASSPATH_SOURCE_DIR}/native/fdlibm/dtoa.c"
-        RESULT_VARIABLE SED_RESULT_DTOA
-    )
-endif()
-
-# Extract JamVM if not present (only if not building legacy Classpath 0.93)
-if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
-    if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
-        message(STATUS "Extracting JamVM to ${JAMVM_SOURCE_DIR}")
-        execute_process(
-            COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}" --no-same-owner --no-same-permissions
-            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-            RESULT_VARIABLE TAR_RESULT
-        )
-        if(NOT TAR_RESULT EQUAL 0)
-            message(FATAL_ERROR "Failed to extract JamVM archive")
-        endif()
-    endif()
 endif()
 
 # ============================================================================
@@ -86,6 +38,12 @@ set(CLEAN_JAVA_ENV_VARS
     "--unset=JAVAC"
     "--unset=JAR"
 )
+
+set(JOPA_CLASSPATH_VERSION "0.99" CACHE STRING "GNU Classpath version to use (0.93 or 0.99)")
+set(CLASSPATH_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/classpath-${JOPA_CLASSPATH_VERSION}.tar.gz")
+set(JAMVM_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/jamvm-2.0.0.tar.gz")
+set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/classpath-${JOPA_CLASSPATH_VERSION}")
+set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
 
 # ============================================================================
 # GNU Classpath Build - compiled with JOPA
@@ -111,9 +69,13 @@ else()
 endif()
 
 ExternalProject_Add(gnu_classpath
+    URL "${CLASSPATH_ARCHIVE}"
     SOURCE_DIR "${CLASSPATH_SOURCE_DIR}"
     BINARY_DIR "${CLASSPATH_BUILD_DIR}"
     INSTALL_DIR "${CLASSPATH_INSTALL_DIR}"
+    
+    # Patch native/fdlibm/dtoa.c to include stdlib.h (for free())
+    PATCH_COMMAND sed -i -e "/#include <string.h>/a #include <stdlib.h>" <SOURCE_DIR>/native/fdlibm/dtoa.c
 
     # Use JOPA as the Java compiler with our stub runtime.jar as bootclasspath
     # This provides java.lang.Object, String, etc. needed for compilation
@@ -126,7 +88,7 @@ ExternalProject_Add(gnu_classpath
         "ASAN_OPTIONS=detect_leaks=0"
         ${CLASSPATH_COMPILER_ENV}
         "ZIP=${ZIP_WRAPPER}"
-        "${CLASSPATH_SOURCE_DIR}/configure"
+        <SOURCE_DIR>/configure
             --prefix=<INSTALL_DIR>
             --with-jar=no
             --disable-gtk-peer
@@ -172,6 +134,7 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
 
     ExternalProject_Add(jamvm
+        URL "${JAMVM_ARCHIVE}"
         SOURCE_DIR "${JAMVM_SOURCE_DIR}"
         BINARY_DIR "${JAMVM_BUILD_DIR}"
         INSTALL_DIR "${JAMVM_INSTALL_DIR}"
@@ -186,7 +149,7 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
             "UBSAN_OPTIONS=halt_on_error=0"
             "ASAN_OPTIONS=detect_leaks=0"
             "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
-            "${JAMVM_SOURCE_DIR}/configure"
+            <SOURCE_DIR>/configure
                 --prefix=<INSTALL_DIR>
                 --with-java-runtime-library=gnuclasspath
                 --with-classpath-install-dir=${CLASSPATH_INSTALL_DIR}
@@ -215,10 +178,10 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     add_custom_target(jamvm_with_gnucp DEPENDS jamvm)
 
     message(STATUS "Bootstrap: ALL Java bytecode will be compiled by JOPA")
-    message(STATUS "JamVM sources: ${JAMVM_SOURCE_DIR}")
+    # message(STATUS "JamVM sources: ${JAMVM_SOURCE_DIR}") # SOURCE_DIR is populated at build time now, checking exists here is wrong
 endif()
 
-message(STATUS "GNU Classpath sources: ${CLASSPATH_SOURCE_DIR}")
+# message(STATUS "GNU Classpath sources: ${CLASSPATH_SOURCE_DIR}") # Same here
 message(STATUS "Install prefix: ${VENDOR_PREFIX}")
 
 # ============================================================================
