@@ -17,6 +17,7 @@ Bad things:
 - Models cannot abstract well and cannot generalize well. They are like humans and tend to deliver solutions for specific problems they see, but they generalize much less.
 - Model outputs may look correct individually but not compose at all. Again, they cannot generalize.
 - When unsupervised, they fail spectacularly in large refactorings and cannot design at all (again, incapable of generalization). I've tried to modularize this compiler, decouple components, replace the parser, I've tried to do many other transformations, all that failed, Claude is incapable of deep thinking and planning.
+- Models cannot produce correct C++ code which would not have UBs and memory management issues on ALL code paths.
 - They tend to take any shortcuts possible and behave like a bad genie.
 - Codex and Gemini are MUCH less capable, on projects of this scale (~50000 C++ lines) they cannot produce coherent output at all. Claude is MUCH better. But again, on codebases of this size you cannot perform global tasks with Claude.
 - Claude can easily get sidetracked and forget main goal
