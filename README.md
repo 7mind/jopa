@@ -15,6 +15,17 @@ How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which ru
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot), but the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
 
+## Achievement Unlocked: Bootstrapping ECJ and Ant
+
+JOPA has successfully achieved a significant milestone in bootstrapping:
+
+-   **Eclipse Compiler for Java (ECJ) 4.2.1**
+-   **Apache Ant 1.8.4**
+
+Both are built from source using JOPA and run on **JamVM 2.0.0** with **GNU Classpath 0.99**. This demonstrates that JOPA is a capable and viable stage in a full-source bootstrap chain, bridging the gap between C++ and a fully featured Java 7 compiler environment.
+
+Previously, bootstrapping these tools required a much longer chain or binary blobs. JOPA simplifies this by providing a C++ compiler that can directly build these complex Java applications.
+
 ## DevJopaK: No-Blob Bootstrap Java Development Kit
 
 JOPA can build a fully self-contained Java development kit without any prebuilt binary blobs in the chain:
