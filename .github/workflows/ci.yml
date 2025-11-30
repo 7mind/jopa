@@ -41,6 +41,10 @@ jobs:
             cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release.log
           '
 
+      - name: Verify DevJopaK Distribution
+        run: |
+          nix develop --command bash ./scripts/test-devjopak.sh
+
       - name: Run Primary Tests (Release)
         run: |
           nix develop --command bash ./scripts/test-primary.sh --release
@@ -109,6 +113,10 @@ jobs:
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
             cmake --build build --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
+
+      - name: Verify DevJopaK Distribution
+        run: |
+          nix develop --command bash ./scripts/test-devjopak.sh
 
       - name: Run Primary Tests (Debug + Sanitizers)
         run: |
