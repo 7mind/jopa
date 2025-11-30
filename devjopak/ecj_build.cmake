@@ -8,6 +8,12 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
     set(ECJ_JAR "${ECJ_INSTALL_DIR}/lib/ecj.jar")
 
+    # Script to generate sources list safely
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh"
+"#!/bin/sh
+find \"\$1\" -name '*.java' > \"\$2\"
+")
+
     add_custom_command(
         OUTPUT "${ECJ_JAR}"
         DEPENDS jamvm_with_gnucp
@@ -24,9 +30,8 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
         COMMAND ${CMAKE_COMMAND} -E remove "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/core/JDTCompilerAdapter.java"
         
         # 3. Compile the remaining sources
-        # We use 'find' to generate the list of files to compile from the pruned source tree
-        # Note: We write the list to CMAKE_CURRENT_BINARY_DIR to ensure the directory exists
-        COMMAND sh -c "find '${ECJ_BUILD_DIR}/src' -name '*.java' > '${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list'"
+        # We use a helper script to generate the list of files to avoid shell quoting issues in CMake
+        COMMAND sh "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh" "${ECJ_BUILD_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
         
         COMMAND ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
