@@ -27,9 +27,10 @@ endif()
 # ============================================================================
 # Extract archives to build directory (out-of-tree)
 # ============================================================================
-set(CLASSPATH_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/classpath-0.99.tar.gz")
+set(JOPA_CLASSPATH_VERSION "0.99" CACHE STRING "GNU Classpath version to use (0.93 or 0.99)")
+set(CLASSPATH_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/classpath-${JOPA_CLASSPATH_VERSION}.tar.gz")
 set(JAMVM_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/jamvm-2.0.0.tar.gz")
-set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/classpath-0.99")
+set(CLASSPATH_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/classpath-${JOPA_CLASSPATH_VERSION}")
 set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
 
 # Extract GNU Classpath if not present
@@ -48,18 +49,25 @@ if(NOT EXISTS "${CLASSPATH_SOURCE_DIR}/configure")
         COMMAND sed -i -e "s|> /dev/null||g" "${CLASSPATH_SOURCE_DIR}/lib/Makefile.in"
         RESULT_VARIABLE SED_RESULT
     )
+    # Patch native/fdlibm/dtoa.c to include stdlib.h (for free())
+    execute_process(
+        COMMAND sed -i -e "/#include <string.h>/a #include <stdlib.h>" "${CLASSPATH_SOURCE_DIR}/native/fdlibm/dtoa.c"
+        RESULT_VARIABLE SED_RESULT_DTOA
+    )
 endif()
 
-# Extract JamVM if not present
-if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
-    message(STATUS "Extracting JamVM to ${JAMVM_SOURCE_DIR}")
-    execute_process(
-        COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}"
-        WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-        RESULT_VARIABLE TAR_RESULT
-    )
-    if(NOT TAR_RESULT EQUAL 0)
-        message(FATAL_ERROR "Failed to extract JamVM archive")
+# Extract JamVM if not present (only if not building legacy Classpath 0.93)
+if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
+    if(NOT EXISTS "${JAMVM_SOURCE_DIR}/configure")
+        message(STATUS "Extracting JamVM to ${JAMVM_SOURCE_DIR}")
+        execute_process(
+            COMMAND ${TAR_COMMAND} -xzf "${JAMVM_ARCHIVE}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+            RESULT_VARIABLE TAR_RESULT
+        )
+        if(NOT TAR_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to extract JamVM archive")
+        endif()
     endif()
 endif()
 
@@ -85,6 +93,23 @@ set(CLEAN_JAVA_ENV_VARS
 set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-build")
 set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
 
+# Determine configuration flags and environment based on version
+if(JOPA_CLASSPATH_VERSION VERSION_LESS "0.98")
+    # Older classpath requires explicit compiler flag like --with-jikes
+    # and expects JIKES environment variable
+    set(CLASSPATH_EXTRA_CONF_FLAGS "--with-jikes")
+    set(CLASSPATH_COMPILER_ENV
+        "JIKES=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+    )
+else()
+    # Newer classpath (0.99) respects JAVAC environment variable
+    set(CLASSPATH_EXTRA_CONF_FLAGS "")
+    set(CLASSPATH_COMPILER_ENV
+        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        "ECJ="
+    )
+endif()
+
 ExternalProject_Add(gnu_classpath
     SOURCE_DIR "${CLASSPATH_SOURCE_DIR}"
     BINARY_DIR "${CLASSPATH_BUILD_DIR}"
@@ -99,9 +124,8 @@ ExternalProject_Add(gnu_classpath
         ${CLEAN_JAVA_ENV_VARS}
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
-        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        ${CLASSPATH_COMPILER_ENV}
         "ZIP=${ZIP_WRAPPER}"
-        "ECJ="
         "${CLASSPATH_SOURCE_DIR}/configure"
             --prefix=<INSTALL_DIR>
             --with-jar=no
@@ -111,6 +135,7 @@ ExternalProject_Add(gnu_classpath
             --disable-examples
             --disable-Werror
             --disable-gjdoc
+            ${CLASSPATH_EXTRA_CONF_FLAGS}
 
     # Note: Using -j1 for GNU Classpath build because JOPA is single-threaded
     # and parallel make causes race conditions with the glibj.zip creation
@@ -119,7 +144,7 @@ ExternalProject_Add(gnu_classpath
         ${CLEAN_JAVA_ENV_VARS}
         "UBSAN_OPTIONS=halt_on_error=0"
         "ASAN_OPTIONS=detect_leaks=0"
-        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        ${CLASSPATH_COMPILER_ENV}
         "ZIP=${ZIP_WRAPPER}"
         ${MAKE_COMMAND} -j1 V=1
 
@@ -138,56 +163,57 @@ set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PAR
 # ============================================================================
 # JamVM Build - classes.zip compiled with JOPA
 # ============================================================================
-set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-build")
-set(JAMVM_INSTALL_DIR "${VENDOR_PREFIX}/jamvm")
+if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
+    set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-build")
+    set(JAMVM_INSTALL_DIR "${VENDOR_PREFIX}/jamvm")
 
-# Delete prebuilt classes.zip to force rebuild from source using JOPA
-set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
+    # Delete prebuilt classes.zip to force rebuild from source using JOPA
+    set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
 
-ExternalProject_Add(jamvm
-    SOURCE_DIR "${JAMVM_SOURCE_DIR}"
-    BINARY_DIR "${JAMVM_BUILD_DIR}"
-    INSTALL_DIR "${JAMVM_INSTALL_DIR}"
+    ExternalProject_Add(jamvm
+        SOURCE_DIR "${JAMVM_SOURCE_DIR}"
+        BINARY_DIR "${JAMVM_BUILD_DIR}"
+        INSTALL_DIR "${JAMVM_INSTALL_DIR}"
 
-    DEPENDS gnu_classpath
+        DEPENDS gnu_classpath
 
-    # Delete prebuilt classes.zip, then configure with JOPA as compiler
-    # Use GNU Classpath's glibj.zip as bootclasspath for JamVM classes
-    CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
-    COMMAND ${CMAKE_COMMAND} -E env
-        ${CLEAN_JAVA_ENV_VARS}
-        "UBSAN_OPTIONS=halt_on_error=0"
-        "ASAN_OPTIONS=detect_leaks=0"
-        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
-        "${JAMVM_SOURCE_DIR}/configure"
-            --prefix=<INSTALL_DIR>
-            --with-java-runtime-library=gnuclasspath
-            --with-classpath-install-dir=${CLASSPATH_INSTALL_DIR}
-            --enable-int-inlining
+        # Delete prebuilt classes.zip, then configure with JOPA as compiler
+        # Use GNU Classpath's glibj.zip as bootclasspath for JamVM classes
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
+        COMMAND ${CMAKE_COMMAND} -E env
+            ${CLEAN_JAVA_ENV_VARS}
+            "UBSAN_OPTIONS=halt_on_error=0"
+            "ASAN_OPTIONS=detect_leaks=0"
+            "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+            "${JAMVM_SOURCE_DIR}/configure"
+                --prefix=<INSTALL_DIR>
+                --with-java-runtime-library=gnuclasspath
+                --with-classpath-install-dir=${CLASSPATH_INSTALL_DIR}
+                --enable-int-inlining
 
-    BUILD_COMMAND ${CMAKE_COMMAND} -E env
-        ${CLEAN_JAVA_ENV_VARS}
-        "UBSAN_OPTIONS=halt_on_error=0"
-        "ASAN_OPTIONS=detect_leaks=0"
-        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
-        ${MAKE_COMMAND} -j${NPROC}
+        BUILD_COMMAND ${CMAKE_COMMAND} -E env
+            ${CLEAN_JAVA_ENV_VARS}
+            "UBSAN_OPTIONS=halt_on_error=0"
+            "ASAN_OPTIONS=detect_leaks=0"
+            "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+            ${MAKE_COMMAND} -j${NPROC}
 
-    INSTALL_COMMAND ${CMAKE_COMMAND} -E env
-        ${CLEAN_JAVA_ENV_VARS}
-        ${MAKE_COMMAND} install
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E env
+            ${CLEAN_JAVA_ENV_VARS}
+            ${MAKE_COMMAND} install
 
-    BUILD_BYPRODUCTS "${JAMVM_INSTALL_DIR}/bin/jamvm"
-)
+        BUILD_BYPRODUCTS "${JAMVM_INSTALL_DIR}/bin/jamvm"
+    )
 
-set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
-set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
+    set(JAMVM_EXECUTABLE "${JAMVM_INSTALL_DIR}/bin/jamvm" PARENT_SCOPE)
+    set(CLASSPATH_INSTALL_PREFIX "${CLASSPATH_INSTALL_DIR}" PARENT_SCOPE)
 
-# jamvm_with_gnucp is the main target for building the complete JVM stack
-add_custom_target(jamvm_with_gnucp DEPENDS jamvm)
+    # jamvm_with_gnucp is the main target for building the complete JVM stack
+    add_custom_target(jamvm_with_gnucp DEPENDS jamvm)
 
-# JamVM implicitly depends on jopa through gnu_classpath dependency chain
+    message(STATUS "Bootstrap: ALL Java bytecode will be compiled by JOPA")
+    message(STATUS "JamVM sources: ${JAMVM_SOURCE_DIR}")
+endif()
 
-message(STATUS "Bootstrap: ALL Java bytecode will be compiled by JOPA")
-message(STATUS "JamVM sources: ${JAMVM_SOURCE_DIR}")
 message(STATUS "GNU Classpath sources: ${CLASSPATH_SOURCE_DIR}")
 message(STATUS "Install prefix: ${VENDOR_PREFIX}")

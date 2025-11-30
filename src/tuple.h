@@ -274,7 +274,7 @@ public:
     // memory usage.
     //
     Tuple(const unsigned log_blksize_, const unsigned base_increment_)
-        : log_blksize(log_blksize_),
+        : log_blksize(log_blksize_ > 31 ? 31 : log_blksize_),
           base_increment(base_increment_)
     {
         base_size = 0;
