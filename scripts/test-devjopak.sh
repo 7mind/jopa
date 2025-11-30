@@ -22,8 +22,8 @@ cmake -S "$ROOT_DIR/devjopak" -B "$DEVJOPAK_BUILD_DIR" \
 
 cmake --build "$DEVJOPAK_BUILD_DIR" --target devjopak
 
-# Find the archive (handling version variations)
-DIST_ARCHIVE=$(find "$DEVJOPAK_BUILD_DIR" -name "devjopak-*.tar.gz" | head -n 1)
+# Find the archive (handling version variations, but strictly excluding ecj variant)
+DIST_ARCHIVE=$(find "$DEVJOPAK_BUILD_DIR" -name "devjopak-*.tar.gz" ! -name "*ecj*" | head -n 1)
 if [ -z "$DIST_ARCHIVE" ]; then
     echo "Error: Could not find devjopak-*.tar.gz in $DEVJOPAK_BUILD_DIR"
     exit 1
