@@ -158,7 +158,8 @@ ExternalProject_Add(gnu_classpath
 # GNU Classpath depends on JOPA and runtime.jar being built first
 ExternalProject_Add_StepDependencies(gnu_classpath configure jopa jopa-stub-rt)
 
-set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip" PARENT_SCOPE)
+set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip")
+set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_GLIBJ_ZIP}" PARENT_SCOPE)
 
 # ============================================================================
 # JamVM Build - classes.zip compiled with JOPA
@@ -217,3 +218,68 @@ endif()
 
 message(STATUS "GNU Classpath sources: ${CLASSPATH_SOURCE_DIR}")
 message(STATUS "Install prefix: ${VENDOR_PREFIX}")
+
+# ============================================================================
+# Apache Ant Build (1.8.4) - Built with JOPA/JamVM
+# ============================================================================
+# Only build Ant if we have a working JamVM (not legacy classpath 0.93)
+if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
+    set(ANT_VERSION "1.8.4")
+    set(ANT_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/apache-ant-${ANT_VERSION}-src.tar.gz")
+    set(ANT_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/apache-ant-${ANT_VERSION}")
+    set(ANT_INSTALL_DIR "${VENDOR_PREFIX}/ant")
+    
+    # Define wrapper scripts for Ant build (using build artifacts directly)
+    # We cannot rely on devjopak wrappers because devjopak target is defined after this file.
+    set(ANT_BUILD_JAVAC "${JOPA_EXECUTABLE} -bootclasspath ${CLASSPATH_GLIBJ_ZIP}")
+    
+    # JamVM needs generic flags to find GNU Classpath
+    # Note: We must use the build-tree paths, not install-tree, unless we installed.
+    # jamvm_with_gnucp installs to vendor-install, so we use that.
+    set(ANT_BUILD_JAVA "${JAMVM_EXECUTABLE} -Dgnu.classpath.boot.library.path=${VENDOR_PREFIX}/classpath/lib/classpath -Xbootclasspath:${CLASSPATH_GLIBJ_ZIP}")
+
+    # Generate wrapper scripts at configure time to avoid shell escaping hell
+    # We add debug output to see what's happening
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" 
+"#!/bin/sh
+echo \"ANT_JAVAC args: $@\" >&2
+ls -l \"${CLASSPATH_GLIBJ_ZIP}\" >&2
+\"${JOPA_EXECUTABLE}\" -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
+")
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh" 
+"#!/bin/sh
+\"${JAMVM_EXECUTABLE}\" -Dgnu.classpath.boot.library.path=\"${VENDOR_PREFIX}/classpath/lib/classpath\" -Xbootclasspath:\"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
+")
+
+    # Make them executable
+    execute_process(COMMAND chmod +x "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh")
+
+    ExternalProject_Add(apache_ant
+        URL "${ANT_ARCHIVE}"
+        SOURCE_DIR "${ANT_SOURCE_DIR}"
+        BINARY_DIR "${ANT_SOURCE_DIR}" # Build in-source
+        INSTALL_DIR "${ANT_INSTALL_DIR}"
+        
+        DEPENDS jamvm_with_gnucp # Ensure tools are built
+
+        # Configure is a no-op for Ant bootstrap
+        CONFIGURE_COMMAND ""
+
+        # Bootstrap Ant using JOPA and JamVM
+        # We set CLASSPATH to empty to avoid system pollution
+        # JAVAC and JAVACMD point to our wrappers
+        BUILD_COMMAND ${CMAKE_COMMAND} -E env
+            ${CLEAN_JAVA_ENV_VARS}
+            "JAVAC=${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh"
+            "JAVACMD=${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh"
+            "CLASSPATH="
+            "ANT_HOME="
+            "./bootstrap.sh"
+
+        # "Install" by copying the built dist directory
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${ANT_INSTALL_DIR}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory "${ANT_SOURCE_DIR}/dist" "${ANT_INSTALL_DIR}"
+        
+        BUILD_BYPRODUCTS "${ANT_INSTALL_DIR}/bin/ant"
+    )
+endif()

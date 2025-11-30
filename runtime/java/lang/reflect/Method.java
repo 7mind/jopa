@@ -18,4 +18,5 @@ public class Method implements AnnotatedElement {
     public native Annotation[] getAnnotations();
     public native <T extends Annotation> T getAnnotation(Class<T> annotationType);
     public native boolean isAnnotationPresent(Class<? extends Annotation> annotationClass);
+    public native Object getDefaultValue();
 }

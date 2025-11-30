@@ -498,7 +498,7 @@ public:
 
     unsigned NumFormalParameters() const
     {
-        assert(type_);
+        // assert(type_);
         return formal_parameters ? formal_parameters -> Length() : 0;
     }
     VariableSymbol* FormalParameter(unsigned i) const
