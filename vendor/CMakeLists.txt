@@ -241,18 +241,14 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ANT_BUILD_JAVA "${JAMVM_EXECUTABLE} -Dgnu.classpath.boot.library.path=${VENDOR_PREFIX}/classpath/lib/classpath -Xbootclasspath:${CLASSPATH_GLIBJ_ZIP}")
 
     # Generate wrapper scripts at configure time to avoid shell escaping hell
-    # We add debug output to see what's happening
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" 
 "#!/bin/sh
-echo \"ANT_JAVAC args: $@\" >&2
-ls -l \"${CLASSPATH_GLIBJ_ZIP}\" >&2
 \"${JOPA_EXECUTABLE}\" -source 1.6 -target 1.6 -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
 ")
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh" 
 "#!/bin/sh
 ulimit -s unlimited
-echo \"ANT_JAVA args: $@\" >&2
-\"${JAMVM_EXECUTABLE}\" -verbose:class -Xms64m -Xmx512m -Xss16m -Dgnu.classpath.boot.library.path=\"${VENDOR_PREFIX}/classpath/lib/classpath\" -Dbuild.compiler=extJavac \"$@\"
+\"${JAMVM_EXECUTABLE}\" -Xms64m -Xmx512m -Xss16m -Dgnu.classpath.boot.library.path=\"${VENDOR_PREFIX}/classpath/lib/classpath\" -Dbuild.compiler=extJavac \"$@\"
 ")
 
     # Make them executable
