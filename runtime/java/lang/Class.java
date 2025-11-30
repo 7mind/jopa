@@ -16,7 +16,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     public native String getSimpleName();
     public native String getCanonicalName();
 
-    public static native Class forName(String className);
+    public static native Class forName(String className) throws ClassNotFoundException;
 
     // Methods
     public native Method[] getDeclaredMethods();
