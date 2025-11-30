@@ -54,6 +54,26 @@ This creates `build-devjopak/devjopak-<version>.tar.gz` containing:
 *   `lib/classes.zip` (JamVM bootstrap classes)
 *   `lib/ant.jar` (Apache Ant libraries)
 
+#### DevJopaK CMake Build Details
+
+The `devjopak` CMake project (`devjopak/CMakeLists.txt`) provides specific targets and options for building the full distribution.
+
+**Configuration Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `JOPA_BUILD_DIR` | `../build` | Path to the main JOPA compiler build directory. |
+| `JOPA_CLASSPATH_VERSION` | `0.99` | GNU Classpath version to use (`0.93` or `0.99`). |
+
+**Build Targets:**
+
+| Target | Description | Output |
+|--------|-------------|--------|
+| `gnu_classpath` | Builds the GNU Classpath library using JOPA. | `build-devjopak/vendor-install/classpath/` |
+| `jamvm_with_gnucp` | Builds JamVM with GNU Classpath. | `build-devjopak/vendor-install/jamvm/` |
+| `apache_ant` | Builds Apache Ant using JOPA/JamVM. | `build-devjopak/vendor-install/ant/` |
+| `devjopak` | Creates the full DevJopaK distribution archive. | `build-devjopak/devjopak-<version>.tar.gz` |
+
 #### Legacy Classpath Testing
 
 You can select the GNU Classpath version using the `JOPA_CLASSPATH_VERSION` option when building DevJopaK:
