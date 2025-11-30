@@ -112,7 +112,7 @@ cat > "$TEST_DIR/build.xml" <<EOF
             <classpath>
                 <pathelement path="classes"/>
                 <pathelement path="test-classes"/>
-                <fileset dir="\\${ant.home}/lib">
+                <fileset dir="\${ant.home}/lib">
                     <include name="junit.jar"/>
                 </fileset>
             </classpath>
