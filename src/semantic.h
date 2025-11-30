@@ -1343,6 +1343,8 @@ private:
     void ProcessBinaryExpression(Ast*);
     void ProcessInstanceofExpression(Ast*);
     void ProcessConditionalExpression(Ast*);
+    // Type inference for conditional expressions (JLS 15.25.3)
+    TypeSymbol* FindLeastUpperBound(TypeSymbol* type1, TypeSymbol* type2);
     void ProcessAssignmentExpression(Ast*);
 
     void ProcessVariableInitializer(AstVariableDeclarator*);

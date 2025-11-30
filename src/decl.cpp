@@ -4841,12 +4841,18 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
 
     method -> SetSignature(control);
 
+    // Temporarily set ThisMethod so type parameters are visible for throws clause
+    MethodSymbol* method_saved_context = ThisMethod();
+    ThisMethod() = method;
+
     for (unsigned k = 0; k < method_declaration -> NumThrows(); k++)
     {
         AstTypeName* throw_expr = method_declaration -> Throw(k);
         ProcessType(throw_expr);
         method -> AddThrows(throw_expr -> symbol);
     }
+
+    ThisMethod() = method_saved_context;
 
     // save for processing bodies later.
     method_declaration -> method_symbol = method;

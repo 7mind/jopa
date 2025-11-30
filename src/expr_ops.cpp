@@ -2902,55 +2902,16 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
     }
     if (true_type == control.no_type || false_type == control.no_type)
         conditional_expression -> symbol = control.no_type;
-    else if (true_type -> Primitive())
+    else
     {
-        if (! false_type -> Primitive() ||
-            (true_type != false_type &&
-             (true_type == control.boolean_type ||
-              false_type == control.boolean_type)))
-        {
-            // Java 5+: Handle primitive vs reference via boxing
-            if (control.option.source >= JopaOption::SDK1_5 &&
-                ! false_type -> Primitive())
-            {
-                // Check if false_type is the boxed form of true_type
-                TypeSymbol* unboxed_false = false_type -> UnboxedType(control);
-                if (unboxed_false && unboxed_false == true_type)
-                {
-                    // Unbox false to match primitive true
-                    conditional_expression -> false_expression =
-                        ConvertToType(conditional_expression -> false_expression,
-                                      true_type);
-                    conditional_expression -> symbol = true_type;
-                }
-                else
-                {
-                    // Box the primitive and use Object as result type
-                    TypeSymbol* boxed_true = true_type -> BoxedType(control);
-                    if (boxed_true && boxed_true != true_type)
-                    {
-                        conditional_expression -> true_expression =
-                            ConvertToType(conditional_expression -> true_expression,
-                                          boxed_true);
-                        // Result is Object (lub of boxed primitive and reference type)
-                        conditional_expression -> symbol = control.Object();
-                    }
-                    else
-                    {
-                        ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
-                                       conditional_expression -> true_expression -> LeftToken(),
-                                       conditional_expression -> false_expression -> RightToken(),
-                                       true_type -> ContainingPackageName(),
-                                       true_type -> ExternalName(),
-                                       false_type -> ContainingPackageName(),
-                                       false_type -> ExternalName());
-                        conditional_expression -> symbol = control.no_type;
-                    }
-                }
-            }
-            else
-            {
-                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
+        TypeSymbol* lub_type = FindLeastUpperBound(true_type, false_type);
+
+        if (lub_type == control.no_type) { // LUB function might return no_type for specific incompatible primitives
+            if (control.IsNumeric(true_type) && control.IsNumeric(false_type)) {
+                // If both are numeric primitives, apply BinaryNumericPromotion
+                BinaryNumericPromotion(conditional_expression);
+            } else {
+                 ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
                                conditional_expression -> true_expression -> LeftToken(),
                                conditional_expression -> false_expression -> RightToken(),
                                true_type -> ContainingPackageName(),
@@ -2959,192 +2920,169 @@ void Semantic::ProcessConditionalExpression(Ast* expr)
                                false_type -> ExternalName());
                 conditional_expression -> symbol = control.no_type;
             }
-        }
-        else // must be a primitive type
-        {
-            if (true_type == false_type)
-            {
-                if (conditional_expression -> symbol != control.no_type)
-                    conditional_expression -> symbol = true_type;
-            }
-            else // must be mixed numeric types
-            {
-                if (true_type == control.byte_type &&
-                    false_type == control.short_type)
-                {
-                    conditional_expression -> true_expression =
-                        ConvertToType(conditional_expression -> true_expression,
-                                      control.short_type);
-                    conditional_expression -> symbol = control.short_type;
-                }
-                else if (true_type == control.short_type &&
-                         false_type == control.byte_type)
-                {
-                    conditional_expression -> false_expression =
-                        ConvertToType(conditional_expression -> false_expression,
-                                      control.short_type);
-                    conditional_expression -> symbol = control.short_type;
-                }
-                else if (true_type == control.int_type &&
-                         control.IsSimpleIntegerValueType(true_type) &&
-                         IsIntValueRepresentableInType(conditional_expression -> true_expression,
-                                                       false_type))
-                {
-                    conditional_expression -> true_expression =
-                        ConvertToType(conditional_expression -> true_expression,
-                                      false_type);
-                    conditional_expression -> symbol = false_type;
-                }
-                else if (false_type == control.int_type &&
-                         control.IsSimpleIntegerValueType(false_type) &&
-                         IsIntValueRepresentableInType(conditional_expression -> false_expression,
-                                                       true_type))
-                {
-                    conditional_expression -> false_expression =
-                        ConvertToType(conditional_expression -> false_expression,
-                                      true_type);
-                    conditional_expression -> symbol = true_type;
-                }
-                else BinaryNumericPromotion(conditional_expression);
-            }
-
-            //
-            // Even when evaluating 'true ? constant : x' or
-            // 'false ? x : constant', x must be constant for ?: to be a
-            // constant expression according to JLS2 15.28.
-            //
-            if (conditional_expression -> true_expression -> IsConstant() &&
-                conditional_expression -> false_expression -> IsConstant())
-            {
-                if (IsConstantTrue(conditional_expression -> test_expression))
-                    conditional_expression -> value =
-                        conditional_expression -> true_expression -> value;
-                else if (IsConstantFalse(conditional_expression -> test_expression))
-                    conditional_expression -> value =
-                        conditional_expression -> false_expression -> value;
-            }
-        }
-    }
-    else // true_type is reference
-    {
-        // Java 5+: Handle reference vs primitive via boxing
-        if (control.option.source >= JopaOption::SDK1_5 &&
-            false_type -> Primitive())
-        {
-            // Check if true_type is the boxed form of false_type
-            TypeSymbol* unboxed_true = true_type -> UnboxedType(control);
-            if (unboxed_true && unboxed_true == false_type)
-            {
-                // Unbox true to match primitive false
-                conditional_expression -> true_expression =
-                    ConvertToType(conditional_expression -> true_expression,
-                                  false_type);
-                conditional_expression -> symbol = false_type;
-            }
-            else
-            {
-                // Box the primitive and use Object as result type
-                TypeSymbol* boxed_false = false_type -> BoxedType(control);
-                if (boxed_false && boxed_false != false_type)
-                {
-                    conditional_expression -> false_expression =
-                        ConvertToType(conditional_expression -> false_expression,
-                                      boxed_false);
-                    // Result is Object (lub of reference type and boxed primitive)
-                    conditional_expression -> symbol = control.Object();
-                }
-                else
-                {
-                    ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
-                                   conditional_expression -> true_expression -> LeftToken(),
-                                   conditional_expression -> false_expression -> RightToken(),
-                                   true_type -> ContainingPackageName(),
-                                   true_type -> ExternalName(),
-                                   false_type -> ContainingPackageName(),
-                                   false_type -> ExternalName());
-                    conditional_expression -> symbol = control.no_type;
-                }
-            }
-        }
-        else if (CanAssignmentConvert(false_type,
-                                 conditional_expression -> true_expression))
-        {
-            conditional_expression -> true_expression =
-                ConvertToType(conditional_expression -> true_expression,
-                              false_type);
-            conditional_expression -> symbol = false_type;
-        }
-        else if (CanAssignmentConvert(true_type,
-                                      conditional_expression -> false_expression))
-        {
-            conditional_expression -> false_expression =
-                ConvertToType(conditional_expression -> false_expression,
-                              true_type);
-            conditional_expression -> symbol = true_type;
-        }
-        else
-        {
-            // JLS 15.25.3: If neither operand type is convertible to the other,
-            // find the least upper bound (lub) of the two types.
-            // For classes, this is the most specific common superclass.
-            TypeSymbol* lub = NULL;
-
-            // Try to find common superclass for class types
-            if (! true_type -> ACC_INTERFACE() && ! false_type -> ACC_INTERFACE())
-            {
-                // Walk up true_type's inheritance chain and find first class
-                // that false_type is a subclass of
-                for (TypeSymbol* ancestor = true_type; ancestor; ancestor = ancestor -> super)
-                {
-                    if (false_type -> IsSubclass(ancestor))
-                    {
-                        lub = ancestor;
-                        break;
-                    }
-                }
-            }
-
-            if (lub)
-            {
-                // Found a common superclass - use it as the result type
-                conditional_expression -> true_expression =
-                    ConvertToType(conditional_expression -> true_expression, lub);
-                conditional_expression -> false_expression =
-                    ConvertToType(conditional_expression -> false_expression, lub);
-                conditional_expression -> symbol = lub;
-            }
-            else
-            {
-                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_CONDITIONAL_EXPRESSION,
-                               conditional_expression -> true_expression -> LeftToken(),
-                               conditional_expression -> false_expression -> RightToken(),
-                               true_type -> ContainingPackageName(),
-                               true_type -> ExternalName(),
-                               false_type -> ContainingPackageName(),
-                               false_type -> ExternalName());
-                conditional_expression -> symbol = control.no_type;
-            }
+        } else {
+            conditional_expression -> true_expression = ConvertToType(conditional_expression -> true_expression, lub_type);
+            conditional_expression -> false_expression = ConvertToType(conditional_expression -> false_expression, lub_type);
+            conditional_expression -> symbol = lub_type;
         }
 
         //
-        // If all the subexpressions are constants, compute the results and
-        // set the value of the expression accordingly.
-        //
-        // Since null should not be a compile-time constant, the assert
-        // should not need to check for null type.
+        // Even when evaluating 'true ? constant : x' or
+        // 'false ? x : constant', x must be constant for ?: to be a
+        // constant expression according to JLS2 15.28.
         //
         if (conditional_expression -> true_expression -> IsConstant() &&
             conditional_expression -> false_expression -> IsConstant())
         {
-            assert(conditional_expression -> symbol == control.String() ||
-                   conditional_expression -> symbol == control.no_type);
-
             if (IsConstantTrue(conditional_expression -> test_expression))
                 conditional_expression -> value =
                     conditional_expression -> true_expression -> value;
             else if (IsConstantFalse(conditional_expression -> test_expression))
                 conditional_expression -> value =
                     conditional_expression -> false_expression -> value;
+        }
+    }
+}
+
+
+
+//
+// JLS 15.25.3. Determine the result type of a conditional expression.
+// This function computes the Least Upper Bound (LUB) of two types.
+//
+TypeSymbol* Semantic::FindLeastUpperBound(TypeSymbol* type1, TypeSymbol* type2)
+{
+    // If types are identical, that's the LUB
+    if (type1 == type2)
+        return type1;
+    // If one is null, the other is the LUB
+    if (type1 == control.null_type)
+        return type2;
+    if (type2 == control.null_type)
+        return type1;
+
+    // Handle primitive types.
+    if (type1->Primitive() && type2->Primitive()) {
+        if (type1 == type2) return type1; // Same primitive type
+
+        // If one is boolean and the other is numeric, they box to Boolean and Integer.
+        // LUB of Boolean and Integer is Object.
+        if ((type1 == control.boolean_type && control.IsNumeric(type2)) ||
+            (control.IsNumeric(type1) && type2 == control.boolean_type))
+        {
+            return control.Object(); // LUB of (Boolean, Integer) is Object
+        }
+        // If both are numeric primitives but different (e.g., int, short),
+        // let the caller handle with BinaryNumericPromotion.
+        if (control.IsNumeric(type1) && control.IsNumeric(type2)) {
+            return control.no_type; // Signal caller to use BinaryNumericPromotion
+        }
+        return control.no_type; // Incompatible primitives (e.g., boolean and char)
+    }
+
+    // Handle boxing/unboxing for one primitive and one reference type (JLS 15.25.3)
+    if (control.option.source >= JopaOption::SDK1_5)
+    {
+        // Recursively call with boxed primitive type to unify to reference types.
+        if (type1->Primitive() && !type2->Primitive()) {
+            return FindLeastUpperBound(type1->BoxedType(control), type2);
+        } else if (!type1->Primitive() && type2->Primitive()) {
+            return FindLeastUpperBound(type1, type2->BoxedType(control));
+        }
+    }
+
+    // If one is a subtype of the other, the wider type is the LUB
+    if (type1->IsSubtype(type2))
+        return type2;
+    if (type2->IsSubtype(type1))
+        return type1;
+
+    // Phase 1: Find most specific common superclass (excluding Object initially if a more specific class might be found)
+    TypeSymbol* common_super_class = nullptr;
+    TypeSymbol* current_t1_super = type1;
+    while(current_t1_super != nullptr && !current_t1_super->ACC_INTERFACE()) {
+        if (type2->IsSubclass(current_t1_super)) {
+            if (common_super_class == nullptr || current_t1_super->IsSubtype(common_super_class)) {
+                common_super_class = current_t1_super;
+            }
+        }
+        current_t1_super = current_t1_super->super;
+    }
+
+    // Phase 2: Collect all supertypes (classes and interfaces) of type1 and type2
+    SymbolSet type1_all_supertypes;
+    Tuple<TypeSymbol*> queue1;
+    if (type1) { queue1.Next() = type1; type1_all_supertypes.AddElement(type1); }
+    for (unsigned i = 0; i < queue1.Length(); ++i) {
+        TypeSymbol* current = queue1[i];
+        if (current->super && !type1_all_supertypes.IsElement(current->super)) {
+            type1_all_supertypes.AddElement(current->super);
+            queue1.Next() = current->super;
+        }
+        for (unsigned j = 0; j < current->NumInterfaces(); ++j) {
+            TypeSymbol* interf = current->Interface(j);
+            if (!type1_all_supertypes.IsElement(interf)) {
+                type1_all_supertypes.AddElement(interf);
+                queue1.Next() = interf;
+            }
+        }
+    }
+
+    SymbolSet type2_all_supertypes;
+    Tuple<TypeSymbol*> queue2;
+    if (type2) { queue2.Next() = type2; type2_all_supertypes.AddElement(type2); }
+    for (unsigned i = 0; i < queue2.Length(); ++i) {
+        TypeSymbol* current = queue2[i];
+        if (current->super && !type2_all_supertypes.IsElement(current->super)) {
+            type2_all_supertypes.AddElement(current->super);
+            queue2.Next() = current->super;
+        }
+        for (unsigned j = 0; j < current->NumInterfaces(); ++j) {
+            TypeSymbol* interf = current->Interface(j);
+            if (!type2_all_supertypes.IsElement(interf)) {
+                type2_all_supertypes.AddElement(interf);
+                queue2.Next() = interf;
+            }
+        }
+    }
+
+    // Phase 3: Find common interfaces
+    Tuple<TypeSymbol*> common_interfaces;
+    for (TypeSymbol* t1_super = (TypeSymbol*)type1_all_supertypes.FirstElement();
+         t1_super != nullptr;
+         t1_super = (TypeSymbol*)type1_all_supertypes.NextElement())
+    {
+        if (t1_super->ACC_INTERFACE() && type2_all_supertypes.IsElement(t1_super)) {
+            common_interfaces.Next() = t1_super;
+        }
+    }
+
+    // Determine the final LUB combining common class and interfaces
+    if (common_super_class != nullptr && common_super_class != control.Object()) {
+        return common_super_class; // If a specific common superclass is found, it is the LUB
+    } else {
+        // If no specific common class (only Object or none), then consider interfaces
+        Tuple<TypeSymbol*> most_specific_common_interfaces;
+        for (unsigned i = 0; i < common_interfaces.Length(); ++i) {
+            TypeSymbol* current_inter = common_interfaces[i];
+            bool is_most_specific = true;
+            for (unsigned j = 0; j < common_interfaces.Length(); ++j) {
+                if (i == j) continue;
+                if (common_interfaces[j]->IsSubtype(current_inter) && common_interfaces[j] != current_inter) {
+                    is_most_specific = false;
+                    break;
+                }
+            }
+            if (is_most_specific) {
+                most_specific_common_interfaces.Next() = current_inter;
+            }
+        }
+
+        if (most_specific_common_interfaces.Length() == 1) {
+            return most_specific_common_interfaces[0]; // Exactly one most specific common interface
+        } else {
+            // Multiple or zero most specific common interfaces (other than Object already handled if common_super_class is null)
+            return control.Object(); // Fallback to Object
         }
     }
 }

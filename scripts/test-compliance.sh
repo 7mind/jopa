@@ -132,7 +132,7 @@ cat "$WHITELIST_FILE" | xargs -P "$NPROC" -I {} sh -c '
     mkdir -p "$test_out" 2>/dev/null || true
     if timeout '"$TEST_TIMEOUT"' "'"$JOPA"'" -source "'"$SOURCE_VERSION"'" -target 1.5 \
         -classpath "'"$RUNTIME_JAR"'" \
-        -sourcepath "'"$LIB_DIRS"'" \
+        -sourcepath "'"$LIB_DIRS"':$(dirname "$java_file")" \
         -d "$test_out" \
         "$java_file" >/dev/null 2>&1; then
         echo "PASS $rel_path"
