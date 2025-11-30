@@ -215,7 +215,10 @@ if(JOPA_BUILD_JAMVM)
         COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_BINARY_DIR}/vendor-install/ant/lib"
             "${DEVJOPAK_DIR}/lib"
-        COMMENT "Copying Apache Ant libraries"
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_BINARY_DIR}/vendor-install/junit/lib/junit.jar"
+            "${DEVJOPAK_DIR}/lib/junit.jar"
+        COMMENT "Copying Apache Ant libraries and JUnit"
     )
 
     add_custom_command(
