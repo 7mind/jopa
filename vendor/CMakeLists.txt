@@ -263,6 +263,7 @@ echo \"ANT_JAVA args: $@\" >&2
         URL "https://repo1.maven.org/maven2/junit/junit/3.8.2/junit-3.8.2-sources.jar"
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/junit-prefix"
         INSTALL_DIR "${VENDOR_PREFIX}/junit"
+        DEPENDS gnu_classpath
         CONFIGURE_COMMAND ""
         BUILD_COMMAND sh -c "mkdir -p bin && find junit -name '*.java' > sources.list" &&
                       "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" -d bin -source 1.6 -target 1.6 @sources.list &&
@@ -271,6 +272,9 @@ echo \"ANT_JAVA args: $@\" >&2
                         ${CMAKE_COMMAND} -E copy junit.jar "${VENDOR_PREFIX}/junit/lib/junit.jar"
         BUILD_IN_SOURCE 1
     )
+    
+    # Ensure JOPA is built before JUnit tries to use it
+    add_dependencies(junit jopa)
 
     ExternalProject_Add(apache_ant
         URL "${ANT_ARCHIVE}"
