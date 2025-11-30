@@ -392,6 +392,41 @@ jobs:
             build/compliance_jdk8_results.env
           retention-days: 7
 
+  build-legacy-classpath:
+    name: Build Legacy Classpath 0.93 (No JamVM)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA and GNU Classpath 0.93
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DJOPA_CLASSPATH_VERSION=0.93
+            cmake --build build --target gnu_classpath -j$(nproc) 2>&1 | tee /tmp/build-legacy.log
+          '
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-legacy-log
+          path: /tmp/build-legacy.log
+          retention-days: 7
+
   build-release-jamvm:
     name: Build and Test (Release + JamVM)
     runs-on: ubuntu-latest

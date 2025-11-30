@@ -31,18 +31,28 @@ This creates a complete Java toolchain where all Java bytecode is compiled from 
 ### Building DevJopaK
 
 ```bash
-cmake -B build -S . -DJOPA_BUILD_JAMVM=ON
+cmake -B build
 cmake --build build --target devjopak
 ```
 
 This creates `devjopak-<version>.tar.gz` containing:
-- `bin/javac` - JOPA compiler wrapper
-- `bin/java` - JamVM runtime wrapper
-- `lib/jopa` - JOPA compiler binary
-- `lib/jamvm` - JamVM runtime binary
-- `lib/classes.zip` - JamVM classes (compiled by JOPA)
-- `lib/glibj.zip` - GNU Classpath runtime
-- `lib/native/` - GNU Classpath native libraries
+*   `bin/javac` (JOPA wrapper)
+*   `bin/java` (JamVM wrapper)
+*   `lib/jopa` (compiler binary)
+*   `lib/jamvm` (runtime binary)
+*   `lib/glibj.zip` (GNU Classpath library)
+*   `lib/classes.zip` (JamVM bootstrap classes)
+
+#### Legacy Classpath Testing
+
+You can select the GNU Classpath version using the `JOPA_CLASSPATH_VERSION` option:
+
+```bash
+cmake -B build -DJOPA_CLASSPATH_VERSION=0.93
+cmake --build build --target gnu_classpath
+```
+
+**Note:** Setting version to `0.93` disables JamVM and the `devjopak` target, as JamVM 2.0.0 requires a newer class library. This mode is primarily for historical compatibility testing of the compiler itself.
 
 ### Using DevJopaK
 
