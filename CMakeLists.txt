@@ -44,7 +44,7 @@ option(JOPA_ENABLE_NATIVE_FP "Use native floating point instead of emulation" ON
 option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
-option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" ${_IS_DEBUG_BUILD})
+option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" OFF)
 
 # JamVM bootstrap options
 option(JOPA_BUILD_JAMVM "Build JamVM + GNU Classpath for bootstrap testing" ON)
@@ -202,6 +202,24 @@ if(JOPA_BUILD_JAMVM)
     )
 
     add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/bin/ant"
+        DEPENDS apache_ant "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_BINARY_DIR}/vendor-install/ant/bin/ant" "${DEVJOPAK_DIR}/bin/ant"
+        COMMAND chmod +x "${DEVJOPAK_DIR}/bin/ant"
+        COMMENT "Copying Apache Ant binary"
+    )
+
+    add_custom_command(
+        OUTPUT "${DEVJOPAK_DIR}/lib/ant"
+        DEPENDS apache_ant "${DEVJOPAK_DIR}/bin/.created"
+        COMMAND ${CMAKE_COMMAND} -E make_directory "${DEVJOPAK_DIR}/lib/ant"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_BINARY_DIR}/vendor-install/ant/lib"
+            "${DEVJOPAK_DIR}/lib/ant"
+        COMMENT "Copying Apache Ant libraries"
+    )
+
+    add_custom_command(
         OUTPUT "${DEVJOPAK_DIR}/LICENSE"
         DEPENDS "${DEVJOPAK_DIR}/bin/.created"
         COMMAND ${CMAKE_COMMAND} -E copy "${CMAKE_SOURCE_DIR}/LICENSE" "${DEVJOPAK_DIR}/LICENSE"
@@ -218,6 +236,8 @@ if(JOPA_BUILD_JAMVM)
             "${DEVJOPAK_DIR}/lib/classes.zip"
             "${DEVJOPAK_DIR}/lib/glibj.zip"
             "${DEVJOPAK_DIR}/lib/native/.created"
+            "${DEVJOPAK_DIR}/bin/ant"
+            "${DEVJOPAK_DIR}/lib/ant"
             "${DEVJOPAK_DIR}/LICENSE"
         WORKING_DIRECTORY "${CMAKE_BINARY_DIR}"
         COMMAND ${CMAKE_COMMAND} -E tar czf "${DEVJOPAK_ARCHIVE}" "devjopak"
