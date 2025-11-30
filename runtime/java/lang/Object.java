@@ -15,21 +15,19 @@ public class Object {
         return "";
     }
 
-    protected Object clone() {
-        return this;
-    }
+    protected native Object clone() throws CloneNotSupportedException;
 
-    public final Class getClass() {
-        return null;
-    }
+    public final native Class<?> getClass();
 
-    protected void finalize() {}
+    protected void finalize() throws Throwable {}
 
-    public final void notify() {}
+    public final native void notify();
 
-    public final void notifyAll() {}
+    public final native void notifyAll();
 
-    public final void wait() {}
+    public final native void wait() throws InterruptedException;
 
-    public final void wait(long timeout) {}
+    public final native void wait(long timeout) throws InterruptedException;
+
+    public final native void wait(long timeout, int nanos) throws InterruptedException;
 }
