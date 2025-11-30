@@ -487,10 +487,16 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
 
     if (source_type -> Primitive())
     {
-        if (target_type -> Primitive())
-        {
-            return target_type == source_type ||
-                CanWideningPrimitiveConvert(target_type, source_type);
+        if (target_type -> Primitive()) {
+            bool widening_allowed = CanWideningPrimitiveConvert(target_type, source_type);
+            bool narrowing_allowed = CanNarrowingPrimitiveConvert(target_type, source_type);
+            fprintf(stderr, "DEBUG: CanCastConvert primitive-primitive check: target=%ls, source=%ls, widening=%d, narrowing=%d\n",
+                    target_type->Name(), source_type->Name(), widening_allowed, narrowing_allowed);
+            if (widening_allowed || narrowing_allowed) {
+                return true;
+            } else {
+                return false;
+            }
         }
         // Java 5: Boxing conversion (primitive → wrapper) for method invocation
         // JLS 5.3: Boxing conversion followed by widening reference conversion
@@ -564,19 +570,44 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
     if (IsIntValueRepresentableInType(expr, target_type))
         return true;
 
-    // Java 5: Boxing conversion (primitive → wrapper)
-    if (control.option.source >= JopaOption::SDK1_5 &&
-        IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
-        return true;
+    // Java 5: Autoboxing and Unboxing conversions (JLS 5.2)
+    if (control.option.source >= JopaOption::SDK1_5)
+    {
+        // Boxing conversion (primitive → wrapper)
+        if (IsBoxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+            return true;
 
-    // Java 5: Unboxing conversion (wrapper → primitive)
-    if (control.option.source >= JopaOption::SDK1_5 &&
-        IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
-        return true;
+        // Unboxing conversion (wrapper → primitive)
+        if (IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+            return true;
+
+        // JLS 5.2. Assignment Conversion includes:
+        // - A widening primitive conversion optionally followed by a boxing conversion.
+        // - An unboxing conversion optionally followed by a widening primitive conversion.
+
+        // Case: Unboxing conversion + Widening primitive conversion (wrapper -> primitive -> wider primitive)
+        if (!source_type->Primitive() && target_type->Primitive()) {
+            TypeSymbol* unboxed_source = GetPrimitiveType(source_type); // Try to unbox source to a primitive
+            if (unboxed_source) {
+                // If unboxing is possible, check if the unboxed primitive can be widened to target_type
+                if (CanWideningPrimitiveConvert(target_type, unboxed_source))
+                    return true;
+            }
+        }
+        // Case: Widening primitive conversion + Boxing conversion (primitive -> wider primitive -> wrapper)
+        if (source_type->Primitive() && !target_type->Primitive()) {
+            TypeSymbol* primitive_target = GetPrimitiveType(target_type); // Primitive type of target wrapper
+            if (primitive_target) {
+                // Check if source primitive can be widened to target's primitive type
+                if (CanWideningPrimitiveConvert(primitive_target, source_type)) {
+                    return true; // e.g., int -> long (widening) -> Long (boxing)
+                }
+            }
+        }
+    }
 
     return false;
 }
-
 
 //
 // Returns true if the source type can be cast into the target type, via an
@@ -596,13 +627,63 @@ bool Semantic::CanCastConvert(TypeSymbol* target_type, TypeSymbol* source_type,
 
     if (source_type -> Primitive())
     {
-        return target_type -> Primitive() &&
-            (CanWideningPrimitiveConvert(target_type, source_type) ||
-             CanNarrowingPrimitiveConvert(target_type, source_type));
+        if (target_type -> Primitive())
+        {
+            return (CanWideningPrimitiveConvert(target_type, source_type) ||
+                 CanNarrowingPrimitiveConvert(target_type, source_type));
+        }
+        else // Primitive to Reference (source_type is primitive, target_type is reference)
+        {
+            // JLS 5.5: Primitive to Reference Casting Conversion
+            // Permitted if S can be converted to the type of T's corresponding wrapper class by boxing conversion (JLS 5.1.7).
+            // Then the cast is allowed if T is Object or Serializable or Comparable, and S can be converted to the type of T's corresponding wrapper class by boxing conversion.
+            if (control.option.source >= JopaOption::SDK1_5) {
+                TypeSymbol* wrapper_of_source = GetWrapperType(source_type);
+                if (wrapper_of_source && wrapper_of_source->IsSubtype(target_type)) {
+                    return true; // e.g. (Object)int: int -> Integer, Integer is subtype of Object
+                }
+            }
+            return false;
+        }
     }
 
-    if (target_type -> Primitive())
+    if (target_type -> Primitive()) // source_type is reference, target_type is primitive
+    {
+        if (control.option.source >= JopaOption::SDK1_5) {
+            TypeSymbol* unboxed_source_as_primitive = GetPrimitiveType(source_type); // Get the primitive type if source is a wrapper
+            if (unboxed_source_as_primitive) { // Source is a wrapper type
+                bool widening_allowed = CanWideningPrimitiveConvert(target_type, unboxed_source_as_primitive);
+                bool narrowing_allowed = CanNarrowingPrimitiveConvert(target_type, unboxed_source_as_primitive);
+                return widening_allowed || narrowing_allowed;
+            }
+            // If source_type is not a direct wrapper (e.g., Object, Number, Serializable, Comparable)
+            // JLS says: Cast S to W (wrapper of T), then unbox W to T.
+            TypeSymbol* wrapper_of_target = GetWrapperType(target_type);
+            if (wrapper_of_target) {
+                // Check if source can be cast to wrapper_of_target
+                bool sub1 = source_type->IsSubtype(wrapper_of_target);
+                bool sub2 = wrapper_of_target->IsSubtype(source_type);
+                bool obj = (source_type == control.Object());
+                
+                if (sub1 || sub2 || obj) {
+                    return true;
+                } else {
+                     // FAIL DEBUG
+                     fprintf(stderr, "DEBUG: FAIL Reference->Primitive cast. source=%ls, target=%ls, wrapper=%ls.\n",
+                             source_type->Name(), target_type->Name(), wrapper_of_target->Name());
+                     fprintf(stderr, "  source->IsSubtype(wrapper): %d\n", sub1);
+                     fprintf(stderr, "  wrapper->IsSubtype(source): %d\n", sub2);
+                     
+                     // Print interfaces of wrapper
+                     fprintf(stderr, "  Wrapper interfaces (%d):\n", wrapper_of_target->NumInterfaces());
+                     for (unsigned i=0; i<wrapper_of_target->NumInterfaces(); i++) {
+                         fprintf(stderr, "    %ls\n", wrapper_of_target->Interface(i)->Name());
+                     }
+                }
+            }
+        }
         return false;
+    }
 
     // Now that primitives are removed, check if one subtypes the other.
     if (source_type == control.null_type ||
@@ -968,8 +1049,7 @@ void Semantic::ProcessCastExpression(Ast* expr)
     TypeSymbol* source_type = cast_expression -> expression -> Type();
     TypeSymbol* target_type = cast_expression -> type -> symbol;
 
-    if (CanCastConvert(target_type, source_type,
-                       cast_expression -> right_parenthesis_token))
+    if (CanCastConvert(target_type, source_type, cast_expression -> right_parenthesis_token))
     {
         cast_expression -> symbol = target_type;
         cast_expression -> value = CastValue(target_type,

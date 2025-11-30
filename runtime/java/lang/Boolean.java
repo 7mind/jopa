@@ -25,6 +25,10 @@ public final class Boolean implements Comparable<Boolean>, java.io.Serializable 
         return value ? "true" : "false";
     }
 
+    public static String toString(boolean b) {
+        return b ? "true" : "false";
+    }
+
     @Override
     public int compareTo(Boolean b) {
         return b.value ? (value ? 0 : -1) : (value ? 1 : 0);

@@ -821,8 +821,8 @@ public:
     bool IsConstantFalse(AstExpression* expr);
 
     // Java 5: Boxing/Unboxing utilities - implemented in decl.cpp
-    TypeSymbol* GetWrapperType(TypeSymbol*);
-    TypeSymbol* GetPrimitiveType(TypeSymbol*);
+    TypeSymbol* GetWrapperType(const TypeSymbol*);
+    TypeSymbol* GetPrimitiveType(const TypeSymbol*);
     bool IsBoxingConversion(TypeSymbol*, TypeSymbol*);
     bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
     MethodSymbol* GetBoxingMethod(TypeSymbol*);

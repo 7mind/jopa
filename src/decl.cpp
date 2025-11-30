@@ -4910,7 +4910,7 @@ TypeSymbol* Semantic::FindPrimitiveType(AstPrimitiveType* primitive_type)
 // Return the wrapper type for a primitive type, or NULL if not primitive.
 // Used for autoboxing conversions (JSR 201).
 //
-TypeSymbol* Semantic::GetWrapperType(TypeSymbol* type)
+TypeSymbol* Semantic::GetWrapperType(const TypeSymbol* type)
 {
     if (!type || !type -> Primitive())
         return NULL;
@@ -4940,7 +4940,7 @@ TypeSymbol* Semantic::GetWrapperType(TypeSymbol* type)
 // Return the primitive type for a wrapper type, or NULL if not a wrapper.
 // Used for unboxing conversions (JSR 201).
 //
-TypeSymbol* Semantic::GetPrimitiveType(TypeSymbol* type)
+TypeSymbol* Semantic::GetPrimitiveType(const TypeSymbol* type)
 {
     if (!type)
         return NULL;
