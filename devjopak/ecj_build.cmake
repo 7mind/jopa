@@ -8,12 +8,6 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
     set(ECJ_JAR "${ECJ_INSTALL_DIR}/lib/ecj.jar")
 
-    # Script to generate sources list safely
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh"
-"#!/bin/sh
-find \"\$1\" -name '*.java' > \"\$2\"
-")
-
     add_custom_command(
         OUTPUT "${ECJ_JAR}"
         DEPENDS jamvm_with_gnucp
@@ -29,10 +23,8 @@ find \"\$1\" -name '*.java' > \"\$2\"
         COMMAND ${CMAKE_COMMAND} -E remove_directory "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/internal/compiler/apt"
         COMMAND ${CMAKE_COMMAND} -E remove "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/core/JDTCompilerAdapter.java"
         
-        # 3. Compile the remaining sources
-        # We use a helper script to generate the list of files to avoid shell quoting issues in CMake
-        COMMAND sh "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh" "${ECJ_BUILD_DIR}/src" "${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
-        
+        # 3. Compile starting from the main batch compiler class
+        # JOPA/javac will automatically find and compile dependencies in sourcepath
         COMMAND ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
             "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh"
@@ -40,7 +32,8 @@ find \"\$1\" -name '*.java' > \"\$2\"
             -source 1.5 -target 1.5
             -encoding ISO-8859-1
             -nowarn
-            "@${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
+            -sourcepath "${ECJ_BUILD_DIR}/src"
+            "${ECJ_BUILD_DIR}/src/org/eclipse/jdt/internal/compiler/batch/Main.java"
             
         # 4. Copy resources (properties, etc.) to classes dir
         # We reuse the source tree for this, identifying non-java files
