@@ -73,12 +73,12 @@ include(CTest)
 # Build jikespg (parser generator) - needed for grammar generation
 add_subdirectory(vendor/jikespg)
 
+add_subdirectory(src)
+
 # Build JamVM + GNU Classpath if requested
 if(JOPA_BUILD_JAMVM)
     add_subdirectory(vendor)
 endif()
-
-add_subdirectory(src)
 
 # Runtime library (needed for tests)
 add_subdirectory(runtime)
