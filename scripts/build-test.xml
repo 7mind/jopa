@@ -1,0 +1,43 @@
+<project name="TestDevJopaK" default="test" basedir=".">
+    <target name="init">
+        <mkdir dir="classes"/>
+        <mkdir dir="test-classes"/>
+        <mkdir dir="reports"/>
+    </target>
+
+    <target name="compile" depends="init">
+        <javac srcdir="." destdir="classes" includeantruntime="false" source="1.6" target="1.6" fork="yes" executable="javac">
+            <include name="Hello.java"/>
+        </javac>
+    </target>
+
+    <target name="compile-tests" depends="compile">
+        <javac srcdir="." destdir="test-classes" includeantruntime="false" source="1.6" target="1.6" fork="yes" executable="javac">
+            <include name="HelloTest.java"/>
+            <classpath>
+                <pathelement path="classes"/>
+                <fileset dir="${ant.home}/lib">
+                    <include name="junit.jar"/>
+                </fileset>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="run" depends="compile">
+        <java classname="Hello" classpath="classes" failonerror="true" fork="yes" jvm="java"/>
+    </target>
+
+    <target name="test" depends="compile-tests">
+        <junit printsummary="yes" haltonfailure="true" fork="yes" jvm="java">
+            <classpath>
+                <pathelement path="classes"/>
+                <pathelement path="test-classes"/>
+                <fileset dir="${ant.home}/lib">
+                    <include name="junit.jar"/>
+                </fileset>
+            </classpath>
+            <formatter type="plain"/>
+            <test name="HelloTest" todir="reports"/>
+        </junit>
+    </target>
+</project>
