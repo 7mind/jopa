@@ -36,6 +36,9 @@ mkdir -p "$TEST_DIR"
 tar -xzf "$DIST_ARCHIVE" -C "$TEST_DIR"
 
 DEVJOPAK_HOME="$TEST_DIR/devjopak"
+# Ensure binaries are executable (cmake -E tar might not preserve permissions perfectly in all envs)
+chmod -R +x "$DEVJOPAK_HOME/bin"
+
 export JAVA_HOME="$DEVJOPAK_HOME"
 export ANT_HOME="$DEVJOPAK_HOME"
 export PATH="$DEVJOPAK_HOME/bin:$PATH"
