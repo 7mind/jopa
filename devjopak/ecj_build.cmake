@@ -3,14 +3,34 @@
 # ============================================================================
 if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ECJ_VERSION "4.2.1")
-    set(ECJ_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/ecj-${ECJ_VERSION}-src")
+    # We will download the source JAR using ExternalProject
+    set(ECJ_URL "https://archive.eclipse.org/eclipse/downloads/drops4/R-4.2.1-201209141800/ecjsrc-4.2.1.jar")
+    set(ECJ_DOWNLOAD_DIR "${CMAKE_BINARY_DIR}/ecj-download")
+    set(ECJ_SOURCE_DIR "${ECJ_DOWNLOAD_DIR}/ecj-src")
+    
     set(ECJ_BUILD_DIR "${CMAKE_BINARY_DIR}/ecj-build")
     set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
     set(ECJ_JAR "${ECJ_INSTALL_DIR}/lib/ecj.jar")
 
+    # Use ExternalProject to download and unzip the ECJ source jar
+    ExternalProject_Add(ecj_source_download
+        URL "${ECJ_URL}"
+        DOWNLOAD_DIR "${ECJ_DOWNLOAD_DIR}"
+        SOURCE_DIR "${ECJ_SOURCE_DIR}"
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+    )
+
+    # Script to generate sources list safely
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gen_ecj_sources.sh"
+"#!/bin/sh
+find \"$1\" -name '*.java' > \"$2\"
+")
+
     add_custom_command(
         OUTPUT "${ECJ_JAR}"
-        DEPENDS jamvm_with_gnucp
+        DEPENDS jamvm_with_gnucp ecj_source_download
         COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_BUILD_DIR}/classes"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_INSTALL_DIR}/lib"
         
