@@ -76,9 +76,8 @@ add_subdirectory(vendor/jikespg)
 add_subdirectory(src)
 
 # Build JamVM + GNU Classpath if requested
-if(JOPA_BUILD_JAMVM)
-    add_subdirectory(vendor)
-endif()
+# Always add vendor to allow building gnu_classpath even if jamvm is disabled
+add_subdirectory(vendor)
 
 # Runtime library (needed for tests)
 add_subdirectory(runtime)

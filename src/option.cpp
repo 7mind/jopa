@@ -876,9 +876,9 @@ Option::Option(ArgumentExpander& arguments,
             source = SDK1_4;
             break;
         case UNKNOWN:
-            // Default to Java 7 (SDK1_7), the highest version we fully support
-            target = SDK1_7;
-            source = SDK1_7;
+            // Default to Java 6 (SDK1_6) to avoid StackMapTable verification issues
+            target = SDK1_6;
+            source = SDK1_6;
             break;
         case SDK1_5:
             source = SDK1_5;
