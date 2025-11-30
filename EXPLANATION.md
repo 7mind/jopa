@@ -3,6 +3,8 @@
 I wanted to better understand capabilites and applicability ceilings of the latest generation of models (Opus 4.5, Sonnet 4.5, gpt-5.1-codex-max, Gemini 2.5 Pro) 
 and learn the ways to use them efficiently. When I tasked Claude to refresh Jikes, I dind't expect it to succeed at all. It outperformed my expectations.
 
+It managed to add Java 7 syntax support and preliminary Java 5 language features in a day in mostly unsupervised mode but it took us a week of hard work to get something which seem to work as a Java 7 compiler. But it's still full of bugs.
+
 Good things I've learned:
 
 - Today (in 2025) models can do much more than 2 years ago. In 2023 I hoped that I could get a single compilation unit done with an agent, now I can think about compilers.
