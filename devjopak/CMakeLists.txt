@@ -58,7 +58,7 @@ set(JAMVM_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/jamvm-2.0.0")
 # ============================================================================ 
 # GNU Classpath Build
 # ============================================================================ 
-set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-build")
+set(CLASSPATH_BUILD_DIR "${CMAKE_BINARY_DIR}/classpath-${JOPA_CLASSPATH_VERSION}-build")
 set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
 
 if(JOPA_CLASSPATH_VERSION VERSION_LESS "0.98")
@@ -120,7 +120,7 @@ set(CLASSPATH_GLIBJ_ZIP "${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip")
 # JamVM Build
 # ============================================================================ 
 if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
-    set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-build")
+    set(JAMVM_BUILD_DIR "${CMAKE_BINARY_DIR}/jamvm-classpath-${JOPA_CLASSPATH_VERSION}-build")
     set(JAMVM_INSTALL_DIR "${VENDOR_PREFIX}/jamvm")
     set(JAMVM_PREBUILT_CLASSES "${JAMVM_SOURCE_DIR}/src/classlib/gnuclasspath/lib/classes.zip")
 
