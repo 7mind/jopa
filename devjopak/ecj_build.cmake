@@ -25,7 +25,8 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
         
         # 3. Compile the remaining sources
         # We use 'find' to generate the list of files to compile from the pruned source tree
-        COMMAND sh -c "find \"${ECJ_BUILD_DIR}/src\" -name '*.java' > \"${ECJ_BUILD_DIR}/sources.list\""
+        # Note: We write the list to CMAKE_CURRENT_BINARY_DIR to ensure the directory exists
+        COMMAND sh -c "find '${ECJ_BUILD_DIR}/src' -name '*.java' > '${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list'"
         
         COMMAND ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
@@ -34,13 +35,10 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
             -source 1.5 -target 1.5
             -encoding ISO-8859-1
             -nowarn
-            "@${ECJ_BUILD_DIR}/sources.list"
+            "@${CMAKE_CURRENT_BINARY_DIR}/ecj_sources.list"
             
         # 4. Copy resources (properties, etc.) to classes dir
         # We reuse the source tree for this, identifying non-java files
-        COMMAND sh -c "find \"${ECJ_BUILD_DIR}/src\" -type f -not -name '*.java' -exec cp --parents -t \"${ECJ_BUILD_DIR}/classes\" {} + || true"
-        # The cp --parents might fail or behave weirdly depending on CWD. 
-        # Safer approach: Copy everything again to classes, then delete .java
         COMMAND ${CMAKE_COMMAND} -E copy_directory "${ECJ_BUILD_DIR}/src" "${ECJ_BUILD_DIR}/classes"
         COMMAND find "${ECJ_BUILD_DIR}/classes" -name "*.java" -delete
 
