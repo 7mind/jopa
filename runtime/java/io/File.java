@@ -84,13 +84,13 @@ public class File implements Serializable, Comparable<File> {
         return false;
     }
 
-    public boolean delete() {
-        return false;
-    }
+        public boolean delete() { return false; }
 
-    public String[] list() {
-        return null;
-    }
+        public void deleteOnExit() {}
+
+        public String[] list() { return null; }
+
+    
 
     public String[] list(FilenameFilter filter) {
         return null;

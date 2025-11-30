@@ -34,7 +34,7 @@ if [[ "$JDK_VERSION" == "jdk7" ]]; then
     ASSETS_DIR="${SUBMODULE_DIR}/test"
     WHITELIST_FILE="${PROJECT_DIR}/test/jdk7_compliance_whitelist.txt"
     SOURCE_VERSION="1.7"
-    LIB_DIRS="${ASSETS_DIR}/com/sun/javadoc/lib:${ASSETS_DIR}/tools/javac/lib:${ASSETS_DIR}/tools/apt/lib"
+    LIB_DIRS="${ASSETS_DIR}/com/sun/javadoc/lib:${ASSETS_DIR}/tools/javac/lib:${ASSETS_DIR}/tools/apt/lib:${ASSETS_DIR}/tools/javac/api/lib"
 else
     SUBMODULE_DIR="${PROJECT_DIR}/assets/jdk8u_langtools"
     ASSETS_DIR="${SUBMODULE_DIR}/test"
