@@ -73,6 +73,7 @@ The `devjopak` CMake project (`devjopak/CMakeLists.txt`) provides specific targe
 | `jamvm_with_gnucp` | Builds JamVM with GNU Classpath. | `build-devjopak/vendor-install/jamvm/` |
 | `apache_ant` | Builds Apache Ant using JOPA/JamVM. | `build-devjopak/vendor-install/ant/` |
 | `devjopak` | Creates the full DevJopaK distribution archive. | `build-devjopak/devjopak-<version>.tar.gz` |
+| `devjopak-ecj` | Creates the DevJopaK distribution with ECJ as the compiler. | `build-devjopak/devjopak-ecj-<version>.tar.gz` |
 
 #### Legacy Classpath Testing
 
@@ -91,6 +92,16 @@ cmake --build build-devjopak --target gnu_classpath
 tar xzf devjopak-*.tar.gz
 ./devjopak/bin/javac Hello.java
 ./devjopak/bin/java Hello
+```
+
+### Using DevJopaK-ECJ
+
+The `devjopak-ecj` distribution works identically but uses the Eclipse Compiler for Java (ECJ) instead of JOPA.
+
+```bash
+tar xzf devjopak-ecj-*.tar.gz
+./devjopak-ecj/bin/javac Hello.java
+./devjopak-ecj/bin/java Hello
 ```
 
 ### Validation Script

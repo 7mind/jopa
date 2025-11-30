@@ -33,19 +33,23 @@ jobs:
       - name: Check flake
         run: nix flake check --show-trace
 
-      - name: Build JOPA and DevJopaK (Release)
+      - name: Build JOPA, DevJopaK, and DevJopaK-ECJ (Release)
         run: |
           nix develop --command bash -c '
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
             cmake --build build -j$(nproc)
             cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-devjopak --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-release.log
+            cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-release.log
           '
 
       - name: Verify DevJopaK Distribution
         run: |
           nix develop --command bash ./scripts/test-devjopak.sh
+
+      - name: Verify DevJopaK-ECJ Distribution
+        run: |
+          nix develop --command bash ./scripts/test-devjopak-ecj.sh
 
       - name: Run Primary Tests (Release)
         run: |
@@ -80,11 +84,20 @@ jobs:
           path: build-devjopak/devjopak-*.tar.gz
           retention-days: 30
 
+      - name: Upload devjopak-ecj artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: devjopak-ecj
+          path: build-devjopak/devjopak-ecj-*.tar.gz
+          retention-days: 30
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: build-devjopak/devjopak-*.tar.gz
+          files: |
+            build-devjopak/devjopak-*.tar.gz
+            build-devjopak/devjopak-ecj-*.tar.gz
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-') }}
@@ -108,19 +121,23 @@ jobs:
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Build JOPA and DevJopaK (Debug + Sanitizers)
+      - name: Build JOPA, DevJopaK, and DevJopaK-ECJ (Debug + Sanitizers)
         run: |
           nix develop --command bash -c '
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
             cmake --build build -j$(nproc)
             cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Debug
-            cmake --build build-devjopak --target devjopak -j$(nproc) 2>&1 | tee /tmp/build-debug.log
+            cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
 
       - name: Verify DevJopaK Distribution
         run: |
           nix develop --command bash ./scripts/test-devjopak.sh
+
+      - name: Verify DevJopaK-ECJ Distribution
+        run: |
+          nix develop --command bash ./scripts/test-devjopak-ecj.sh
 
       - name: Run Primary Tests (Debug + Sanitizers)
         run: |
