@@ -3286,16 +3286,16 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
     VariableSymbol* enum_ordinal_param = NULL;
     if (this_type -> IsEnum() && this_type != control.Enum())
     {
-        // Add name parameter (String)
-        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        // Add name parameter (String) - use synthetic name to avoid conflict
+        NameSymbol* name_sym = control.FindOrInsertName(L"$name", 5);
         enum_name_param = block_symbol -> InsertVariableSymbol(name_sym);
         enum_name_param -> SetType(control.String());
         enum_name_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
         enum_name_param -> MarkComplete();
         enum_name_param -> SetACC_SYNTHETIC();
 
-        // Add ordinal parameter (int)
-        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        // Add ordinal parameter (int) - use synthetic name to avoid conflict
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"$ordinal", 8);
         enum_ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
         enum_ordinal_param -> SetType(control.int_type);
         enum_ordinal_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
@@ -3458,7 +3458,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
     if (type -> IsEnum() && type != control.Enum())
     {
         // Add name parameter (String)
-        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        NameSymbol* name_sym = control.FindOrInsertName(L"$name", 5);
         VariableSymbol* name_param = block_symbol -> InsertVariableSymbol(name_sym);
         name_param -> SetType(control.String());
         name_param -> SetOwner(constructor);
@@ -3468,7 +3468,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         constructor -> AddFormalParameter(name_param);
 
         // Add ordinal parameter (int)
-        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"$ordinal", 8);
         VariableSymbol* ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
         ordinal_param -> SetType(control.int_type);
         ordinal_param -> SetOwner(constructor);
@@ -3523,9 +3523,9 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
                 // They were added earlier: name (index 1) and ordinal (index 2)
                 // (index 0 is 'this')
                 VariableSymbol* name_param = constructor -> block_symbol -> FindVariableSymbol(
-                    control.FindOrInsertName(L"name", 4));
+                    control.FindOrInsertName(L"$name", 5));
                 VariableSymbol* ordinal_param = constructor -> block_symbol -> FindVariableSymbol(
-                    control.FindOrInsertName(L"ordinal", 7));
+                    control.FindOrInsertName(L"$ordinal", 8));
 
                 // Create name argument reference
                 AstName* name_ref = compilation_unit -> ast_pool -> GenName(left_loc);

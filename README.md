@@ -177,7 +177,7 @@ Java 7 language features are fully supported for parsing, semantic analysis, and
 | JDK Version | Whitelisted parser | Passing parser | Passing parser % | Whitelisted typer | Passing Typer | Passing Typer % | Passing bytecode | Passing bytecode % |
 |-------------|--------------------|----------------|------------------|-------------------|---------------|-----------------|------------------|--------------------|
 | JDK 8       | 4501               | 4222           | 93.8%            | 1428              | 744           | 52.1%           | N/A              | N/A                |
-| JDK 7       | 3029               | 2983           | 98.5%            | 849               | 612           | 72.1%           | N/A              | N/A                |
+| JDK 7       | 3029               | 2983           | 98.5%            | 849               | 620           | 73.0%           | N/A              | N/A                |
 
 Bytecode test columns are `N/A` because we currently only compile the JDK tests via `scripts/test-java8-compliance.sh` / `scripts/test-java7-compliance.sh` and do not execute a separate bytecode validation suite yet.
 

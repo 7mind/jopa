@@ -84,4 +84,17 @@ public class Thread implements Runnable {
     public static int activeCount() {
         return 0;
     }
+
+    public enum State {
+        NEW,
+        RUNNABLE,
+        BLOCKED,
+        WAITING,
+        TIMED_WAITING,
+        TERMINATED;
+    }
+
+    public State getState() {
+        return State.NEW;
+    }
 }
