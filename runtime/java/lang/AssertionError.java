@@ -13,6 +13,10 @@ public class AssertionError extends Error {
         super(String.valueOf(detailMessage));
     }
 
+    public AssertionError(String message, Throwable cause) {
+        super(message, cause);
+    }
+
     public AssertionError(boolean detailMessage) {
         this(String.valueOf(detailMessage));
     }

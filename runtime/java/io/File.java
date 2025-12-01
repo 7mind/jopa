@@ -10,11 +10,17 @@ public class File implements Serializable, Comparable<File> {
 
     public File(String parent, String child) {}
 
-    public File(File parent, String child) {}
+        public File(File parent, String child) {}
 
-    public String getName() {
-        return null;
-    }
+    
+
+        public File(java.net.URI uri) {}
+
+    
+
+        public String getName() { return null; }
+
+    
 
     public String getParent() {
         return null;

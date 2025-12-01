@@ -8,7 +8,7 @@ public interface PackageDoc extends Doc {
     ClassDoc[] errors();
     ClassDoc[] enums();
     ClassDoc[] interfaces();
-    ClassDoc[] annotationTypes();
-    AnnotationTypeDoc[] annotationTypes(boolean filter);
+    AnnotationTypeDoc[] annotationTypes();
+    AnnotationDesc[] annotations();
     ClassDoc findClass(String className);
 }

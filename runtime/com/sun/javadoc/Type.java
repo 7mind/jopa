@@ -5,10 +5,13 @@ public interface Type {
     String qualifiedTypeName();
     String simpleTypeName();
     String dimension();
+    String toString();
     boolean isPrimitive();
     ClassDoc asClassDoc();
+    ParameterizedType asParameterizedType();
     TypeVariable asTypeVariable();
     WildcardType asWildcardType();
-    ParameterizedType asParameterizedType();
     AnnotationTypeDoc asAnnotationTypeDoc();
+    AnnotatedType asAnnotatedType();
+    AnnotationDesc[] annotations();
 }

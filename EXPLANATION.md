@@ -2,33 +2,30 @@
 
 ## JDK 7 Compliance Progress
 
-We have improved JDK 7 compliance from 66.9% to 75.0%.
+We have achieved 73.7% compliance (626 passing tests). While the absolute number dropped slightly from a peak of 75.0% due to the removal of unstable `com.sun.mirror` stubs that caused compiler crashes, the current state is more robust.
 
 ### Major Changes
 
 1.  **Runtime Stubs Enhancement**:
-    -   Added missing exception classes: `NoSuchMethodException`, `NoSuchFieldException`, `NegativeArraySizeException`.
-    -   Updated `java.lang.Class` to include `throws ClassNotFoundException` in `forName`.
-    -   Updated `java.lang.String` to include missing `indexOf` and `lastIndexOf` overloads.
-    -   Updated `java.io.File` to include `deleteOnExit`.
-    -   Added `java.awt` and `java.awt.event` stubs (`Window`, `Frame`, `Component`, `Container`, `WindowListener`, `WindowAdapter`).
-    -   Added `javax.tools` and `com.sun.source` stubs to support compiler API tests (`JavacTask`, `Trees`, `TreePath`, `StandardLocation`).
-    -   Added `com.sun.tools.javac.Main` stub.
+    -   Added `com.sun.javadoc` package stubs (`RootDoc`, `ClassDoc`, `Tag`, etc.) enabling Javadoc tests (`AuthorDD`, `MetaTag`) to pass.
+    -   Added `com.sun.tools.javadoc.Main` stub.
+    -   Added `junit.framework` stubs (`TestCase`, `Assert`, etc.).
+    -   Enhanced `java.io` stubs (`ObjectInputStream`, `ObjectOutputStream` implementing all abstract methods).
+    -   Enhanced `java.net.URI` (`getPath`).
+    -   Enhanced `javax.tools` (`DiagnosticCollector`, `StandardLocation`).
+    -   Enhanced `com.sun.source.util` (`Trees`, `TreePath`).
 
-2.  **Definite Assignment**:
-    -   Fixed failures in `DUAssert.java` by adding primitive constructors to `java.lang.AssertionError`.
-
-3.  **Test Infrastructure**:
-    -   Updated `test-compliance.sh` to include `tools/javac/api/lib` in sourcepath, enabling many API tests to pass.
+2.  **Stability**:
+    -   Removed `com.sun.mirror` (APT) stubs because they triggered a compiler crash (`runtime error: member call on null pointer`) in `EnumDecl.java`. This caused a drop in passing tests but resolved the crash.
 
 ### Remaining Challenges
 
--   **Multi-file Tests**: Many tests (e.g., `ConstValInlining`, `T`, `EnclosingAccessCheck`) fail because they depend on auxiliary classes in the same directory or in `p` subdirectories, which are not automatically found or compiled by the current test runner.
--   **Internal API Dependencies**: Tests relying on deep internal APIs of `javac` (e.g., `com.sun.tools.javac.main.JavaCompiler`) require extensive stubbing.
--   **Bytecode Dependencies**: Tests depending on `.jasm` (Java Assembler) files cannot be compiled as we lack an assembler in the test loop.
+-   **Compiler Crash**: The `jopa` compiler crashes during bytecode generation when compiling APT tests (`EnumDecl`) if `com.sun.mirror` stubs are present. This requires C++ debugging of `src/codegen/bytecode_expr.cpp`.
+-   **Multi-file Tests**: Tests depending on auxiliary files in the same directory (e.g., `ConstValInlining`, `EnclosingAccessCheck`) fail because the test runner compiles files individually.
+-   **Internal API Dependencies**: Tests relying on deep internal APIs of `javac` (`com.sun.tools.javac.main.JavaCompiler`) remain unsupported.
 
 ### Next Steps
 
--   Expand `com.sun.javadoc` stubs to fix Javadoc tests.
--   Implement a more robust test runner that can handle multi-file compilations or dependencies in the same directory.
--   Continue refining `Definite Assignment` logic in `src/definite.cpp`.
+-   Investigate and fix the compiler crash in `ByteCode::EmitName` to restore `com.sun.mirror` support.
+-   Implement a test runner capable of multi-file compilation.
+-   Continue expanding runtime stubs for `java.util` and other core packages.
