@@ -1805,8 +1805,8 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         // Java 7: Handle multi-catch
         if (clause -> NumUnionTypes() > 0)
         {
-            // Multi-catch: process each union type
-            parm_type = control.Throwable();  // Common supertype for multi-catch
+            // Multi-catch: process each union type and compute LUB
+            parm_type = NULL;
 
             for (unsigned u = 0; u < clause -> NumUnionTypes(); u++)
             {
@@ -1821,6 +1821,30 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                                    union_type,
                                    type -> ContainingPackageName(),
                                    type -> ExternalName());
+                }
+
+                // Compute LUB: find common superclass
+                if (type != control.no_type)
+                {
+                    if (! parm_type)
+                    {
+                        parm_type = type;
+                    }
+                    else
+                    {
+                        // Find the most specific common superclass
+                        // Walk up the inheritance chain of parm_type until we find
+                        // a class that type is a subclass of
+                        TypeSymbol* candidate = parm_type;
+                        while (candidate && ! type -> IsSubclass(candidate))
+                        {
+                            candidate = candidate -> super;
+                        }
+                        if (candidate)
+                            parm_type = candidate;
+                        else
+                            parm_type = control.Throwable();  // Fallback
+                    }
                 }
 
                 // Check for duplicate types in the multi-catch
@@ -1857,6 +1881,10 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                     }
                 }
             }
+
+            // Fallback if all types were errors
+            if (! parm_type)
+                parm_type = control.Throwable();
         }
         else
         {

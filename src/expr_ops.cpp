@@ -640,6 +640,7 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
 bool Semantic::CanCastConvert(TypeSymbol* target_type, TypeSymbol* source_type,
                               TokenIndex tok)
 {
+    (void)tok;  // Unused after removing interface method compatibility check
     if (!target_type || !source_type) return false;
 
     if (target_type == control.null_type)
@@ -732,43 +733,22 @@ bool Semantic::CanCastConvert(TypeSymbol* target_type, TypeSymbol* source_type,
     //
     // Here, we are left with two reference types. Two classes are not
     // compatible at this point, and final classes do not implement
-    // interfaces. Otherwise, a class can implement an interface (even with
-    // conflicting signatures), but two interfaces must be compatible.
+    // interfaces.
     //
     if (source_type -> ACC_FINAL() || target_type -> ACC_FINAL() ||
         (! source_type -> ACC_INTERFACE() && ! target_type -> ACC_INTERFACE()))
     {
          return false;
     }
-    if (! source_type -> ACC_INTERFACE() || ! target_type -> ACC_INTERFACE())
-        return true;
-    if (! source_type -> expanded_method_table)
-        ComputeMethodsClosure(source_type, tok);
-    if (! target_type -> expanded_method_table)
-        ComputeMethodsClosure(target_type, tok);
-    ExpandedMethodTable* source_method_table =
-        source_type -> expanded_method_table;
-    unsigned i;
-    for (i = 0; i < source_method_table -> symbol_pool.Length(); i++)
-    {
-        MethodSymbol* method1 =
-            source_method_table -> symbol_pool[i] -> method_symbol;
-        MethodShadowSymbol* method_shadow2 =
-            target_type -> expanded_method_table ->
-            FindOverloadMethodShadow(method1, this, tok);
-        if (method_shadow2)
-        {
-            if (! method1 -> IsTyped())
-                method1 -> ProcessMethodSignature(this, tok);
 
-            MethodSymbol* method2 = method_shadow2 -> method_symbol;
-            if (! method2 -> IsTyped())
-                method2 -> ProcessMethodSignature(this, tok);
-            if (method1 -> Type() != method2 -> Type())
-                return false;
-        }
-    }
-    return true; // All the methods passed the test.
+    //
+    // JLS 5.5.1: Interface-to-interface casts are always allowed at compile
+    // time (they may fail at runtime). The method signature compatibility
+    // check that was previously here is too strict and not required by JLS.
+    // A cast from interface I to interface J is allowed even if I and J have
+    // methods with the same name but different return types.
+    //
+    return true;
 }
 
 
