@@ -2722,9 +2722,9 @@ void Semantic::ProcessConstructorBody(AstConstructorDeclaration* constructor_dec
 
             // Get the name and ordinal parameter symbols from the constructor's block symbol
             VariableSymbol* name_param = this_method -> block_symbol -> FindVariableSymbol(
-                control.FindOrInsertName(L"name", 4));
+                control.FindOrInsertName(L"$name", 5));
             VariableSymbol* ordinal_param = this_method -> block_symbol -> FindVariableSymbol(
-                control.FindOrInsertName(L"ordinal", 7));
+                control.FindOrInsertName(L"$ordinal", 8));
 
             // Create name argument reference
             AstName* name_ref = compilation_unit -> ast_pool -> GenName(loc);
