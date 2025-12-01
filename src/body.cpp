@@ -2106,6 +2106,14 @@ void Semantic::ProcessTryStatement(Ast* stmt)
     //      object declared to be of type S can actually be an instance of an
     //      object of type T in which case it will be caught by clause C.
     //
+    //
+    // We pop the stack now so that the catch blocks are processed in the
+    // environment of the enclosing block.
+    //
+    try_statement -> processing_try_block = false;
+    TryStatementStack().Pop();
+    TryExceptionTableStack().Pop();
+
     Tuple<TypeSymbol*> catchable_exceptions;
     Tuple<TypeSymbol*> convertible_exceptions;
     exception_set -> AddElement(control.Error());
@@ -2213,9 +2221,6 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         }
     }
 
-    try_statement -> processing_try_block = false;
-    TryStatementStack().Pop();
-    TryExceptionTableStack().Pop();
     if (TryExceptionTableStack().Top())
     {
         //
