@@ -928,6 +928,13 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 bound_type = type;
             }
 
+            if (!bound_type)
+            {
+                // Try to find using ImportType (checks single type imports and same package)
+                // Note: ImportType expects us to be in the context of the file
+                bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
+            }
+
             // Try to find in the current package
             if (!bound_type)
             {
@@ -1029,7 +1036,21 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
 
             // Try to find in the containing type's package
             TypeSymbol* containing_type = method -> containing_type;
-            if (containing_type)
+            
+            // Check if the bound refers to the containing type itself (T7022054pos1)
+            if (containing_type && containing_type->Identity() == bound_name)
+            {
+                bound_type = containing_type;
+            }
+            
+            if (!bound_type)
+            {
+                // Try to find using ImportType (checks single type imports and same package)
+                // Note: ImportType expects us to be in the context of the file
+                bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
+            }
+            
+            if (!bound_type && containing_type)
             {
                 PackageSymbol* package = containing_type -> ContainingPackage();
                 if (package)
@@ -5322,6 +5343,20 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             {
                 // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
+                
+                if (!erased) {
+                     // Debugging T7022054pos1
+                     if (type_param->name_symbol->Name()[0] == 'X') {
+                         Coutput << "FindType: Type param " << name_symbol->Name() << " has no erasure (unbounded?)" << endl;
+                         if (type_param->NumBounds() > 0) {
+                            Coutput << "  But has " << type_param->NumBounds() << " bounds!" << endl;
+                            Coutput << "  Bound 0: " << type_param->Bound(0)->Name() << endl;
+                         } else {
+                            Coutput << "  And has 0 bounds." << endl;
+                         }
+                     }
+                }
+
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
             }
