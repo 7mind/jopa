@@ -821,8 +821,8 @@ public:
     bool IsConstantFalse(AstExpression* expr);
 
     // Java 5: Boxing/Unboxing utilities - implemented in decl.cpp
-    TypeSymbol* GetWrapperType(TypeSymbol*);
-    TypeSymbol* GetPrimitiveType(TypeSymbol*);
+    TypeSymbol* GetWrapperType(const TypeSymbol*);
+    TypeSymbol* GetPrimitiveType(const TypeSymbol*);
     bool IsBoxingConversion(TypeSymbol*, TypeSymbol*);
     bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
     MethodSymbol* GetBoxingMethod(TypeSymbol*);
@@ -1343,6 +1343,8 @@ private:
     void ProcessBinaryExpression(Ast*);
     void ProcessInstanceofExpression(Ast*);
     void ProcessConditionalExpression(Ast*);
+    // Type inference for conditional expressions (JLS 15.25.3)
+    TypeSymbol* FindLeastUpperBound(TypeSymbol* type1, TypeSymbol* type2);
     void ProcessAssignmentExpression(Ast*);
 
     void ProcessVariableInitializer(AstVariableDeclarator*);

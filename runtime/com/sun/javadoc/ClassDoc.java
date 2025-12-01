@@ -2,6 +2,7 @@ package com.sun.javadoc;
 
 public interface ClassDoc extends ProgramElementDoc, Type {
     boolean isAbstract();
+    boolean isInterface();
     boolean isSerializable();
     boolean isExternalizable();
     MethodDoc[] serializationMethods();

@@ -1,10 +1,1 @@
-package com.sun.mirror.declaration;
-
-import java.util.Collection;
-import com.sun.mirror.type.ClassType;
-
-public interface ClassDeclaration extends TypeDeclaration {
-    ClassType getSuperclass();
-    Collection<ConstructorDeclaration> getConstructors();
-    Collection<? extends MethodDeclaration> getMethods();
-}
+package com.sun.mirror.declaration; import com.sun.mirror.type.*; import java.util.Collection; public interface ClassDeclaration extends TypeDeclaration { ClassType getSuperclass(); Collection<ConstructorDeclaration> getConstructors(); }

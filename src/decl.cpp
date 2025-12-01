@@ -2074,6 +2074,7 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
 
                         // Also check inherited methods from superclasses
                         // This handles cases like enums inheriting bridge methods from Enum
+                        // and generic superclasses implementing interface methods
                         if (! has_implementation)
                         {
                             for (TypeSymbol* super = this_type -> super; super && !has_implementation; super = super -> super)
@@ -2091,11 +2092,19 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                                         continue;
 
                                     // Check if all parameter types match
+                                    // For generic superclasses, the implementation method's parameter
+                                    // types (after erasure) may be supertypes of the interface method's
+                                    // parameter types. E.g., GenObject<T>.foo(Object) can implement
+                                    // TestInterface.foo(String) when GenObject<String> is used.
                                     bool params_match = true;
                                     for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
                                     {
-                                        if (impl -> FormalParameter(p) -> Type() !=
-                                            method -> FormalParameter(p) -> Type())
+                                        TypeSymbol* impl_type = impl -> FormalParameter(p) -> Type();
+                                        TypeSymbol* method_type = method -> FormalParameter(p) -> Type();
+                                        // Check exact match or if method param is subtype of impl param
+                                        // (allows for generic type erasure bridge methods)
+                                        if (impl_type != method_type &&
+                                            ! method_type -> IsSubtype(impl_type))
                                         {
                                             params_match = false;
                                             break;
@@ -3286,16 +3295,16 @@ void Semantic::ProcessConstructorDeclaration(AstConstructorDeclaration* construc
     VariableSymbol* enum_ordinal_param = NULL;
     if (this_type -> IsEnum() && this_type != control.Enum())
     {
-        // Add name parameter (String)
-        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        // Add name parameter (String) - use synthetic name to avoid conflict
+        NameSymbol* name_sym = control.FindOrInsertName(L"$name", 5);
         enum_name_param = block_symbol -> InsertVariableSymbol(name_sym);
         enum_name_param -> SetType(control.String());
         enum_name_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
         enum_name_param -> MarkComplete();
         enum_name_param -> SetACC_SYNTHETIC();
 
-        // Add ordinal parameter (int)
-        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        // Add ordinal parameter (int) - use synthetic name to avoid conflict
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"$ordinal", 8);
         enum_ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
         enum_ordinal_param -> SetType(control.int_type);
         enum_ordinal_param -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
@@ -3458,7 +3467,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
     if (type -> IsEnum() && type != control.Enum())
     {
         // Add name parameter (String)
-        NameSymbol* name_sym = control.FindOrInsertName(L"name", 4);
+        NameSymbol* name_sym = control.FindOrInsertName(L"$name", 5);
         VariableSymbol* name_param = block_symbol -> InsertVariableSymbol(name_sym);
         name_param -> SetType(control.String());
         name_param -> SetOwner(constructor);
@@ -3468,7 +3477,7 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
         constructor -> AddFormalParameter(name_param);
 
         // Add ordinal parameter (int)
-        NameSymbol* ordinal_sym = control.FindOrInsertName(L"ordinal", 7);
+        NameSymbol* ordinal_sym = control.FindOrInsertName(L"$ordinal", 8);
         VariableSymbol* ordinal_param = block_symbol -> InsertVariableSymbol(ordinal_sym);
         ordinal_param -> SetType(control.int_type);
         ordinal_param -> SetOwner(constructor);
@@ -3523,9 +3532,9 @@ void Semantic::AddDefaultConstructor(TypeSymbol* type)
                 // They were added earlier: name (index 1) and ordinal (index 2)
                 // (index 0 is 'this')
                 VariableSymbol* name_param = constructor -> block_symbol -> FindVariableSymbol(
-                    control.FindOrInsertName(L"name", 4));
+                    control.FindOrInsertName(L"$name", 5));
                 VariableSymbol* ordinal_param = constructor -> block_symbol -> FindVariableSymbol(
-                    control.FindOrInsertName(L"ordinal", 7));
+                    control.FindOrInsertName(L"$ordinal", 8));
 
                 // Create name argument reference
                 AstName* name_ref = compilation_unit -> ast_pool -> GenName(left_loc);
@@ -4841,12 +4850,18 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
 
     method -> SetSignature(control);
 
+    // Temporarily set ThisMethod so type parameters are visible for throws clause
+    MethodSymbol* method_saved_context = ThisMethod();
+    ThisMethod() = method;
+
     for (unsigned k = 0; k < method_declaration -> NumThrows(); k++)
     {
         AstTypeName* throw_expr = method_declaration -> Throw(k);
         ProcessType(throw_expr);
         method -> AddThrows(throw_expr -> symbol);
     }
+
+    ThisMethod() = method_saved_context;
 
     // save for processing bodies later.
     method_declaration -> method_symbol = method;
@@ -4904,7 +4919,7 @@ TypeSymbol* Semantic::FindPrimitiveType(AstPrimitiveType* primitive_type)
 // Return the wrapper type for a primitive type, or NULL if not primitive.
 // Used for autoboxing conversions (JSR 201).
 //
-TypeSymbol* Semantic::GetWrapperType(TypeSymbol* type)
+TypeSymbol* Semantic::GetWrapperType(const TypeSymbol* type)
 {
     if (!type || !type -> Primitive())
         return NULL;
@@ -4934,7 +4949,7 @@ TypeSymbol* Semantic::GetWrapperType(TypeSymbol* type)
 // Return the primitive type for a wrapper type, or NULL if not a wrapper.
 // Used for unboxing conversions (JSR 201).
 //
-TypeSymbol* Semantic::GetPrimitiveType(TypeSymbol* type)
+TypeSymbol* Semantic::GetPrimitiveType(const TypeSymbol* type)
 {
     if (!type)
         return NULL;

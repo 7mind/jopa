@@ -1,6 +1,6 @@
 package java.lang;
 
-public final class Boolean {
+public final class Boolean implements Comparable<Boolean>, java.io.Serializable {
     public static final Class TYPE = getPrimitiveClass("boolean");
     private static native Class getPrimitiveClass(String name);
 
@@ -23,5 +23,14 @@ public final class Boolean {
 
     public String toString() {
         return value ? "true" : "false";
+    }
+
+    public static String toString(boolean b) {
+        return b ? "true" : "false";
+    }
+
+    @Override
+    public int compareTo(Boolean b) {
+        return b.value ? (value ? 0 : -1) : (value ? 1 : 0);
     }
 }

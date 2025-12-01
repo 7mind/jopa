@@ -1,13 +1,1 @@
-package com.sun.mirror.declaration;
-
-import java.util.Collection;
-import com.sun.mirror.util.SourcePosition;
-
-public interface Declaration {
-    String getDocComment();
-    Collection<AnnotationMirror> getAnnotationMirrors();
-    <A extends java.lang.annotation.Annotation> A getAnnotation(Class<A> annotationType);
-    Collection<Modifier> getModifiers();
-    String getSimpleName();
-    SourcePosition getPosition();
-}
+package com.sun.mirror.declaration; import com.sun.mirror.util.*; import java.lang.annotation.Annotation; import java.util.Collection; public interface Declaration { String getSimpleName(); SourcePosition getPosition(); Collection<Modifier> getModifiers(); <A extends Annotation> A getAnnotation(Class<A> annotationType); Collection<AnnotationMirror> getAnnotationMirrors(); String getDocComment(); void accept(DeclarationVisitor v); }

@@ -5,6 +5,7 @@ public interface Tag {
     Doc holder();
     String kind();
     String text();
+    String toString();
     Tag[] inlineTags();
     Tag[] firstSentenceTags();
     SourcePosition position();

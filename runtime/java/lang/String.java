@@ -25,21 +25,21 @@ public final class String implements java.io.Serializable, Comparable<String>, C
         return this;
     }
 
-    public native String substring(int beginIndex);
-
     public native String substring(int beginIndex, int endIndex);
 
     public CharSequence subSequence(int start, int end) {
         return substring(start, end);
     }
 
-    public native int indexOf(int ch);
-
-    public native int indexOf(String str);
-
-    public native int lastIndexOf(int ch);
-
-    public native int lastIndexOf(String str);
+    public int indexOf(int ch) { return -1; }
+    public int indexOf(int ch, int fromIndex) { return -1; }
+    public int indexOf(String str) { return -1; }
+    public int indexOf(String str, int fromIndex) { return -1; }
+    public int lastIndexOf(int ch) { return -1; }
+    public int lastIndexOf(int ch, int fromIndex) { return -1; }
+    public int lastIndexOf(String str) { return -1; }
+    public int lastIndexOf(String str, int fromIndex) { return -1; }
+    public String substring(int beginIndex) { return null; }
 
     public native char[] toCharArray();
 
@@ -95,4 +95,6 @@ public final class String implements java.io.Serializable, Comparable<String>, C
     public static native String valueOf(double d);
 
     public static native String valueOf(Object obj);
+
+    public static String format(String format, Object... args) { return ""; }
 }

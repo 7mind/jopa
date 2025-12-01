@@ -1,5 +1,1 @@
-package com.sun.mirror.declaration;
-
-public interface EnumConstantDeclaration extends FieldDeclaration {
-    EnumDeclaration getDeclaringType();
-}
+package com.sun.mirror.declaration; public interface EnumConstantDeclaration extends FieldDeclaration { EnumDeclaration getDeclaringType(); }

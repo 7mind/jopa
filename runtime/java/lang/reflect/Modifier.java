@@ -28,4 +28,8 @@ public class Modifier {
     public static boolean isInterface(int mod) { return (mod & INTERFACE) != 0; }
     public static boolean isAbstract(int mod) { return (mod & ABSTRACT) != 0; }
     public static boolean isStrict(int mod) { return (mod & STRICT) != 0; }
+
+    public static String toString(int mod) {
+        return "";
+    }
 }

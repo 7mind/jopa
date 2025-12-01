@@ -24,9 +24,10 @@ public final class System {
         return 0L;
     }
 
-    public static void arraycopy(Object src, int srcPos, Object dest, int destPos, int length) {
-        // Native implementation
-    }
+    public static native void arraycopy(Object src, int srcPos, Object dest, int destPos, int length);
+    public static native void gc();
+    public static native long nanoTime();
+
 
     public static String getProperty(String key) {
         return null;

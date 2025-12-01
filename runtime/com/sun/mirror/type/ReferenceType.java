@@ -1,4 +1,1 @@
-package com.sun.mirror.type;
-
-public interface ReferenceType extends TypeMirror {
-}
+package com.sun.mirror.type; public interface ReferenceType extends TypeMirror {}

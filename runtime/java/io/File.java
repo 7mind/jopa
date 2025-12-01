@@ -10,11 +10,33 @@ public class File implements Serializable, Comparable<File> {
 
     public File(String parent, String child) {}
 
-    public File(File parent, String child) {}
+        public File(File parent, String child) {}
 
-    public String getName() {
-        return null;
-    }
+    
+
+            public File(java.net.URI uri) {}
+
+    
+
+        
+
+    
+
+            public java.net.URI toURI() { return null; }
+
+    
+
+        
+
+    
+
+            public String getName() { return null; }
+
+    
+
+        
+
+    
 
     public String getParent() {
         return null;
@@ -84,13 +106,13 @@ public class File implements Serializable, Comparable<File> {
         return false;
     }
 
-    public boolean delete() {
-        return false;
-    }
+        public boolean delete() { return false; }
 
-    public String[] list() {
-        return null;
-    }
+        public void deleteOnExit() {}
+
+        public String[] list() { return null; }
+
+    
 
     public String[] list(FilenameFilter filter) {
         return null;

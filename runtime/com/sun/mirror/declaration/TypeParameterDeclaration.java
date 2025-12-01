@@ -1,9 +1,1 @@
-package com.sun.mirror.declaration;
-
-import java.util.Collection;
-import com.sun.mirror.type.ReferenceType;
-
-public interface TypeParameterDeclaration extends Declaration {
-    Collection<ReferenceType> getBounds();
-    Declaration getOwner();
-}
+package com.sun.mirror.declaration; import com.sun.mirror.type.*; import java.util.Collection; public interface TypeParameterDeclaration extends Declaration { Collection<ReferenceType> getBounds(); Declaration getOwner(); }

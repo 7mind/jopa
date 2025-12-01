@@ -5102,9 +5102,10 @@ void Parser::MakeResource()
 
 //
 // Rule 575: CatchClause ::= 'catch' '(' UnionType VariableDeclaratorId ')' Block
-// Rule 576: CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
 //
-// Multi-catch with union types
+// Multi-catch without modifiers
+// Sym(1) = catch, Sym(2) = (, Sym(3) = UnionType, Sym(4) = VariableDeclaratorId,
+// Sym(5) = ), Sym(6) = Block
 //
 void Parser::MakeMultiCatch()
 {
@@ -5112,16 +5113,9 @@ void Parser::MakeMultiCatch()
     p -> SetPool(ast_pool);
     p -> catch_token = Token(1);
 
-    // Determine indices based on presence of modifiers
-    // Use safe cast methods to check type
-    bool has_modifiers = Sym(3) && Sym(3) -> ModifiersCast();
-    int union_index = has_modifiers ? 4 : 3;
-    int id_index = union_index + 1;
-    int block_index = id_index + 2;
-
-    // Get the union type - stored as a list
+    // Get the union type - stored as a list (Sym(3))
     AstType* first_type = NULL;
-    AstListNode* list = Sym(union_index) -> ListNodeCast();
+    AstListNode* list = Sym(3) ? Sym(3) -> ListNodeCast() : NULL;
     if (list)
     {
         // Store all union types and use first for formal parameter
@@ -5138,26 +5132,77 @@ void Parser::MakeMultiCatch()
     }
     else
     {
-        first_type = DYNAMIC_CAST<AstType*>(Sym(union_index));
+        // Single type (shouldn't happen for multi-catch, but handle it)
+        first_type = DYNAMIC_CAST<AstType*>(Sym(3));
     }
 
     // Create a formal parameter for the catch (uses first type)
     AstFormalParameter* fp = ast_pool -> NewFormalParameter();
-    if (has_modifiers)
-    {
-        fp -> modifiers_opt = MakeModifiers();
-    }
     fp -> type = first_type;
     fp -> ellipsis_token_opt = 0;
 
-    // Create variable declarator from variable declarator id
+    // Create variable declarator from variable declarator id (Sym(4))
     AstVariableDeclarator* formal_declarator = ast_pool -> NewVariableDeclarator();
     formal_declarator -> variable_declarator_name =
-        DYNAMIC_CAST<AstVariableDeclaratorId*> (Sym(id_index));
+        DYNAMIC_CAST<AstVariableDeclaratorId*> (Sym(4));
     fp -> formal_declarator = formal_declarator;
 
     p -> formal_parameter = fp;
-    p -> block = DYNAMIC_CAST<AstBlock*> (Sym(block_index));
+    p -> block = DYNAMIC_CAST<AstBlock*> (Sym(6));
+
+    Sym(1) = p;
+}
+
+//
+// Rule 576: CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
+//
+// Multi-catch with modifiers (e.g., 'final')
+// Sym(1) = catch, Sym(2) = (, Sym(3) = Modifiers, Sym(4) = UnionType,
+// Sym(5) = VariableDeclaratorId, Sym(6) = ), Sym(7) = Block
+//
+void Parser::MakeMultiCatchWithModifiers()
+{
+    AstCatchClause* p = ast_pool -> NewCatchClause();
+    p -> SetPool(ast_pool);
+    p -> catch_token = Token(1);
+
+    // Get the union type - stored as a list (Sym(4))
+    AstType* first_type = NULL;
+    AstListNode* list = Sym(4) ? Sym(4) -> ListNodeCast() : NULL;
+    if (list)
+    {
+        // Store all union types and use first for formal parameter
+        p -> AllocateUnionTypes(list -> index + 1);
+        AstListNode* root = list;
+        do
+        {
+            root = root -> next;
+            AstType* t = DYNAMIC_CAST<AstType*>(root -> element);
+            p -> AddUnionType(t);
+            if (! first_type) first_type = t;
+        } while (root != list);
+        FreeCircularList(list);
+    }
+    else
+    {
+        // Single type (shouldn't happen for multi-catch, but handle it)
+        first_type = DYNAMIC_CAST<AstType*>(Sym(4));
+    }
+
+    // Create a formal parameter for the catch (uses first type)
+    AstFormalParameter* fp = ast_pool -> NewFormalParameter();
+    fp -> modifiers_opt = MakeModifiers();  // Sym(3) is Modifiers
+    fp -> type = first_type;
+    fp -> ellipsis_token_opt = 0;
+
+    // Create variable declarator from variable declarator id (Sym(5))
+    AstVariableDeclarator* formal_declarator = ast_pool -> NewVariableDeclarator();
+    formal_declarator -> variable_declarator_name =
+        DYNAMIC_CAST<AstVariableDeclaratorId*> (Sym(5));
+    fp -> formal_declarator = formal_declarator;
+
+    p -> formal_parameter = fp;
+    p -> block = DYNAMIC_CAST<AstBlock*> (Sym(7));
 
     Sym(1) = p;
 }

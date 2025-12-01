@@ -1,11 +1,1 @@
-package com.sun.mirror.declaration;
-
-import java.util.Collection;
-import com.sun.mirror.type.ReferenceType;
-
-public interface ExecutableDeclaration extends MemberDeclaration {
-    boolean isVarArgs();
-    Collection<ParameterDeclaration> getParameters();
-    Collection<ReferenceType> getThrownTypes();
-    Collection<TypeParameterDeclaration> getFormalTypeParameters();
-}
+package com.sun.mirror.declaration; import com.sun.mirror.type.*; import java.util.Collection; public interface ExecutableDeclaration extends MemberDeclaration { boolean isVarArgs(); Collection<TypeParameterDeclaration> getFormalTypeParameters(); Collection<ParameterDeclaration> getParameters(); Collection<ReferenceType> getThrownTypes(); }

@@ -1,7 +1,7 @@
 package java.lang;
 
 // Stub Integer class for testing
-public final class Integer extends Number {
+public final class Integer extends Number implements Comparable<Integer>, java.io.Serializable {
     public static final Class TYPE = getPrimitiveClass("int");
     private static native Class getPrimitiveClass(String name);
 
@@ -49,5 +49,14 @@ public final class Integer extends Number {
             return value == other.value;
         }
         return false;
+    }
+
+    @Override
+    public int compareTo(Integer anotherInteger) {
+        return compare(this.value, anotherInteger.value);
+    }
+
+    public static int compare(int x, int y) {
+        return (x < y) ? -1 : ((x == y) ? 0 : 1);
     }
 }

@@ -1,4 +1,1 @@
-package com.sun.mirror.type;
-
-public interface VoidType extends TypeMirror {
-}
+package com.sun.mirror.type; public interface VoidType extends TypeMirror {}

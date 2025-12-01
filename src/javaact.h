@@ -2544,7 +2544,9 @@ void Parser::InitRuleAction()
 
 // Rule 576: CatchClause ::= 'catch' '(' Modifiers UnionType VariableDeclaratorId ')' Block
 #ifndef HEADERS
-    rule_action[576] = &Parser::MakeMultiCatch;
+    rule_action[576] = &Parser::MakeMultiCatchWithModifiers;
+#else
+    void MakeMultiCatchWithModifiers();
 #endif
 
 // Rule 577: UnionType ::= ClassOrInterfaceType '|' ClassOrInterfaceType

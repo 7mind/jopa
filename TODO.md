@@ -24,3 +24,16 @@ and is compiled with `-sourcepath runtime`, the generated class file is corrupte
 **To investigate:**
 - Look at bridge method generation when compiling java.lang classes
 - The issue may be related to how the compiler handles self-referential generics in bootstrap mode
+
+## JDK 7 Compliance (In Progress)
+
+- **Status**: 77.4% (657/849 tests passed).
+- **Achievements**:
+    - Fixed critical compiler crash in `ByteCode::EmitName` (null symbol check).
+    - Fixed crash in `Semantic::CanCastConvert` (null symbol check).
+    - Fixed UBSan error in `double.cpp` by avoiding large constants in stubs.
+    - Expanded runtime stubs: `com.sun.mirror` (APT), `com.sun.javadoc`, `javax.tools`, `java.io`, `java.util`.
+- **Remaining Issues**:
+    - `tools/apt` tests fail due to type inference issues on stubs (`iterator().next()` returning Object).
+    - Multi-file tests fail due to test runner limitations.
+    - `tools/javac` internal API dependencies.

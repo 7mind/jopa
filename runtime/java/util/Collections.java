@@ -31,6 +31,10 @@ public class Collections {
         return null;
     }
 
+    public static <T> Collection<T> unmodifiableCollection(Collection<? extends T> c) {
+        return null;
+    }
+
     public static <T> List<T> singletonList(T o) {
         return null;
     }

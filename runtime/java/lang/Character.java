@@ -1,6 +1,6 @@
 package java.lang;
 
-public final class Character {
+public final class Character implements Comparable<Character>, java.io.Serializable {
     public static final Class TYPE = getPrimitiveClass("char");
     private static native Class getPrimitiveClass(String name);
 
@@ -20,5 +20,10 @@ public final class Character {
 
     public String toString() {
         return String.valueOf(value);
+    }
+
+    @Override
+    public int compareTo(Character anotherCharacter) {
+        return this.value - anotherCharacter.value;
     }
 }
