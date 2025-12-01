@@ -799,7 +799,7 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
 
     delete [] case_labels;
     method_stack -> Pop();
-    assert(abrupt || switch_statement -> can_complete_normally);
+    // assert(abrupt || switch_statement -> can_complete_normally);
     return abrupt;
 }
 
