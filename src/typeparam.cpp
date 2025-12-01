@@ -2,9 +2,37 @@
 #include "symbol.h"
 #include "lookup.h"
 #include "control.h"
+#include "paramtype.h"
 
 
 namespace Jopa { // Open namespace Jopa block
+
+TypeParameterSymbol::~TypeParameterSymbol()
+{
+    delete bounds;
+    if (parameterized_bounds)
+    {
+        for (unsigned i = 0; i < parameterized_bounds -> Length(); i++)
+            delete (*parameterized_bounds)[i];
+        delete parameterized_bounds;
+    }
+    delete [] signature_string;
+}
+
+Type* TypeParameterSymbol::ParameterizedBound(unsigned i) const
+{
+    if (parameterized_bounds && i < parameterized_bounds -> Length())
+        return (*parameterized_bounds)[i];
+    return NULL;
+}
+
+void TypeParameterSymbol::AddParameterizedBound(Type* bound)
+{
+    if (! parameterized_bounds)
+        parameterized_bounds = new Tuple<Type*>(2);
+    parameterized_bounds -> Next() = bound;
+}
+
 //
 // Get the erased type for this type parameter
 //
