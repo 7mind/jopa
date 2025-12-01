@@ -2,6 +2,7 @@ package com.sun.tools.javac.api;
 
 import javax.tools.*;
 import javax.annotation.processing.Processor;
+import com.sun.source.util.JavacTask;
 import java.util.Locale;
 
 public class JavacTaskImpl extends JavacTask {
@@ -14,4 +15,8 @@ public class JavacTaskImpl extends JavacTask {
     public Iterable<? extends com.sun.source.tree.CompilationUnitTree> parse() { return null; }
     public javax.lang.model.util.Types getTypes() { return null; }
     public javax.lang.model.util.Elements getElements() { return null; }
+
+    public void setTaskListener(com.sun.source.util.TaskListener taskListener) {}
+    public void addTaskListener(com.sun.source.util.TaskListener taskListener) {}
+    public void removeTaskListener(com.sun.source.util.TaskListener taskListener) {}
 }

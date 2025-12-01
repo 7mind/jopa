@@ -14,11 +14,27 @@ public class File implements Serializable, Comparable<File> {
 
     
 
-        public File(java.net.URI uri) {}
+            public File(java.net.URI uri) {}
 
     
 
-        public String getName() { return null; }
+        
+
+    
+
+            public java.net.URI toURI() { return null; }
+
+    
+
+        
+
+    
+
+            public String getName() { return null; }
+
+    
+
+        
 
     
 
