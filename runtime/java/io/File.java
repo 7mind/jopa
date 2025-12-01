@@ -23,6 +23,7 @@ public class File implements Serializable, Comparable<File> {
     
 
             public java.net.URI toURI() { return null; }
+            public java.net.URL toURL() throws java.net.MalformedURLException { return null; }
 
     
 

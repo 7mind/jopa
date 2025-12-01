@@ -1506,8 +1506,9 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
         {
             for ( ; ctor; ctor = ctor -> next_method)
             {
+                int num_throws = (int) ctor -> NumThrows();
                 int k;
-                for (k = ctor -> NumThrows() - 1; k >= 0; k--)
+                for (k = num_throws - 1; k >= 0; k--)
                 {
                     if (CanAssignmentConvertReference(ctor -> Throws(k),
                                                       exception))
@@ -1521,8 +1522,9 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
         else
         {
             assert(ctor);
+            int num_throws = (int) ctor -> NumThrows();
             int k = 0;
-            for (k = ctor -> NumThrows() - 1; k >= 0; k--)
+            for (k = num_throws - 1; k >= 0; k--)
             {
                 if (CanAssignmentConvertReference(ctor -> Throws(k),
                                                   exception))
@@ -1611,6 +1613,18 @@ void Semantic::ProcessThrowStatement(Ast* stmt)
                        throw_statement);
     }
 
+    // Precise Rethrow Analysis
+    bool precise_rethrow_handled = false;
+    VariableSymbol* var = NULL;
+    if (control.option.source >= JopaOption::SDK1_7 &&
+        throw_statement -> expression -> symbol &&
+        throw_statement -> expression -> symbol -> VariableCast())
+    {
+        var = throw_statement -> expression -> symbol -> VariableCast();
+        if (var -> multithrown_exceptions)
+            precise_rethrow_handled = true;
+    }
+
     //
     // Since 'throw null' always generates NullPointerException, we do not
     // add it to the exception set; otherwise checked exception catch blocks
@@ -1618,9 +1632,32 @@ void Semantic::ProcessThrowStatement(Ast* stmt)
     //
     SymbolSet* exception_set = TryExceptionTableStack().Top();
     if (exception_set && type != control.null_type)
-        exception_set -> AddElement(type);
+    {
+        if (precise_rethrow_handled)
+        {
+             for (unsigned i = 0; i < var -> multithrown_exceptions -> Length(); i++)
+                  exception_set -> AddElement((*var -> multithrown_exceptions)[i]);
+        }
+        else
+        {
+            exception_set -> AddElement(type);
+        }
+    }
 
-    if (UncaughtException(type))
+    if (precise_rethrow_handled)
+    {
+         for (unsigned i = 0; i < var -> multithrown_exceptions -> Length(); i++)
+         {
+              TypeSymbol* ex = (*var -> multithrown_exceptions)[i];
+              if (UncaughtException(ex))
+              {
+                    ReportSemError(SemanticError::UNCAUGHT_THROWN_EXCEPTION,
+                                   throw_statement, ex -> ContainingPackageName(),
+                                   ex -> ExternalName(), UncaughtExceptionContext());
+              }
+         }
+    }
+    else if (UncaughtException(type))
         ReportSemError(SemanticError::UNCAUGHT_THROWN_EXCEPTION,
                        throw_statement, type -> ContainingPackageName(),
                        type -> ExternalName(), UncaughtExceptionContext());
@@ -1935,12 +1972,15 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         BlockSymbol* block = LocalSymbolTable().Top() ->
             InsertBlockSymbol(block_body -> NumStatements() + 1);
         block -> max_variable_index = max_variable_index;
-        LocalSymbolTable().Push(block -> Table());
+        // LocalSymbolTable().Push(block -> Table()); // Deferred to Loop 2
 
         AccessFlags access_flags = ProcessFormalModifiers(parameter);
 
+        // We must insert the variable into the block table, even if we don't push the table yet.
+        // InsertVariableSymbol uses 'this' (the SymbolTable it is called on).
+        // So we use block->Table()->InsertVariableSymbol
         VariableSymbol* symbol =
-            LocalSymbolTable().Top() -> InsertVariableSymbol(name_symbol);
+            block -> Table() -> InsertVariableSymbol(name_symbol);
         symbol -> SetFlags(access_flags);
         symbol -> SetType(parm_type);
         symbol -> SetOwner(ThisMethod());
@@ -1959,14 +1999,15 @@ void Semantic::ProcessTryStatement(Ast* stmt)
         block_body -> is_reachable = true;
 
         block_body -> block_symbol = block;
-        block_body -> nesting_level = LocalBlockStack().Size();
-        LocalBlockStack().Push(block_body);
+        // block_body -> nesting_level = LocalBlockStack().Size(); // Deferred
+        // LocalBlockStack().Push(block_body); // Deferred
 
-        ProcessBlockStatements(block_body);
+        // ProcessBlockStatements(block_body); // Deferred to Loop 2
 
-        LocalBlockStack().Pop();
-        LocalSymbolTable().Pop();
+        // LocalBlockStack().Pop(); // Deferred
+        // LocalSymbolTable().Pop(); // Deferred
 
+        /* Deferred to Loop 2
         //
         // Update the information for the block that immediately encloses
         // the current block.
@@ -1988,6 +2029,7 @@ void Semantic::ProcessTryStatement(Ast* stmt)
             try_statement -> can_complete_normally = true;
 
         block -> CompressSpace(); // space optimization
+        */
     }
 
     //
@@ -2064,6 +2106,14 @@ void Semantic::ProcessTryStatement(Ast* stmt)
     //      object declared to be of type S can actually be an instance of an
     //      object of type T in which case it will be caught by clause C.
     //
+    //
+    // We pop the stack now so that the catch blocks are processed in the
+    // environment of the enclosing block.
+    //
+    try_statement -> processing_try_block = false;
+    TryStatementStack().Pop();
+    TryExceptionTableStack().Pop();
+
     Tuple<TypeSymbol*> catchable_exceptions;
     Tuple<TypeSymbol*> convertible_exceptions;
     exception_set -> AddElement(control.Error());
@@ -2076,6 +2126,7 @@ void Semantic::ProcessTryStatement(Ast* stmt)
             continue;
         unsigned initial_length = catchable_exceptions.Length() +
             convertible_exceptions.Length();
+        unsigned initial_catchable = catchable_exceptions.Length();
 
         for (TypeSymbol* exception =
                  (TypeSymbol*) exception_set -> FirstElement();
@@ -2087,6 +2138,13 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                 catchable_exceptions.Next() = exception;
             else if (CanAssignmentConvertReference(exception, type))
                 convertible_exceptions.Next() = exception;
+        }
+
+        // Java 7: Populate precise rethrow exceptions
+        if (control.option.source >= JopaOption::SDK1_7) {
+            for (unsigned i = initial_catchable; i < catchable_exceptions.Length(); i++) {
+                clause->parameter_symbol->AddMultiThrownException(catchable_exceptions[i]);
+            }
         }
 
         //
@@ -2130,13 +2188,39 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                                prev_type -> ExternalName(),
                                loc.location);
             }
-            else clause -> block -> is_reachable = true;
+            else
+            {
+                clause -> block -> is_reachable = true;
+
+                // Process Catch Body (Deferred from Loop 1)
+                AstBlock* block_body = clause -> block;
+                BlockSymbol* block = block_body -> block_symbol;
+
+                LocalSymbolTable().Push(block -> Table());
+                block_body -> nesting_level = LocalBlockStack().Size();
+                LocalBlockStack().Push(block_body);
+
+                ProcessBlockStatements(block_body);
+
+                LocalBlockStack().Pop();
+                LocalSymbolTable().Pop();
+
+                // Update max_variable_index
+                if (LocalBlockStack().TopMaxEnclosedVariableIndex() <
+                    block -> max_variable_index)
+                {
+                    LocalBlockStack().TopMaxEnclosedVariableIndex() =
+                        block -> max_variable_index;
+                }
+
+                if (block_body -> can_complete_normally)
+                    try_statement -> can_complete_normally = true;
+
+                block -> CompressSpace();
+            }
         }
     }
 
-    try_statement -> processing_try_block = false;
-    TryStatementStack().Pop();
-    TryExceptionTableStack().Pop();
     if (TryExceptionTableStack().Top())
     {
         //
@@ -2989,4 +3073,3 @@ void Semantic::ProcessExecutableBodies(AstClassBody* class_body)
 
 
 } // Close namespace Jopa block
-

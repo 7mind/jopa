@@ -1,6 +1,10 @@
 package java.lang;
 
 public final class Byte extends Number implements Comparable<Byte>, java.io.Serializable {
+    public static final byte MIN_VALUE = (byte) 0x80;
+    public static final byte MAX_VALUE = (byte) 0x7f;
+    public static final int SIZE = 8;
+    public static final int BYTES = 1;
     public static final Class TYPE = getPrimitiveClass("byte");
     private static native Class getPrimitiveClass(String name);
 

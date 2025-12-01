@@ -480,6 +480,9 @@ bool Semantic::CanNarrowingPrimitiveConvert(const TypeSymbol* target_type,
 bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
                                           const TypeSymbol* source_type)
 {
+    if (! target_type || ! source_type)
+        return false;
+
     if (target_type == control.no_type) // Don't convert any class to bad type.
         return false;
     if (source_type == control.no_type) // Allow bad type to match anything.
@@ -563,9 +566,21 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
         return true;
 
     TypeSymbol* source_type = expr -> Type();
+    if (! source_type)
+        return false;
 
     if (CanMethodInvocationConvert(target_type, source_type))
         return true;
+
+    // Allow constant narrowing into wrapper types by checking representability
+    if (control.option.source >= JopaOption::SDK1_5 &&
+        ! target_type -> Primitive() &&
+        control.IsSimpleIntegerValueType(source_type))
+    {
+        TypeSymbol* primitive_target = GetPrimitiveType(target_type);
+        if (primitive_target && IsIntValueRepresentableInType(expr, primitive_target))
+            return true;
+    }
 
     if (IsIntValueRepresentableInType(expr, target_type))
         return true;

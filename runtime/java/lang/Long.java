@@ -1,6 +1,10 @@
 package java.lang;
 
-public final class Long extends Number {
+public final class Long extends Number implements Comparable<Long>, java.io.Serializable {
+    public static final long MIN_VALUE = 0x8000000000000000L;
+    public static final long MAX_VALUE = 0x7fffffffffffffffL;
+    public static final int SIZE = 64;
+    public static final int BYTES = 8;
     public static final Class TYPE = getPrimitiveClass("long");
     private static native Class getPrimitiveClass(String name);
 
@@ -39,6 +43,11 @@ public final class Long extends Number {
     }
 
     public String toString() {
-        return String.valueOf((int) value);
+        return String.valueOf(value);
+    }
+
+    @Override
+    public int compareTo(Long anotherLong) {
+        return this.value < anotherLong.value ? -1 : (this.value == anotherLong.value ? 0 : 1);
     }
 }

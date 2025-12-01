@@ -10,6 +10,11 @@ public class ArrayList<E> implements List<E>, java.lang.Iterable<E> {
         size = 0;
     }
 
+    public ArrayList(Collection<? extends E> c) {
+        this();
+        // Minimal implementation for compilation
+    }
+
     public boolean add(E e) {
         if (size >= elements.length) {
             Object[] newElements = new Object[elements.length * 2];

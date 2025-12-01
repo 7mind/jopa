@@ -955,7 +955,15 @@ IEEEfloat IEEEfloat::Ulp() const
     IEEEfloat f;
     f.value.float_value = value.float_value;
 
-    L = (i4) f.ExpBits() - FRACT_SIZE * MIN_FRACT;
+    u4 exp_bits = f.ExpBits();
+    long long L64 = (long long) exp_bits -
+                    (long long) FRACT_SIZE * (long long) MIN_FRACT;
+    if (L64 > INT_MAX)
+        L = INT_MAX;
+    else if (L64 < INT_MIN)
+        L = INT_MIN;
+    else
+        L = (i4) L64;
     if (L > 0)
         f.value.iword = L;
     else
@@ -2204,7 +2212,15 @@ IEEEdouble IEEEdouble::Ulp() const
     IEEEdouble d;
     d.value.double_value = value.double_value;
 
-    L = (i4) d.ExpBits() - FRACT_SIZE * MIN_FRACT;
+    u4 exp_bits = d.ExpBits();
+    long long L64 = (long long) exp_bits -
+                    (long long) FRACT_SIZE * (long long) MIN_FRACT;
+    if (L64 > INT_MAX)
+        L = INT_MAX;
+    else if (L64 < INT_MIN)
+        L = INT_MIN;
+    else
+        L = (i4) L64;
     if (L > 0)
         d.setHighAndLowWords((u4) L, 0);
     else
@@ -3201,4 +3217,3 @@ IEEEdouble BigInt::DoubleValue() const
 
 
 } // Close namespace Jopa block
-

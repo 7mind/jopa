@@ -1,15 +1,18 @@
 package java.lang;
 
 public final class Double extends Number implements Comparable<Double> {
+    public static final Class TYPE = getPrimitiveClass("double");
+    private static native Class getPrimitiveClass(String name);
     public static final double POSITIVE_INFINITY = 1.0 / 0.0;
     public static final double NEGATIVE_INFINITY = -1.0 / 0.0;
     public static final double NaN = 0.0d / 0.0;
-    public static final double MAX_VALUE = 0.0;
-    public static final double MIN_NORMAL = 0.0;
-    public static final double MIN_VALUE = 0.0;
+    public static final double MAX_VALUE = 1.7976931348623157e308;
+    public static final double MIN_NORMAL = 2.2250738585072014e-308;
+    public static final double MIN_VALUE = 4.9e-324;
     public static final int MAX_EXPONENT = 1023;
     public static final int MIN_EXPONENT = -1022;
     public static final int SIZE = 64;
+    public static final int BYTES = 8;
 
     private final double value;
 

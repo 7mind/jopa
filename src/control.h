@@ -6,6 +6,7 @@
 #include "set.h"
 
 #include <vector>
+#include <unordered_set>
 
 namespace Jopa { // Open namespace Jopa block
 class ParameterizedType;
@@ -375,7 +376,14 @@ public:                                                         \
     // This is called when a compilation unit is successfully parsed.
     void RegisterAstPool(StoragePool* pool)
     {
-        ast_pools_to_delete.push_back(pool);
+        ast_pools_to_delete.insert(pool);
+    }
+
+    // Unregister an ast_pool before deleting it early (for successful compilations).
+    // This prevents double-free when Control is destroyed.
+    void UnregisterAstPool(StoragePool* pool)
+    {
+        ast_pools_to_delete.erase(pool);
     }
 
     Control(char**, Option&);
@@ -519,9 +527,11 @@ private:
 
     //
     // Storage for StoragePool objects (ast_pools) that must be cleaned up at the end.
-    // These are registered when compilation units are created and deleted in the destructor.
+    // These are registered when compilation units are created. For successful
+    // compilations, pools are deleted early and unregistered. Remaining pools
+    // (from files with errors) are deleted in the destructor.
     //
-    std::vector<StoragePool*> ast_pools_to_delete;
+    std::unordered_set<StoragePool*> ast_pools_to_delete;
 
     //
     // Cache of system packages. lang and unnamed are always valid, because of

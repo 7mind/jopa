@@ -645,19 +645,14 @@ DefiniteAssignmentSet* Semantic::DefiniteAssignmentExpression(AstExpression* exp
                                (variable -> ACC_STATIC() ? NULL
                                 : variable -> Name()));
             }
-            else if (! def_pair.da_set[index])
-            {
-                //
-                // If the variable is also DA, then this code is never
-                // executed, so it does not affect loop or try-catch analysis.
-                //
-                if (DefiniteFinalAssignments() -> Size() > 0)
-                {
-                    DefiniteFinalAssignments() -> Top().Next() =
-                        left_hand_side;
-                }
-                ReachableAssignments() -> AddElement(index);
-            }
+            //
+            // Track that a final field of this type was assigned on a
+            // reachable path; this is later folded into definite assignment
+            // at constructor exit (important when the assignment occurs in a
+            // finally that guards returns/breaks).
+            if (DefiniteFinalAssignments() -> Size() > 0)
+                DefiniteFinalAssignments() -> Top().Next() = left_hand_side;
+            ReachableAssignments() -> AddElement(index);
         }
 
         def_pair.AssignElement(index);
@@ -933,29 +928,57 @@ void Semantic::DefiniteIfStatement(Ast* stmt)
     if (after_expr)
         *DefinitelyAssignedVariables() = after_expr -> true_pair;
 
+    bool condition_true = IsConstantTrue(if_statement -> expression);
+    bool condition_false = IsConstantFalse(if_statement -> expression);
+
     //
     // Recall that the parser ensures that the statements that appear in an
     // if-statement (both the true and false statement) are enclosed in a
     // block.
     //
-    DefiniteBlock(if_statement -> true_statement);
-
-    if (! if_statement -> false_statement_opt) // no else part ?
+    if (condition_true)
     {
-        *DefinitelyAssignedVariables() *= (after_expr
-                                           ? after_expr -> false_pair
-                                           : *starting_pair);
+        DefiniteBlock(if_statement -> true_statement);
+        // False branch unreachable; keep state from true branch only.
+    }
+    else if (condition_false)
+    {
+        // Skip unreachable true branch; start from the false path.
+        if (if_statement -> false_statement_opt)
+        {
+            *DefinitelyAssignedVariables() = (after_expr
+                                              ? after_expr -> false_pair
+                                              : *starting_pair);
+            DefiniteBlock(if_statement -> false_statement_opt);
+        }
+        else
+        {
+            *DefinitelyAssignedVariables() *= (after_expr
+                                               ? after_expr -> false_pair
+                                               : *starting_pair);
+        }
     }
     else
     {
-        DefinitePair true_set(*DefinitelyAssignedVariables());
-        *DefinitelyAssignedVariables() = (after_expr
-                                          ? after_expr -> false_pair
-                                          : *starting_pair);
+        DefiniteBlock(if_statement -> true_statement);
 
-        DefiniteBlock(if_statement -> false_statement_opt);
+        if (! if_statement -> false_statement_opt) // no else part ?
+        {
+            *DefinitelyAssignedVariables() *= (after_expr
+                                               ? after_expr -> false_pair
+                                               : *starting_pair);
+        }
+        else
+        {
+            DefinitePair true_set(*DefinitelyAssignedVariables());
+            *DefinitelyAssignedVariables() = (after_expr
+                                              ? after_expr -> false_pair
+                                              : *starting_pair);
 
-        *DefinitelyAssignedVariables() *= true_set;
+            DefiniteBlock(if_statement -> false_statement_opt);
+
+            *DefinitelyAssignedVariables() *= true_set;
+        }
     }
 
     // harmless if NULL
@@ -964,7 +987,7 @@ void Semantic::DefiniteIfStatement(Ast* stmt)
 }
 
 
-void Semantic::DefiniteLoopBody(BitSet& starting_set)
+void Semantic::DefiniteLoopBody(BitSet& starting_set, bool loop_may_repeat)
 {
     //
     // Find the set of variables that were DU before the loop, but not DU
@@ -978,7 +1001,11 @@ void Semantic::DefiniteLoopBody(BitSet& starting_set)
         AstExpression* name = DefiniteFinalAssignments() -> Top()[i];
         VariableSymbol* variable = (VariableSymbol*) name -> symbol;
 
-        if (starting_set[variable -> LocalVariableIndex(this)])
+        //
+        // Only flag if a final assigned in the loop could be executed on a
+        // path that loops again (i.e., it is not provably unreachable).
+        //
+        if (starting_set[variable -> LocalVariableIndex(this)] && loop_may_repeat)
         {
             ReportSemError(SemanticError::VARIABLE_NOT_DEFINITELY_UNASSIGNED_IN_LOOP,
                            name -> LeftToken(),
@@ -1001,7 +1028,7 @@ void Semantic::DefiniteWhileStatement(Ast* stmt)
     DefiniteAssignmentSet* after_expr =
         DefiniteBooleanExpression(while_statement -> expression,
                                   *DefinitelyAssignedVariables());
-    DefinitePair before_statement(Universe() -> Size());
+    DefinitePair before_statement(*DefinitelyAssignedVariables());
 
     if (after_expr)
         *DefinitelyAssignedVariables() = after_expr -> true_pair;
@@ -1013,7 +1040,20 @@ void Semantic::DefiniteWhileStatement(Ast* stmt)
     if (while_statement -> statement -> is_reachable)
         DefiniteBlock(while_statement -> statement);
     *DefinitelyAssignedVariables() *= DefiniteBlocks() -> TopContinuePair();
-    DefiniteLoopBody(starting_set);
+    AstBlock* loop_body = while_statement -> statement;
+    bool body_reachable = loop_body -> is_reachable;
+    bool fallthrough = false;
+    if (body_reachable)
+    {
+        if (loop_body -> NumStatements() == 0)
+            fallthrough = true;
+        else
+            fallthrough = loop_body -> Statement(loop_body -> NumStatements() - 1) -> can_complete_normally;
+    }
+    bool loop_may_repeat =
+        ! IsConstantFalse(while_statement -> expression) &&
+        (fallthrough || DefiniteBlocks() -> TopContinueReachable());
+    DefiniteLoopBody(starting_set, loop_may_repeat);
     *DefinitelyAssignedVariables() = DefiniteBlocks() -> TopBreakPair() *
         (after_expr ? after_expr -> false_pair : before_statement);
 
@@ -1045,7 +1085,7 @@ void Semantic::DefiniteForStatement(Ast* stmt)
 
     BitSet starting_set(DefinitelyAssignedVariables() -> du_set);
     DefiniteAssignmentSet* after_end_expression = NULL;
-    DefinitePair before_statement(Universe() -> Size());
+    DefinitePair before_statement(*DefinitelyAssignedVariables());
 
     if (for_statement -> end_expression_opt)
         after_end_expression =
@@ -1068,9 +1108,35 @@ void Semantic::DefiniteForStatement(Ast* stmt)
     // the body of the for statement.
     //
     *DefinitelyAssignedVariables() *= DefiniteBlocks() -> TopContinuePair();
-    for (i = 0; i < for_statement -> NumForUpdateStatements(); i++)
-        DefiniteExpressionStatement(for_statement -> ForUpdateStatement(i));
-    DefiniteLoopBody(starting_set);
+
+    AstBlock* loop_body = for_statement -> statement;
+    bool body_reachable = loop_body -> is_reachable;
+    bool fallthrough = false;
+    if (body_reachable)
+    {
+        if (loop_body -> NumStatements() == 0)
+            fallthrough = true;
+        else
+            fallthrough = loop_body -> Statement(loop_body -> NumStatements() - 1) -> can_complete_normally;
+    }
+
+    bool has_continue = DefiniteBlocks() -> TopContinueReachable();
+    bool condition_allows_reiteration =
+        (! for_statement -> end_expression_opt) ||
+        ! IsConstantFalse(for_statement -> end_expression_opt);
+    bool updates_reachable = body_reachable && (fallthrough || has_continue);
+    bool loop_may_repeat = condition_allows_reiteration && updates_reachable;
+
+    if (updates_reachable)
+    {
+        for (i = 0; i < for_statement -> NumForUpdateStatements(); i++)
+            DefiniteExpressionStatement(for_statement -> ForUpdateStatement(i));
+        DefiniteLoopBody(starting_set, loop_may_repeat);
+    }
+    else
+    {
+        DefiniteFinalAssignments() -> Pop();
+    }
 
     //
     // Compute the set of variables that belongs to both sets below:
@@ -1146,14 +1212,26 @@ void Semantic::DefiniteForeachStatement(Ast* stmt)
     // the body of the for statement.
     //
     *DefinitelyAssignedVariables() *= DefiniteBlocks() -> TopContinuePair();
-    DefiniteLoopBody(starting_set);
+    AstBlock* loop_body = for_statement -> statement;
+    bool body_reachable = loop_body -> is_reachable;
+    bool fallthrough = false;
+    if (body_reachable)
+    {
+        if (loop_body -> NumStatements() == 0)
+            fallthrough = true;
+        else
+            fallthrough = loop_body -> Statement(loop_body -> NumStatements() - 1) -> can_complete_normally;
+    }
+    bool loop_may_repeat = body_reachable &&
+        (fallthrough || DefiniteBlocks() -> TopContinueReachable());
+    DefiniteLoopBody(starting_set, loop_may_repeat);
 
     //
     // Compute the set of variables that are DA before every break statement
     // that may exit the for statement.
     //
     *DefinitelyAssignedVariables() =
-        DefiniteBlocks() -> TopBreakPair() * before_statement;        
+        DefiniteBlocks() -> TopBreakPair() * before_statement;
 }
 
 
@@ -1174,10 +1252,24 @@ void Semantic::DefiniteDoStatement(Ast* stmt)
                                   *DefinitelyAssignedVariables());
     DefinitePair after_loop(Universe() -> Size());
 
+    AstBlock* loop_body = do_statement -> statement;
+    bool body_reachable = loop_body -> is_reachable;
+    bool fallthrough = false;
+    if (body_reachable)
+    {
+        if (loop_body -> NumStatements() == 0)
+            fallthrough = true;
+        else
+            fallthrough = loop_body -> Statement(loop_body -> NumStatements() - 1) -> can_complete_normally;
+    }
+    bool loop_may_repeat =
+        ! IsConstantFalse(do_statement -> expression) &&
+        (fallthrough || DefiniteBlocks() -> TopContinueReachable());
+
     if (after_expr)
         *DefinitelyAssignedVariables() = after_expr -> true_pair;
     else after_loop = *DefinitelyAssignedVariables();
-    DefiniteLoopBody(starting_set);
+    DefiniteLoopBody(starting_set, loop_may_repeat);
 
     *DefinitelyAssignedVariables() = DefiniteBlocks() -> TopBreakPair() *
         (after_expr ? after_expr -> false_pair : after_loop);
@@ -1248,6 +1340,7 @@ void Semantic::DefiniteBreakStatement(Ast* stmt)
     {
         DefiniteBlocks() -> BreakPair(break_statement -> nesting_level) *=
             *DefinitelyAssignedVariables();
+        DefiniteBlocks() -> MarkBreakReachable(break_statement -> nesting_level);
     }
 
     //
@@ -1274,6 +1367,7 @@ void Semantic::DefiniteContinueStatement(Ast* stmt)
         DefiniteBlocks() -> ContinuePair(continue_statement ->
                                          nesting_level) *=
             *DefinitelyAssignedVariables();
+        DefiniteBlocks() -> MarkContinueReachable(continue_statement -> nesting_level);
     }
 
     //
@@ -1443,6 +1537,12 @@ void Semantic::DefiniteTryStatement(Ast* stmt)
             starting_pair.du_set - *ReachableAssignments();
         DefiniteBlock(try_statement -> finally_clause_opt -> block);
         DefinitelyAssignedVariables() -> da_set += after_blocks;
+        //
+        // All returns recorded inside the try must flow through finally;
+        // reflect the definitely-assigned state after the finally block.
+        //
+        DefiniteBlocks() -> ReturnPair().da_set *= DefinitelyAssignedVariables() -> da_set;
+        DefinitelyAssignedVariables() -> da_set += *ReachableAssignments();
     }
     else
     {
@@ -1666,8 +1766,12 @@ void Semantic::DefiniteConstructorBody(AstConstructorDeclaration* constructor_de
 #endif // DUMP
     //
     // Compute the set of finals that has definitely been assigned in this
-    // constructor.
-    //
+    // constructor. Track reachable assignments separately so we can reapply
+    // them after any set-size adjustments below.
+    BitSet assigned_finals(*ReachableAssignments());
+    for (int idx = 0; idx < (int) FinalFields() -> Length(); idx++)
+        if (assigned_finals[idx])
+            DefinitelyAssignedVariables() -> AddElement(idx);
     *DefinitelyAssignedVariables() *= DefiniteBlocks() -> ReturnPair();
     DefiniteBlocks() -> Pop();
 
@@ -1678,6 +1782,10 @@ void Semantic::DefiniteConstructorBody(AstConstructorDeclaration* constructor_de
     DefinitelyAssignedVariables() -> Resize(size);
     BlankFinals() -> Resize(size);
     ReachableAssignments() -> Resize(size);
+    // Reapply reachable final assignments after resizing.
+    for (int idx = 0; idx < (int) FinalFields() -> Length(); idx++)
+        if (assigned_finals[idx])
+            DefinitelyAssignedVariables() -> AddElement(idx);
 }
 
 

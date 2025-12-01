@@ -10,6 +10,7 @@ class MethodSymbol;
 class NameSymbol;
 class Symbol;
 class Control;
+class Type; // Forward declaration
 
 //
 // TypeParameterSymbol represents a type parameter declaration
@@ -39,7 +40,15 @@ public:
     // For example, <T extends Number & Comparable> has two bounds
     // If NULL or empty, bound is implicitly Object
     //
+    // 'bounds' stores the ERASURE of the bounds (TypeSymbol*)
     Tuple<TypeSymbol*>* bounds;
+
+    //
+    // 'parameterized_bounds' stores the full generic type of the bounds (Type*)
+    // e.g. for <T extends Comparable<T>>, bounds[0] is Comparable,
+    // parameterized_bounds[0] is Comparable<T> (as a Type*)
+    //
+    Tuple<Type*>* parameterized_bounds;
 
     //
     // Position of this type parameter in the declaration
@@ -65,6 +74,7 @@ public:
         : name_symbol(name)
         , owner(owner_symbol)
         , bounds(NULL)
+        , parameterized_bounds(NULL)
         , position(pos)
         , lower_bound(NULL)
         , upper_bound(NULL)
@@ -75,11 +85,17 @@ public:
     //
     // Destructor
     //
-    ~TypeParameterSymbol()
-    {
-        delete bounds;
-        delete [] signature_string;
-    }
+    ~TypeParameterSymbol(); // Implemented in typeparam.cpp to avoid circular dependency
+
+    //
+    // Get the i-th parameterized bound (full generic type info)
+    //
+    Type* ParameterizedBound(unsigned i) const; // Implemented in typeparam.cpp
+
+    //
+    // Add a parameterized bound to this type parameter
+    //
+    void AddParameterizedBound(Type* bound); // Implemented in typeparam.cpp
 
     //
     // Get the erased type for this type parameter.

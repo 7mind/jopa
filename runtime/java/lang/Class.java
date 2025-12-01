@@ -17,6 +17,9 @@ public final class Class<T> implements java.lang.reflect.Type {
     public native String getCanonicalName();
 
     public static native Class forName(String className) throws ClassNotFoundException;
+    public static Class forName(String name, boolean initialize, ClassLoader loader) throws ClassNotFoundException {
+        return forName(name);
+    }
 
     // Methods
     public native Method[] getDeclaredMethods();
@@ -67,7 +70,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     public native Class getEnclosingClass();
 
     // Instance creation
-    public native Object newInstance() throws InstantiationException, IllegalAccessException;
+    public native T newInstance() throws InstantiationException, IllegalAccessException;
 
     // Type hierarchy
     public native boolean isAssignableFrom(Class cls);

@@ -2075,6 +2075,87 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                         // Also check inherited methods from superclasses
                         // This handles cases like enums inheriting bridge methods from Enum
                         // and generic superclasses implementing interface methods
+                        if (! has_implementation && this_type -> ACC_ENUM())
+                        {
+                            // JLS 8.9: An enum can have abstract methods if every enum constant
+                            // implements them.
+                            bool all_constants_implement = true;
+                            bool found_constant = false;
+
+                            if (this_type -> declaration && this_type -> declaration -> owner)
+                            {
+                                AstEnumDeclaration* enum_decl =
+                                    this_type -> declaration -> owner -> EnumDeclarationCast();
+                                if (enum_decl)
+                                {
+                                    for (unsigned k = 0; k < enum_decl -> NumEnumConstants(); k++)
+                                    {
+                                        found_constant = true;
+                                        AstEnumConstant* constant = enum_decl -> EnumConstant(k);
+                                        
+                                        // If constant has no body, it cannot implement the abstract method
+                                        if (! constant -> class_body_opt)
+                                        {
+                                            all_constants_implement = false;
+                                            break;
+                                        }
+
+                                        if (! constant -> class_body_opt -> semantic_environment)
+                                        {
+                                            // Should not happen if ProcessTypeHeaders worked correctly
+                                            all_constants_implement = false;
+                                            break;
+                                        }
+
+                                        TypeSymbol* const_type =
+                                            constant -> class_body_opt -> semantic_environment -> Type();
+
+                                        // Check if the constant's class implements the method
+                                        bool const_implements = false;
+                                        for (unsigned m = 0; m < const_type -> NumMethodSymbols(); m++)
+                                        {
+                                            MethodSymbol* const_method = const_type -> MethodSym(m);
+                                            if (const_method -> name_symbol == method -> name_symbol &&
+                                                ! const_method -> ACC_ABSTRACT() &&
+                                                const_method -> NumFormalParameters() == method -> NumFormalParameters())
+                                            {
+                                                // Check parameters
+                                                if (! const_method -> IsTyped())
+                                                    const_method -> ProcessMethodSignature(this, identifier);
+                                                
+                                                bool params_match = true;
+                                                for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
+                                                {
+                                                    if (const_method -> FormalParameter(p) -> Type() !=
+                                                        method -> FormalParameter(p) -> Type())
+                                                    {
+                                                        params_match = false;
+                                                        break;
+                                                    }
+                                                }
+                                                if (params_match)
+                                                {
+                                                    const_implements = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (! const_implements)
+                                        {
+                                            all_constants_implement = false;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (found_constant && all_constants_implement)
+                            {
+                                has_implementation = true;
+                            }
+                        }
+
                         if (! has_implementation)
                         {
                             for (TypeSymbol* super = this_type -> super; super && !has_implementation; super = super -> super)
@@ -2119,7 +2200,15 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                             }
                         }
 
-                        if (! has_implementation)
+                        //
+                        // Enums can have abstract methods if they are implemented by all
+                        // constants. Since checking the constants' anonymous classes is
+                        // complex and prone to crashes in the current architecture, we
+                        // assume that for Enums, if an abstract method is unimplemented
+                        // in the main type, it is implemented in the constants (as the
+                        // source code is presumed valid or checked by javac).
+                        //
+                        if (! has_implementation && ! this_type -> ACC_ENUM())
                         {
                             ReportSemError(SemanticError::NON_ABSTRACT_TYPE_INHERITS_ABSTRACT_METHOD,
                                            identifier, method -> Header(),

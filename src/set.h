@@ -2,62 +2,12 @@
 
 #include "platform.h"
 #include "lookup.h"
+#include <algorithm>
+#include <unordered_map>
+#include <vector>
 
 
 namespace Jopa { // Open namespace Jopa block
-class ShadowSymbol
-{
-public:
-    ShadowSymbol* next;
-    Symbol* symbol;
-    unsigned pool_index;
-
-    inline const NameSymbol* Identity() { return symbol -> Identity(); }
-
-    ShadowSymbol(Symbol* symbol_)
-        : symbol(symbol_),
-          conflict(NULL)
-    {}
-
-    ~ShadowSymbol() { delete conflict; }
-
-    Symbol* Conflict(unsigned i) { return (*conflict)[i]; }
-
-    inline unsigned NumConflicts()
-    {
-        return conflict ? conflict -> Length() : 0;
-    }
-
-    inline void AddConflict(Symbol* conflict_symbol)
-    {
-        if (symbol != conflict_symbol && ! Find(conflict_symbol))
-            conflict -> Next() = conflict_symbol;
-    }
-
-    inline void RemoveConflict(int k)
-    {
-        unsigned last_index = conflict -> Length() - 1;
-        if (k < 0) // when k is negative, it identifies the main symbol
-             symbol = (*conflict)[last_index];
-        else (*conflict)[k] = (*conflict)[last_index];
-        conflict -> Reset(last_index);
-    }
-
-private:
-    Tuple<Symbol*>* conflict;
-
-    bool Find(Symbol* conflict_symbol)
-    {
-        if (! conflict)
-            conflict = new Tuple<Symbol*>(4);
-        for (unsigned k = 0; k < conflict -> Length(); k++)
-            if ((*conflict)[k] == conflict_symbol)
-                return true;
-        return false;
-    }
-};
-
-
 class SymbolSet
 {
 public:
@@ -67,234 +17,46 @@ public:
         MAX_HASH_SIZE = 1021
     };
 
-    SymbolSet(unsigned hash_size_ = DEFAULT_HASH_SIZE)
-        : symbol_pool(256),
-          main_index(0),
-          sub_index(0)
-    {
-        hash_size = (hash_size_ <= 0 ? 1 : hash_size_);
+    explicit SymbolSet(unsigned hash_size_ = DEFAULT_HASH_SIZE);
+    ~SymbolSet() = default;
 
-        prime_index = -1;
-        do
-        {
-            if (hash_size < primes[prime_index + 1])
-                break;
-            prime_index++;
-        } while (primes[prime_index] < MAX_HASH_SIZE);
+    unsigned Size() const;
+    void SetEmpty();
+    bool IsEmpty() const;
 
-        base = (ShadowSymbol**) memset(new ShadowSymbol*[hash_size], 0,
-                                       hash_size * sizeof(ShadowSymbol*));
-    }
+    SymbolSet& operator=(const SymbolSet& rhs);
 
-    ~SymbolSet();
-
-    //
-    // Calculate the size of the set and return the value.
-    //
-    inline unsigned Size()
-    {
-        unsigned size = 0;
-
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-        {
-            ShadowSymbol* shadow = symbol_pool[i];
-            Symbol* symbol = shadow -> symbol;
-            for (unsigned k = 0; symbol;
-                 symbol = (Symbol*) (k < shadow -> NumConflicts()
-                                     ? shadow -> Conflict(k++) : NULL))
-            {
-                size++;
-            }
-        }
-        return size;
-    }
-
-    //
-    // Empty out the set in question - i.e., remove all its elements
-    //
-    inline void SetEmpty()
-    {
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-            delete symbol_pool[i];
-        symbol_pool.Reset();
-        base = (ShadowSymbol**) memset(base, 0,
-                                       hash_size * sizeof(ShadowSymbol*));
-    }
-
-    //
-    // Determine whether the set is empty.
-    //
-    bool IsEmpty() { return symbol_pool.Length() == 0; }
-
-    //
-    // Assignment of a set to another.
-    //
-    SymbolSet& operator=(const SymbolSet& rhs)
-    {
-        if (this != &rhs)
-        {
-            this -> SetEmpty();
-            this -> Union(rhs);
-        }
-        return *this;
-    }
-
-    //
-    // Equality comparison of two sets
-    //
     bool operator==(const SymbolSet&) const;
-
-    //
-    // NonEquality comparison of two sets
-    //
     inline bool operator!=(const SymbolSet& rhs) const
     {
         return ! (*this == rhs);
     }
 
-    //
-    // Union the set in question with the set passed as argument: "set"
-    //
     void Union(const SymbolSet&);
-
-    //
-    // Intersect the set in question with the set passed as argument: "set"
-    //
     void Intersection(const SymbolSet&);
-
-    //
-    // Return a bolean value indicating whether or not the set in question
-    // intersects the set passed as argument; i.e., is there at least one
-    // element of set that is also an element of "this" set.
-    //
     bool Intersects(const SymbolSet&) const;
-
-    //
-    // How many elements with this name symbol do we have?
-    //
-    inline unsigned NameCount(const Symbol* element) const
-    {
-        const NameSymbol* name_symbol = element -> Identity();
-        for (ShadowSymbol* shadow = base[name_symbol -> index % hash_size];
-             shadow; shadow = shadow -> next)
-        {
-            if (shadow -> Identity() == name_symbol)
-                return shadow -> NumConflicts() + 1;
-        }
-        return 0;
-    }
-
-    //
-    // Is "element" an element of the set in question ?
-    //
-    inline bool IsElement(const Symbol* element) const
-    {
-        assert(element);
-
-        const NameSymbol* name_symbol = element -> Identity();
-        for (ShadowSymbol* shadow = base[name_symbol -> index % hash_size];
-             shadow; shadow = shadow -> next)
-        {
-            if (shadow -> Identity() == name_symbol)
-            {
-                Symbol* symbol = shadow -> symbol;
-                for (unsigned k = 0; symbol;
-                     symbol = (Symbol*) (k < shadow -> NumConflicts()
-                                         ? shadow -> Conflict(k++) : NULL))
-                {
-                    if (symbol == element)
-                        return true;
-                }
-                return false;
-            }
-        }
-        return false;
-    }
-
-    //
-    // Add element to the set in question if was not already there.
-    //
-    inline void AddElement(Symbol* element)
-    {
-        assert(element && "AddElement called with NULL element");
-        const NameSymbol* name_symbol = element -> Identity();
-        assert(name_symbol && "element->Identity() returned NULL");
-        unsigned i = name_symbol -> index % hash_size;
-
-        ShadowSymbol* shadow;
-        for (shadow = base[i]; shadow; shadow = shadow -> next)
-        {
-            if (shadow -> Identity() == name_symbol)
-            {
-                shadow -> AddConflict(element);
-                return;
-            }
-        }
-
-        shadow = new ShadowSymbol(element);
-        shadow -> pool_index = symbol_pool.Length();
-        symbol_pool.Next() = shadow;
-
-        shadow -> next = base[i];
-        base[i] = shadow;
-
-        //
-        // If the set is "adjustable" and the number of unique elements in it
-        // exceeds 2 times the size of the base, and we have not yet reached
-        // the maximum allowable size for a base, reallocate a larger base
-        // and rehash the elements.
-        //
-        if (symbol_pool.Length() > (hash_size << 1) &&
-            hash_size < MAX_HASH_SIZE)
-        {
-            Rehash();
-        }
-    }
-
-
+    unsigned NameCount(const Symbol* element) const;
+    bool IsElement(const Symbol* element) const;
+    void AddElement(Symbol* element);
     void RemoveElement(const Symbol*);
 
-    Symbol* FirstElement()
-    {
-        main_index = 0;
-        sub_index = 0;
-        return main_index < symbol_pool.Length()
-            ? symbol_pool[main_index] -> symbol : (Symbol*) NULL;
-    }
-
-    Symbol* NextElement()
-    {
-        Symbol* symbol = NULL;
-
-        if (main_index < symbol_pool.Length())
-        {
-             if (sub_index < symbol_pool[main_index] -> NumConflicts())
-                 symbol = symbol_pool[main_index] -> Conflict(sub_index++);
-             else
-             {
-                 main_index++;
-                 sub_index = 0;
-                 symbol = (main_index < symbol_pool.Length()
-                           ? symbol_pool[main_index] -> symbol
-                           : (Symbol*) NULL);
-             }
-        }
-        return symbol;
-    }
+    Symbol* FirstElement();
+    Symbol* NextElement();
 
 protected:
-    Tuple<ShadowSymbol*> symbol_pool;
+    using Bucket = std::vector<Symbol*>;
+    using BucketMap = std::unordered_map<const NameSymbol*, Bucket>;
 
-    unsigned main_index;
-    unsigned sub_index;
+    Bucket* FindBucket(const NameSymbol* name_symbol);
+    const Bucket* FindBucket(const NameSymbol* name_symbol) const;
+    Bucket& EnsureBucket(const NameSymbol* name_symbol);
+    void RemoveBucketIfEmpty(const NameSymbol* name_symbol);
 
-    ShadowSymbol** base;
-    unsigned hash_size;
+    BucketMap buckets;
+    std::vector<const NameSymbol*> bucket_order;
 
-    static unsigned primes[];
-    int prime_index;
-
-    void Rehash();
+    size_t main_index;
+    size_t sub_index;
 };
 
 
@@ -311,42 +73,12 @@ public:
     //
     // Is there an element with this name in the map ?
     //
-    inline Symbol* Image(const NameSymbol* name_symbol)
-    {
-        assert(name_symbol);
-
-        for (ShadowSymbol* shadow = base[name_symbol -> index % hash_size];
-             shadow; shadow = shadow -> next)
-        {
-            if (shadow -> Identity() == name_symbol)
-                return shadow -> symbol;
-        }
-        return NULL;
-    }
+    Symbol* Image(const NameSymbol* name_symbol);
 
     //
     // Add element to the set in question if was not already there.
     //
-    inline void AddElement(Symbol* element)
-    {
-        assert(element);
-
-        ShadowSymbol* shadow = NULL;
-        for (shadow = base[element -> Identity() -> index % hash_size];
-             shadow; shadow = shadow -> next)
-        {
-            if (shadow -> Identity() == element -> Identity())
-                break;
-        }
-
-        //
-        // If an element was already mapped into that name, replace it.
-        // Otherwise, add the new element.
-        //
-        if (shadow)
-            shadow -> symbol = element;
-        else SymbolSet::AddElement(element);
-    }
+    void AddElement(Symbol* element);
 };
 
 
@@ -368,31 +100,14 @@ public:
         MAX_HASH_SIZE = 1021
     };
 
-    Map(unsigned hash_size_ = DEFAULT_HASH_SIZE);
-    virtual ~Map()
-    {
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-            delete symbol_pool[i];
-        delete [] base;
-    }
+    explicit Map(unsigned hash_size_ = DEFAULT_HASH_SIZE);
+    virtual ~Map() = default;
 
 
     //
     // Has key been mapped to an image, yet? If so, return the image.
     //
-    inline Value* Image(Key* key)
-    {
-        assert(key);
-
-        // Unsigned math prevents negative indices.
-        unsigned k = key -> HashCode() % hash_size;
-        for (Element* element = base[k]; element; element = element -> next)
-        {
-            if (element -> key == key)
-                return element -> value;
-        }
-        return NULL;
-    }
+    Value* Image(Key* key);
 
     //
     // Map or remap key to a given image.
@@ -405,25 +120,12 @@ public:
     //
     void DeleteValues()
     {
-        for (unsigned i = 0; i < symbol_pool.Length(); i++)
-            delete symbol_pool[i] -> value;
+        for (auto& entry : mapping)
+            delete entry.second;
     }
 
 private:
-    struct Element
-    {
-        Element* next;
-        Key* key;
-        Value* value;
-    };
-
-    Tuple<Element*> symbol_pool;
-
-    Element** base;
-    unsigned hash_size;
-
-    void Rehash();
-    void Resize();
+    std::unordered_map<Key*, Value*> mapping;
 };
 
 
@@ -439,24 +141,13 @@ public:
         MAX_HASH_SIZE = 1021
     };
 
-    SymbolMap(unsigned hash_size_ = DEFAULT_HASH_SIZE);
-    ~SymbolMap();
+    explicit SymbolMap(unsigned hash_size_ = DEFAULT_HASH_SIZE);
+    ~SymbolMap() = default;
 
     //
     // Has symbol been mapped to an image, yet? If so, return the image.
     //
-    inline Symbol* Image(Symbol* symbol)
-    {
-        assert(symbol);
-
-        unsigned k = symbol -> Identity() -> index % hash_size;
-        for (Element* element = base[k]; element; element = element -> next)
-        {
-            if (element -> domain_element == symbol)
-                return element -> image;
-        }
-        return NULL;
-    }
+    Symbol* Image(Symbol* symbol);
 
     //
     // Map or remap symbol to a given image.
@@ -464,22 +155,7 @@ public:
     void Map(Symbol*, Symbol*);
 
 private:
-    struct Element
-    {
-        Element* next;
-        Symbol* domain_element;
-        Symbol* image;
-    };
-
-    Tuple<Element*> symbol_pool;
-
-    Element** base;
-    unsigned hash_size;
-
-    static unsigned primes[];
-    int prime_index;
-
-    void Rehash();
+    std::unordered_map<Symbol*, Symbol*> mapping;
 };
 
 
@@ -732,6 +408,25 @@ public:
             s[i] &= (~ rhs.s[i]);
 
         return *this;
+    }
+
+    //
+    // Check if all bits are set (universe).
+    //
+    bool IsUniverse() const
+    {
+        int last = ((int) set_size - 1) / cell_size;
+        for (int i = 0; i < last; i++)
+        {
+            if (s[i] != ~((CELL) 0))
+                return false;
+        }
+        if (set_size == 0)
+            return true;
+        CELL mask = (set_size % cell_size
+                     ? ((CELL) 1 << (set_size % cell_size)) - (CELL) 1
+                     : ~((CELL) 0));
+        return (s[last] & mask) == mask;
     }
 
     //
@@ -1003,20 +698,20 @@ public:
     }
 
 };
+template<typename Key, typename Value>
+Map<Key, Value>::Map(unsigned hash_size_)
+{
+    (void) hash_size_;
+}
 
 
 template<typename Key, typename Value>
-void Map<Key, Value>::Rehash()
+Value* Map<Key, Value>::Image(Key* key)
 {
-    Resize();
+    assert(key);
 
-    for (unsigned i = 0; i < symbol_pool.Length(); i++)
-    {
-        Element* element = symbol_pool[i];
-        unsigned k = element -> key -> HashCode() % hash_size;
-        element -> next = base[k];
-        base[k] = element;
-    }
+    typename std::unordered_map<Key*, Value*>::iterator it = mapping.find(key);
+    return it != mapping.end() ? it->second : NULL;
 }
 
 
@@ -1025,72 +720,14 @@ void Map<Key, Value>::Add(Key* key, Value* value)
 {
     assert(key);
 
-    Element* element;
-    unsigned k = key -> HashCode() % hash_size;
-    for (element = base[k]; element; element = element -> next)
-    {
-        if (element -> key == key)
-            break;
-    }
-
-    //
-    // If this is a new element, add it to the map.
-    //
-    if (! element)
-    {
-        element = new Element();
-        element -> key = key;
-        element -> next = base[k];
-        base[k] = element;
-
-        symbol_pool.Next() = element;
-
-        //
-        // If the number of unique elements in the map exceeds 2 times
-        // the size of the base, and we have not yet reached the maximum
-        // allowable size for a base, reallocate a larger base and rehash
-        // the elements.
-        //
-        if (symbol_pool.Length() > (hash_size << 1) &&
-            hash_size < (unsigned) MAX_HASH_SIZE)
-        {
-            Rehash();
-        }
-    }
-    else
+    const std::pair<typename std::unordered_map<Key*, Value*>::iterator, bool>
+        inserted = mapping.emplace(key, value);
+    if (! inserted.second)
     {
         assert(false &&
                "WARNING: Attempt to remap a key, unsupported operation !!!");
     }
-    element -> value = value;
 }
-
-
-template<typename Key, typename Value>
-Map<Key, Value>::Map(unsigned hash_size_)
-{
-    hash_size = (hash_size_ <= 0 ? 1 : hash_size_);
-    base = NULL;
-    Resize();
-}
-
-
-template<typename Key, typename Value>
-void Map<Key, Value>::Resize()
-{
-    static int prime_index = -1;
-    static const unsigned primes[] = {DEFAULT_HASH_SIZE, 101, 401,
-                                      MAX_HASH_SIZE};
-    while (hash_size >= primes[prime_index + 1] && hash_size < MAX_HASH_SIZE)
-    {
-        hash_size = primes[++prime_index];
-    }
-    delete [] base;
-    base = new Element*[hash_size];
-    memset(base, 0, hash_size * sizeof(Element*));
-}
-
 
 
 } // Close namespace Jopa block
-

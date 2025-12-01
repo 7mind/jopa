@@ -1119,6 +1119,75 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 method_call -> resolved_type = inferred_type;
             }
         }
+        //
+        // Secondary inference: if the return type parameter is only constrained
+        // through another method type parameter (e.g., <I extends Interface<T>, T>),
+        // try to pull the concrete argument from the parameterized interface/class
+        // implemented by the actual argument.
+        //
+        if (! inferred_type)
+        {
+            for (unsigned i = 0; i < method_call -> arguments -> NumArguments() && ! inferred_type; i++)
+            {
+                AstExpression* arg = method_call -> arguments -> Argument(i);
+                TypeSymbol* arg_type = arg -> Type();
+                VariableSymbol* formal_param =
+                    (i < method -> NumFormalParameters()) ? method -> FormalParameter(i) : NULL;
+                TypeSymbol* formal_type = formal_param ? formal_param -> Type() : NULL;
+                if (! arg_type || ! formal_type)
+                    continue;
+
+                // Walk the argument's supertype chain to find a matching interface/class
+                for (TypeSymbol* search = arg_type; search && ! inferred_type; search = search -> super)
+                {
+                    // Check interfaces first
+                    for (unsigned k = 0; k < search -> NumInterfaces() && ! inferred_type; k++)
+                    {
+                        if (search -> Interface(k) != formal_type)
+                            continue;
+
+                        ParameterizedType* pinterface = search -> ParameterizedInterface(k);
+                        if (pinterface && pinterface -> NumTypeArguments() > 0)
+                        {
+                            Type* type_arg = pinterface -> TypeArgument(0);
+                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure() : NULL;
+                            if (erasure && erasure != control.no_type && erasure -> fully_qualified_name)
+                                inferred_type = erasure;
+                        }
+                    }
+
+                    // Also handle parameterized superclass that matches the formal type
+                    if (! inferred_type && search -> super == formal_type)
+                    {
+                        ParameterizedType* psuper = search -> GetParameterizedSuper();
+                        if (psuper && psuper -> NumTypeArguments() > 0)
+                        {
+                            Type* type_arg = psuper -> TypeArgument(0);
+                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure() : NULL;
+                            if (erasure && erasure != control.no_type && erasure -> fully_qualified_name)
+                                inferred_type = erasure;
+                        }
+                    }
+                }
+            }
+
+            if (inferred_type)
+            {
+                TypeSymbol* method_return_type = method -> Type();
+                unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+                if (return_dims > 0)
+                {
+                    TypeSymbol* base = inferred_type -> num_dimensions > 0
+                        ? inferred_type -> base_type : inferred_type;
+                    method_call -> resolved_type = base -> GetArrayType((Semantic*) this,
+                                                                         inferred_type -> num_dimensions + return_dims);
+                }
+                else
+                {
+                    method_call -> resolved_type = inferred_type;
+                }
+            }
+        }
     }
 
     //

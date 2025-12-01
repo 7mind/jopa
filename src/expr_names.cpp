@@ -473,13 +473,21 @@ AstExpression* Semantic::FindEnclosingInstance(AstExpression* base,
     if (! this0)
     {
         //
-        // In the case of an anonymous class in an explicit constructor call,
-        // when the immediate enclosing class is not yet initialized, other
-        // enclosing classes are not accessible (even though they COULD be
-        // available through additional constructor parameters) - JLS 8.8.5.1
+        // For anonymous/local classes we expect a synthetic this$0. If it
+        // wasn't created yet, synthesize it so we can still walk enclosing
+        // instances (needed for qualified this used inside arguments of an
+        // explicit constructor invocation).
         //
-        assert(base_type -> Anonymous() && base_type -> IsLocal());
-        return NULL;
+        TypeSymbol* enclosing_type = base_type -> EnclosingType();
+        if (! enclosing_type)
+            enclosing_type = base_type -> ContainingType();
+        if (enclosing_type)
+            this0 = base_type -> InsertThis0();
+        if (! this0)
+        {
+            assert(base_type -> Anonymous() && base_type -> IsLocal());
+            return NULL;
+        }
     }
 
     TokenIndex tok = base -> RightToken();

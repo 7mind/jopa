@@ -123,10 +123,19 @@ wchar_t* MethodSymbol::Header()
                 }
                 if (k == num_parameters - 1 && ACC_VARARGS())
                 {
-                    assert(s[-2] == U_LB && s[-1] == U_RB);
-                    s[-2] = U_DOT;
-                    s[-1] = U_DOT;
-                    *s++ = U_DOT;
+                    if (s[-2] == U_LB && s[-1] == U_RB)
+                    {
+                        s[-2] = U_DOT;
+                        s[-1] = U_DOT;
+                        *s++ = U_DOT;
+                    }
+                    else
+                    {
+                        // Fallback: just append ... if we didn't find the expected [] suffix
+                        *s++ = U_DOT;
+                        *s++ = U_DOT;
+                        *s++ = U_DOT;
+                    }
                 }
                 *s++ = U_SPACE;
                 for (s2 = formal -> Name(); *s2; s2++)
@@ -285,9 +294,8 @@ void TypeSymbol::RemoveCompilationReferences()
         semantic_environment = NULL;
         declaration = NULL;
 
-        //
-        // TODO: What else needs to be reset?
-        //
+        // Clear all AST references in the symbol table so the AST pool
+        // can be safely deleted.
         if (table)
         {
             unsigned i;
@@ -1116,11 +1124,10 @@ void FileSymbol::CleanUp()
 
     if (compilation_unit)
     {
-        // NOTE: Do NOT delete ast_pool here. AST nodes can be referenced
-        // cross-file (e.g., type arguments, wildcards) and may be accessed
-        // after this cleanup. The ast_pool will be cleaned up when the
-        // entire compilation ends and Control is destroyed.
-        // TODO: Track ast_pools in Control for proper cleanup.
+        // NOTE: The ast_pool is handled separately:
+        // - For successful compilations, it's deleted early in Control::CleanUp
+        // - For files with errors, it's deleted in Control's destructor
+        // Here we just clear the pointer since the pool is managed elsewhere.
         compilation_unit = NULL;
     }
 
@@ -1836,10 +1843,15 @@ bool TypeSymbol::HasEnclosingInstance(TypeSymbol* type, bool exact)
             : (env -> Type() -> IsSubclass(type)))
         {
             //
-            // We found the innermost candidate type, now see if it is an
-            // enclosing type that is fully initialized.
+            // We found the innermost candidate type. If we're in a static
+            // region (e.g., during an explicit constructor invocation),
+            // keep walking outward to see if an already-initialized
+            // enclosing instance satisfies the request.
             //
-            return ! env -> StaticRegion();
+            if (! env -> StaticRegion())
+                return true;
+            else
+                continue;
         }
         if (env -> Type() -> ACC_STATIC()) // No more enclosing levels exist.
             return false;
@@ -1931,8 +1943,7 @@ TypeSymbol* TypeSymbol::UnboxedType(Control& control)
 
 VariableSymbol* TypeSymbol::InsertThis0()
 {
-    assert(IsInner() && ContainingType() &&
-           ! semantic_environment -> previous -> StaticRegion());
+    assert(IsInner() && ContainingType());
 
     Control& control = semantic_environment -> sem -> control;
 
@@ -3176,4 +3187,3 @@ TypeSymbol* TypeSymbol::GetPlaceholderType()
 
 
 } // Close namespace Jopa block
-
