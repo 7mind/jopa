@@ -290,7 +290,7 @@ jobs:
           retention-days: 7
 
   compliance-tests-jdk7:
-    name: JDK7 Compliance Tests (77% threshold)
+    name: JDK7 Compliance Tests (78% threshold)
     runs-on: ubuntu-latest
 
     steps:
@@ -312,7 +312,7 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java7-compliance.sh --build
 
-      - name: Check JDK7 Success Threshold (77%)
+      - name: Check JDK7 Success Threshold (78%)
         run: |
           source build/compliance_jdk7_results.env
           echo "JDK7 Compliance Results:"
@@ -330,8 +330,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 77%
-          THRESHOLD=77
+          # Check if success rate is at least 78%
+          THRESHOLD=78
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
@@ -356,7 +356,7 @@ jobs:
           retention-days: 7
 
   compliance-tests-jdk8:
-    name: JDK8 Compliance Tests (56% threshold)
+    name: JDK8 Compliance Tests (57% threshold)
     runs-on: ubuntu-latest
 
     steps:
@@ -378,7 +378,7 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java8-compliance.sh --build
 
-      - name: Check JDK8 Success Threshold (56%)
+      - name: Check JDK8 Success Threshold (57%)
         run: |
           source build/compliance_jdk8_results.env
           echo "JDK8 Compliance Results:"
@@ -396,8 +396,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 56%
-          THRESHOLD=56
+          # Check if success rate is at least 57%
+          THRESHOLD=57
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
