@@ -39,9 +39,42 @@ jobs:
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
             cmake --build build -j$(nproc)
-            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
+
+            # Configure devjopak with memory tracking wrapper
+            export JOPA_REAL_EXECUTABLE="$(pwd)/build/src/jopa"
+            export JOPA_MEMORY_LOG="/tmp/jopa-memory-release.log"
+            rm -f "$JOPA_MEMORY_LOG"
+
+            cmake -S devjopak -B build-devjopak \
+              -DJOPA_BUILD_DIR=build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJOPA_EXECUTABLE="$(pwd)/scripts/jopa-memory-wrapper.sh"
             cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-release.log
           '
+
+      - name: Report Memory Usage (Release)
+        if: always()
+        run: |
+          MEMLOG="/tmp/jopa-memory-release.log"
+          if [ -f "$MEMLOG" ] && [ -s "$MEMLOG" ]; then
+            PEAK_KB=$(sort -n "$MEMLOG" | tail -1)
+            PEAK_MB=$(echo "scale=1; $PEAK_KB / 1024" | bc)
+            INVOCATIONS=$(wc -l < "$MEMLOG")
+            AVG_KB=$(awk '{sum+=$1} END {printf "%.0f", sum/NR}' "$MEMLOG")
+            AVG_MB=$(echo "scale=1; $AVG_KB / 1024" | bc)
+
+            echo "## Memory Usage (Release Build)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Peak RSS | ${PEAK_MB} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| Avg RSS | ${AVG_MB} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| Compiler Invocations | ${INVOCATIONS} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Memory Usage (Release Build)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No memory data collected" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Verify DevJopaK Distribution
         run: |
@@ -127,9 +160,42 @@ jobs:
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
             cmake --build build -j$(nproc)
-            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Debug
+
+            # Configure devjopak with memory tracking wrapper
+            export JOPA_REAL_EXECUTABLE="$(pwd)/build/src/jopa"
+            export JOPA_MEMORY_LOG="/tmp/jopa-memory-debug.log"
+            rm -f "$JOPA_MEMORY_LOG"
+
+            cmake -S devjopak -B build-devjopak \
+              -DJOPA_BUILD_DIR=build \
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DJOPA_EXECUTABLE="$(pwd)/scripts/jopa-memory-wrapper.sh"
             cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
+
+      - name: Report Memory Usage (Debug)
+        if: always()
+        run: |
+          MEMLOG="/tmp/jopa-memory-debug.log"
+          if [ -f "$MEMLOG" ] && [ -s "$MEMLOG" ]; then
+            PEAK_KB=$(sort -n "$MEMLOG" | tail -1)
+            PEAK_MB=$(echo "scale=1; $PEAK_KB / 1024" | bc)
+            INVOCATIONS=$(wc -l < "$MEMLOG")
+            AVG_KB=$(awk '{sum+=$1} END {printf "%.0f", sum/NR}' "$MEMLOG")
+            AVG_MB=$(echo "scale=1; $AVG_KB / 1024" | bc)
+
+            echo "## Memory Usage (Debug Build)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Peak RSS | ${PEAK_MB} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| Avg RSS | ${AVG_MB} MB |" >> $GITHUB_STEP_SUMMARY
+            echo "| Compiler Invocations | ${INVOCATIONS} |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## Memory Usage (Debug Build)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No memory data collected" >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Verify DevJopaK Distribution
         run: |
