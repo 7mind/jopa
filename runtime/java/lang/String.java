@@ -95,4 +95,6 @@ public final class String implements java.io.Serializable, Comparable<String>, C
     public static native String valueOf(double d);
 
     public static native String valueOf(Object obj);
+
+    public static String format(String format, Object... args) { return ""; }
 }

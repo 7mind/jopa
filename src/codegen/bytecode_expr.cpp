@@ -808,6 +808,11 @@ void ByteCode::GenerateAssertVariableInitializer(TypeSymbol* tsym,
 
 int ByteCode::EmitName(AstName* expression, bool need_value)
 {
+    if (!expression->symbol) {
+        fprintf(stderr, "INTERNAL ERROR: Symbol is NULL in EmitName. Skipping.\n");
+        return 0;
+    }
+
     if (expression -> symbol -> TypeCast())
         return 0;
     VariableSymbol* var = expression -> symbol -> VariableCast();

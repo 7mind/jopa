@@ -1,0 +1,1 @@
+package com.sun.mirror.apt; import java.util.*; import com.sun.mirror.declaration.*; public interface AnnotationProcessorFactory { Collection<String> supportedOptions(); Collection<String> supportedAnnotationTypes(); AnnotationProcessor getProcessorFor(Set<AnnotationTypeDeclaration> atds, AnnotationProcessorEnvironment env); }

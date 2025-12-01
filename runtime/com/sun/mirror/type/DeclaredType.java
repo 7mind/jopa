@@ -1,0 +1,1 @@
+package com.sun.mirror.type; import com.sun.mirror.declaration.TypeDeclaration; import java.util.Collection; public interface DeclaredType extends ReferenceType { TypeDeclaration getDeclaration(); DeclaredType getContainingType(); Collection<TypeMirror> getActualTypeArguments(); Collection<InterfaceType> getSuperinterfaces(); }

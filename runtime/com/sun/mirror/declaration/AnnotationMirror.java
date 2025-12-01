@@ -1,0 +1,1 @@
+package com.sun.mirror.declaration; import com.sun.mirror.type.AnnotationType; import com.sun.mirror.util.SourcePosition; import java.util.Map; public interface AnnotationMirror { AnnotationType getAnnotationType(); Map<AnnotationTypeElementDeclaration, AnnotationValue> getElementValues(); SourcePosition getPosition(); }
