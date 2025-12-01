@@ -678,8 +678,8 @@ Control::~Control()
     for (i = 0; i < unreadable_input_filenames.Length(); i++)
         delete [] unreadable_input_filenames[i];
 
-    // Clean up all registered ast_pools.
-    // These are registered when compilation units are created.
+    // Clean up remaining ast_pools (from files with errors).
+    // Successfully compiled files have their pools deleted early and unregistered.
     for (StoragePool* pool : ast_pools_to_delete)
         delete pool;
 
@@ -1295,7 +1295,8 @@ void Control::ProcessBodies(TypeSymbol* type)
 
             //
             // If no error was detected while generating code, then
-            // start cleaning up.
+            // start cleaning up. Clear all AST references so the pool
+            // can be safely deleted later.
             //
             if (! option.nocleanup)
             {
@@ -1304,9 +1305,17 @@ void Control::ProcessBodies(TypeSymbol* type)
                     for (unsigned k = 0; k < types -> Length(); k++)
                     {
                         TypeSymbol* type = (*types)[k];
-                        delete type -> semantic_environment;
-                        type -> semantic_environment = NULL;
-                        type -> declaration -> semantic_environment = NULL;
+                        // Save pointer before RemoveCompilationReferences clears it
+                        SemanticEnvironment* env = type -> semantic_environment;
+                        // Clear the AST node's back-pointer to semantic_environment
+                        // (must be done before RemoveCompilationReferences sets
+                        // declaration = NULL)
+                        if (type -> declaration)
+                            type -> declaration -> semantic_environment = NULL;
+                        // Clear all AST references (declaration, declarators, etc.)
+                        type -> RemoveCompilationReferences();
+                        // Now delete the semantic environment
+                        delete env;
                     }
                 }
                 delete types;
@@ -1531,6 +1540,25 @@ void Control::CleanUp(FileSymbol* file_symbol)
         sem -> PrintMessages();
         if (sem -> return_code > 0)
             return_code = 1;
+
+        //
+        // For successful compilations, delete the AST pool early to reduce
+        // memory usage. All AST references have been cleared in ProcessBodies.
+        // For files with errors, the pool is kept until Control is destroyed.
+        //
+        if (! option.nocleanup &&
+            sem -> NumErrors() == 0 &&
+            sem -> lex_stream -> NumBadTokens() == 0 &&
+            file_symbol -> compilation_unit &&
+            file_symbol -> compilation_unit -> ast_pool)
+        {
+            StoragePool* pool = file_symbol -> compilation_unit -> ast_pool;
+            // Must set compilation_unit to NULL BEFORE deleting pool,
+            // because compilation_unit itself is allocated from the pool
+            file_symbol -> compilation_unit = NULL;
+            UnregisterAstPool(pool);
+            delete pool;
+        }
 
         file_symbol -> CleanUp();
     }
