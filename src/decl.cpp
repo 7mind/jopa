@@ -2074,6 +2074,7 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
 
                         // Also check inherited methods from superclasses
                         // This handles cases like enums inheriting bridge methods from Enum
+                        // and generic superclasses implementing interface methods
                         if (! has_implementation)
                         {
                             for (TypeSymbol* super = this_type -> super; super && !has_implementation; super = super -> super)
@@ -2091,11 +2092,19 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                                         continue;
 
                                     // Check if all parameter types match
+                                    // For generic superclasses, the implementation method's parameter
+                                    // types (after erasure) may be supertypes of the interface method's
+                                    // parameter types. E.g., GenObject<T>.foo(Object) can implement
+                                    // TestInterface.foo(String) when GenObject<String> is used.
                                     bool params_match = true;
                                     for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
                                     {
-                                        if (impl -> FormalParameter(p) -> Type() !=
-                                            method -> FormalParameter(p) -> Type())
+                                        TypeSymbol* impl_type = impl -> FormalParameter(p) -> Type();
+                                        TypeSymbol* method_type = method -> FormalParameter(p) -> Type();
+                                        // Check exact match or if method param is subtype of impl param
+                                        // (allows for generic type erasure bridge methods)
+                                        if (impl_type != method_type &&
+                                            ! method_type -> IsSubtype(impl_type))
                                         {
                                             params_match = false;
                                             break;
