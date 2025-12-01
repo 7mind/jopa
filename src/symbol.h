@@ -1684,6 +1684,7 @@ public:
         , local_variable_index(-1)
         , type_(NULL)
         , signature_string(NULL)
+        , multithrown_exceptions(NULL)
     {
         Symbol::_kind = VARIABLE;
     }
@@ -1692,6 +1693,7 @@ public:
     {
         delete [] signature_string;
         delete file_location;
+        delete multithrown_exceptions;
     }
 
     void SetOwner(Symbol* owner_)
@@ -1783,6 +1785,17 @@ private:
     int local_variable_index;
     TypeSymbol* type_;
     char* signature_string;
+
+public:
+    // Java 7 Precise Rethrow support
+    Tuple<TypeSymbol*>* multithrown_exceptions;
+
+    inline void AddMultiThrownException(TypeSymbol* exception)
+    {
+        if (! multithrown_exceptions)
+            multithrown_exceptions = new Tuple<TypeSymbol*>(4);
+        multithrown_exceptions -> Next() = exception;
+    }
 };
 
 
