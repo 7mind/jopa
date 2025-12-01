@@ -490,8 +490,6 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
         if (target_type -> Primitive()) {
             bool widening_allowed = CanWideningPrimitiveConvert(target_type, source_type);
             bool narrowing_allowed = CanNarrowingPrimitiveConvert(target_type, source_type);
-            fprintf(stderr, "DEBUG: CanCastConvert primitive-primitive check: target=%ls, source=%ls, widening=%d, narrowing=%d\n",
-                    target_type->Name(), source_type->Name(), widening_allowed, narrowing_allowed);
             if (widening_allowed || narrowing_allowed) {
                 return true;
             } else {
