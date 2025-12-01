@@ -250,7 +250,6 @@ tools/javac/EmptyArray.java
 tools/javac/EmptyBreak.java
 tools/javac/EmptyDocComments.java
 tools/javac/EmptySwitch.java
-tools/javac/EnclosingAccessCheck.java
 tools/javac/ExceptionalFinally.java
 tools/javac/FaultySignature.java
 tools/javac/FinalInitializer.java
@@ -312,7 +311,6 @@ tools/javac/PackageClassClash/PackageClassClash.java
 tools/javac/Paths/6638501/JarFromManifestFailure.java
 tools/javac/Paths/CompileClose.java
 tools/javac/PrivateUplevelConstant.java
-tools/javac/ProtectedInnerClass/ProtectedInnerClass_2.java
 tools/javac/QualifiedNewScope.java
 tools/javac/QualifiedOuterThis.java
 tools/javac/QualifiedOuterThis2.java
@@ -705,7 +703,6 @@ tools/javac/miranda/T4279316b.java
 tools/javac/miranda/T4279316c.java
 tools/javac/miranda/T4279316d.java
 tools/javac/miranda/T4528315.java
-tools/javac/missingClass/A.java
 tools/javac/mixedTarget/ExtendCovariant1.java
 tools/javac/multicatch/7005371/T7005371.java
 tools/javac/multicatch/Pos03.java

@@ -45,8 +45,9 @@ POSITIVE_TEST_PATTERNS = [
 ]
 
 # Annotations that indicate the test should fail (exclude these)
+# Keep these lowercased and compare against lowercased source content.
 NEGATIVE_TEST_PATTERNS = [
-    r"@compile/fail",        # Expected to fail compilation
+    "compile/fail",          # Expected to fail compilation
 ]
 
 
@@ -61,15 +62,16 @@ def has_positive_annotation(file_path: Path) -> bool:
     """Check if file has @compile or @run annotation (but not @compile/fail)."""
     try:
         content = file_path.read_text(encoding="utf-8", errors="ignore")
+        lower_content = content.lower()
 
         # First check for negative patterns - if found, exclude
         for pattern in NEGATIVE_TEST_PATTERNS:
-            if re.search(pattern, content):
+            if pattern in lower_content or re.search(pattern, content, re.IGNORECASE):
                 return False
 
         # Then check for positive patterns
         for pattern in POSITIVE_TEST_PATTERNS:
-            if re.search(pattern, content):
+            if re.search(pattern, content, re.IGNORECASE):
                 return True
 
         return False

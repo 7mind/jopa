@@ -1,6 +1,10 @@
 package java.lang;
 
-public final class Short extends Number {
+public final class Short extends Number implements Comparable<Short>, java.io.Serializable {
+    public static final short MIN_VALUE = (short) 0x8000;
+    public static final short MAX_VALUE = (short) 0x7fff;
+    public static final int SIZE = 16;
+    public static final int BYTES = 2;
     public static final Class TYPE = getPrimitiveClass("short");
     private static native Class getPrimitiveClass(String name);
 
@@ -40,5 +44,10 @@ public final class Short extends Number {
 
     public String toString() {
         return String.valueOf((int) value);
+    }
+
+    @Override
+    public int compareTo(Short anotherShort) {
+        return this.value - anotherShort.value;
     }
 }

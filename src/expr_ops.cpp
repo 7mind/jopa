@@ -567,6 +567,16 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
     if (CanMethodInvocationConvert(target_type, source_type))
         return true;
 
+    // Allow constant narrowing into wrapper types by checking representability
+    if (control.option.source >= JopaOption::SDK1_5 &&
+        ! target_type -> Primitive() &&
+        control.IsSimpleIntegerValueType(source_type))
+    {
+        TypeSymbol* primitive_target = GetPrimitiveType(target_type);
+        if (primitive_target && IsIntValueRepresentableInType(expr, primitive_target))
+            return true;
+    }
+
     if (IsIntValueRepresentableInType(expr, target_type))
         return true;
 

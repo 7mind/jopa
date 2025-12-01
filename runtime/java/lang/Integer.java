@@ -1,7 +1,10 @@
 package java.lang;
 
-// Stub Integer class for testing
 public final class Integer extends Number implements Comparable<Integer>, java.io.Serializable {
+    public static final int MIN_VALUE = 0x80000000;
+    public static final int MAX_VALUE = 0x7fffffff;
+    public static final int SIZE = 32;
+    public static final int BYTES = 4;
     public static final Class TYPE = getPrimitiveClass("int");
     private static native Class getPrimitiveClass(String name);
 

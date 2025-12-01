@@ -1931,8 +1931,7 @@ TypeSymbol* TypeSymbol::UnboxedType(Control& control)
 
 VariableSymbol* TypeSymbol::InsertThis0()
 {
-    assert(IsInner() && ContainingType() &&
-           ! semantic_environment -> previous -> StaticRegion());
+    assert(IsInner() && ContainingType());
 
     Control& control = semantic_environment -> sem -> control;
 
@@ -3176,4 +3175,3 @@ TypeSymbol* TypeSymbol::GetPlaceholderType()
 
 
 } // Close namespace Jopa block
-

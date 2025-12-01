@@ -1,6 +1,10 @@
 package java.lang;
 
 public final class Character implements Comparable<Character>, java.io.Serializable {
+    public static final char MIN_VALUE = '\u0000';
+    public static final char MAX_VALUE = '\uffff';
+    public static final int SIZE = 16;
+    public static final int BYTES = 2;
     public static final Class TYPE = getPrimitiveClass("char");
     private static native Class getPrimitiveClass(String name);
 
