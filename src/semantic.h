@@ -1207,12 +1207,15 @@ private:
     void ReportConstructorNotFound(Ast*, TypeSymbol*);
     void ReportMethodNotFound(AstMethodInvocation*, TypeSymbol*);
     MethodSymbol* FindConstructor(TypeSymbol*, Ast*, TokenIndex, TokenIndex);
-    inline bool MoreSpecific(MethodSymbol*, MethodSymbol*);
-    inline bool MoreSpecific(MethodSymbol*, Tuple<MethodSymbol*>&);
-    inline bool NoMethodMoreSpecific(Tuple<MethodSymbol*>&, MethodSymbol*);
-    inline bool MoreSpecific(MethodSymbol*, Tuple<MethodShadowSymbol*>&);
+    inline TypeSymbol* EffectiveParameterType(MethodSymbol*, unsigned, unsigned);
+    inline bool MoreSpecific(MethodSymbol*, MethodSymbol*, unsigned);
+    inline bool MoreSpecific(MethodSymbol*, Tuple<MethodSymbol*>&, unsigned);
+    inline bool NoMethodMoreSpecific(Tuple<MethodSymbol*>&, MethodSymbol*,
+                                     unsigned);
+    inline bool MoreSpecific(MethodSymbol*, Tuple<MethodShadowSymbol*>&,
+                             unsigned);
     inline bool NoMethodMoreSpecific(Tuple<MethodShadowSymbol*>&,
-                                     MethodSymbol*);
+                                     MethodSymbol*, unsigned);
     inline bool MethodApplicableByArity(MethodSymbol*, unsigned);
     void FindMethodInEnvironment(Tuple<MethodShadowSymbol*>&,
                                  SemanticEnvironment*&,

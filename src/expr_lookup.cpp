@@ -79,6 +79,42 @@ inline bool Semantic::CanSubtypeConvert(const TypeSymbol* target_type,
         source_type -> IsSubtype(target_type);
 }
 
+inline TypeSymbol* Semantic::EffectiveParameterType(MethodSymbol* method,
+                                                    unsigned arg_index,
+                                                    unsigned num_arguments)
+{
+    unsigned num_formals = method -> NumFormalParameters();
+    (void) num_arguments;
+
+    if (! method -> ACC_VARARGS())
+    {
+        if (arg_index >= num_formals)
+            return NULL;
+        VariableSymbol* param = method -> FormalParameter(arg_index);
+        return param ? param -> Type() : NULL;
+    }
+
+    if (num_formals == 0)
+        return NULL;
+
+    if (arg_index < num_formals - 1)
+    {
+        VariableSymbol* param = method -> FormalParameter(arg_index);
+        return param ? param -> Type() : NULL;
+    }
+
+    VariableSymbol* varargs_param = method -> FormalParameter(num_formals - 1);
+    if (! varargs_param)
+        return NULL;
+
+    TypeSymbol* varargs_type = varargs_param -> Type();
+    if (! varargs_type)
+        return NULL;
+
+    return varargs_type -> IsArray() ? varargs_type -> ArraySubtype()
+                                     : varargs_type;
+}
+
 // Returns true if source_method is more specific than target_method, which
 // is defined as the type that declared the method, as well as all method
 // parameter types, being equal or more specific in the source_method.
@@ -86,7 +122,8 @@ inline bool Semantic::CanSubtypeConvert(const TypeSymbol* target_type,
 // boxing/unboxing conversions.
 //
 inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
-                                   MethodSymbol* target_method)
+                                   MethodSymbol* target_method,
+                                   unsigned num_arguments)
 {
     //
     // Sun bug 4761586: the declaration type is no longer considered when
@@ -97,17 +134,17 @@ inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
 //      {
 //          return false;
 //      }
-    for (int k = target_method -> NumFormalParameters() - 1; k >= 0; k--)
+    for (unsigned k = 0; k < num_arguments; k++)
     {
-        VariableSymbol* target_param = target_method -> FormalParameter(k);
-        VariableSymbol* source_param = source_method -> FormalParameter(k);
+        TypeSymbol* target_type = EffectiveParameterType(target_method, k,
+                                                         num_arguments);
+        TypeSymbol* source_type = EffectiveParameterType(source_method, k,
+                                                         num_arguments);
         // Error recovery: parameters might be invalid if there are semantic errors
-        if (! target_param || ! source_param ||
-            ! target_param -> Type() || ! source_param -> Type())
+        if (! target_type || ! source_type)
             return false;
         // Use subtyping only for specificity, not boxing/unboxing
-        if (! CanSubtypeConvert(target_param -> Type(),
-                                source_param -> Type()))
+        if (! CanSubtypeConvert(target_type, source_type))
         {
             return false;
         }
@@ -121,11 +158,12 @@ inline bool Semantic::MoreSpecific(MethodSymbol* source_method,
 // specific methods.
 //
 inline bool Semantic::MoreSpecific(MethodSymbol* method,
-                                   Tuple<MethodSymbol*>& maximally_specific_method)
+                                   Tuple<MethodSymbol*>& maximally_specific_method,
+                                   unsigned num_arguments)
 {
     for (unsigned i = 0; i < maximally_specific_method.Length(); i++)
     {
-        if (! MoreSpecific(method, maximally_specific_method[i]))
+        if (! MoreSpecific(method, maximally_specific_method[i], num_arguments))
             return false;
     }
     return true;
@@ -138,11 +176,12 @@ inline bool Semantic::MoreSpecific(MethodSymbol* method,
 // be added to the set.
 //
 inline bool Semantic::NoMethodMoreSpecific(Tuple<MethodSymbol*>& maximally_specific_method,
-                                           MethodSymbol* method)
+                                           MethodSymbol* method,
+                                           unsigned num_arguments)
 {
     for (unsigned i = 0; i < maximally_specific_method.Length(); i++)
     {
-        if (MoreSpecific(maximally_specific_method[i], method))
+        if (MoreSpecific(maximally_specific_method[i], method, num_arguments))
             return false;
     }
     return true;
@@ -154,12 +193,14 @@ inline bool Semantic::NoMethodMoreSpecific(Tuple<MethodSymbol*>& maximally_speci
 // specific methods.
 //
 inline bool Semantic::MoreSpecific(MethodSymbol* method,
-                                   Tuple<MethodShadowSymbol*>& maximally_specific_method)
+                                   Tuple<MethodShadowSymbol*>& maximally_specific_method,
+                                   unsigned num_arguments)
 {
     for (unsigned i = 0; i < maximally_specific_method.Length(); i++)
     {
         if (! MoreSpecific(method,
-                           maximally_specific_method[i] -> method_symbol))
+                           maximally_specific_method[i] -> method_symbol,
+                           num_arguments))
             return false;
     }
     return true;
@@ -172,11 +213,13 @@ inline bool Semantic::MoreSpecific(MethodSymbol* method,
 // be added to the set.
 //
 inline bool Semantic::NoMethodMoreSpecific(Tuple<MethodShadowSymbol*>& maximally_specific_method,
-                                           MethodSymbol* method)
+                                           MethodSymbol* method,
+                                           unsigned num_arguments)
 {
     for (unsigned i = 0; i < maximally_specific_method.Length(); i++)
     {
-        if (MoreSpecific(maximally_specific_method[i] -> method_symbol, method))
+        if (MoreSpecific(maximally_specific_method[i] -> method_symbol, method,
+                         num_arguments))
             return false;
     }
     return true;
@@ -725,12 +768,12 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
             }
             if (i == num_arguments)
             {
-                if (MoreSpecific(ctor, constructor_set))
+                if (MoreSpecific(ctor, constructor_set, num_arguments))
                 {
                     constructor_set.Reset();
                     constructor_set.Next() = ctor;
                 }
-                else if (NoMethodMoreSpecific(constructor_set, ctor))
+                else if (NoMethodMoreSpecific(constructor_set, ctor, num_arguments))
                     constructor_set.Next() = ctor;
             }
         }
@@ -760,12 +803,12 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
                 }
                 if (i == num_arguments)
                 {
-                    if (MoreSpecific(ctor, constructor_set))
+                    if (MoreSpecific(ctor, constructor_set, num_arguments))
                     {
                         constructor_set.Reset();
                         constructor_set.Next() = ctor;
                     }
-                    else if (NoMethodMoreSpecific(constructor_set, ctor))
+                    else if (NoMethodMoreSpecific(constructor_set, ctor, num_arguments))
                         constructor_set.Next() = ctor;
                 }
             }
@@ -835,12 +878,12 @@ MethodSymbol* Semantic::FindConstructor(TypeSymbol* containing_type, Ast* ast,
 
             if (i == num_arguments)
             {
-                if (MoreSpecific(ctor, constructor_set))
+                if (MoreSpecific(ctor, constructor_set, num_arguments))
                 {
                     constructor_set.Reset();
                     constructor_set.Next() = ctor;
                 }
-                else if (NoMethodMoreSpecific(constructor_set, ctor))
+                else if (NoMethodMoreSpecific(constructor_set, ctor, num_arguments))
                     constructor_set.Next() = ctor;
             }
         }
@@ -1082,12 +1125,12 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
 
             if (i == num_formals)
             {
-                if (MoreSpecific(method, method_set))
+                if (MoreSpecific(method, method_set, num_args))
                 {
                     method_set.Reset();
                     method_set.Next() = method_shadow;
                 }
-                else if (NoMethodMoreSpecific(method_set, method))
+                else if (NoMethodMoreSpecific(method_set, method, num_args))
                     method_set.Next() = method_shadow;
             }
         }
@@ -1131,12 +1174,12 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
 
                 if (i == num_formals)
                 {
-                    if (MoreSpecific(method, method_set))
+                    if (MoreSpecific(method, method_set, num_args))
                     {
                         method_set.Reset();
                         method_set.Next() = method_shadow;
                     }
-                    else if (NoMethodMoreSpecific(method_set, method))
+                    else if (NoMethodMoreSpecific(method_set, method, num_args))
                         method_set.Next() = method_shadow;
                 }
             }
@@ -1212,12 +1255,12 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
 
                 if (i == num_args)
                 {
-                    if (MoreSpecific(method, method_set))
+                    if (MoreSpecific(method, method_set, num_args))
                     {
                         method_set.Reset();
                         method_set.Next() = method_shadow;
                     }
-                    else if (NoMethodMoreSpecific(method_set, method))
+                    else if (NoMethodMoreSpecific(method_set, method, num_args))
                         method_set.Next() = method_shadow;
                 }
             }
@@ -1341,12 +1384,12 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
 
                     if (i == num_formals)
                     {
-                        if (MoreSpecific(method, methods_found))
+                        if (MoreSpecific(method, methods_found, num_args))
                         {
                             methods_found.Reset();
                             methods_found.Next() = shadow;
                         }
-                        else if (NoMethodMoreSpecific(methods_found, method))
+                        else if (NoMethodMoreSpecific(methods_found, method, num_args))
                             methods_found.Next() = shadow;
                     }
                 }
@@ -1387,12 +1430,12 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
 
                         if (i == num_formals)
                         {
-                            if (MoreSpecific(method, methods_found))
+                            if (MoreSpecific(method, methods_found, num_args))
                             {
                                 methods_found.Reset();
                                 methods_found.Next() = shadow;
                             }
-                            else if (NoMethodMoreSpecific(methods_found, method))
+                            else if (NoMethodMoreSpecific(methods_found, method, num_args))
                                 methods_found.Next() = shadow;
                         }
                     }
@@ -1466,12 +1509,12 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
 
                         if (i == num_args)
                         {
-                            if (MoreSpecific(method, methods_found))
+                            if (MoreSpecific(method, methods_found, num_args))
                             {
                                 methods_found.Reset();
                                 methods_found.Next() = shadow;
                             }
-                            else if (NoMethodMoreSpecific(methods_found, method))
+                            else if (NoMethodMoreSpecific(methods_found, method, num_args))
                                 methods_found.Next() = shadow;
                         }
                     }
