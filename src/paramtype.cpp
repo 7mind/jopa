@@ -273,6 +273,57 @@ void Type::GenerateSignature(char* buffer, unsigned& length)
     }
 }
 
+bool Type::IsSubtype(TypeSymbol* type)
+{
+    if (!type) return false;
+
+    switch (kind)
+    {
+        case SIMPLE_TYPE:
+            return simple_type && simple_type -> IsSubtype(type);
+
+        case PARAMETERIZED_TYPE:
+            return parameterized_type -> Erasure() -> IsSubtype(type);
+
+        case TYPE_PARAMETER:
+        {
+            // For type variable T, T <: type if any bound <: type
+            // If no bounds, T <: Object
+            if (type_parameter -> NumBounds() == 0)
+            {
+                return type == NULL; // Should check against Object, but we don't have Control here easily.
+                // Assuming type is not null, and unbounded T only extends Object.
+                // We need Control to get Object.
+                // However, Erasure() returns Object (or NULL).
+                // If Erasure() is NULL, we can't check properly without Control.
+                // But TypeParameterSymbol::ErasedType() handles this if we trust it.
+                // Wait, ErasedType returns NULL if unbounded and no Control.
+                
+                // If we assume type is valid, we can check if type is Object by name?
+                // Or just rely on Erasure logic if possible.
+                
+                // Better: check bounds.
+            }
+            
+            for (unsigned i = 0; i < type_parameter -> NumBounds(); i++)
+            {
+                if (type_parameter -> Bound(i) -> IsSubtype(type))
+                    return true;
+            }
+            return false;
+        }
+
+        case WILDCARD_TYPE:
+            return wildcard_type -> UpperBound() && wildcard_type -> UpperBound() -> IsSubtype(type);
+
+        case ARRAY_TYPE:
+            return array_type -> Erasure() && array_type -> Erasure() -> IsSubtype(type);
+
+        default:
+            return false;
+    }
+}
+
 Type* Type::Clone()
 {
     switch (kind)

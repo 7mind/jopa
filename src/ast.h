@@ -17,6 +17,7 @@ class MethodSymbol;
 class TypeSymbol;
 class TypeParameterSymbol;
 class ParameterizedType;
+class Type; // Added forward declaration
 class StoragePool;
 struct CaseElement;
 
@@ -824,9 +825,12 @@ class AstType : public Ast
 {
 public:
     TypeSymbol* symbol;
+    Type* generic_type; // For type variables (T) to allow bounds checking
 
     inline AstType(AstKind k, AstTag t = NO_TAG)
         : Ast(k, t)
+        , symbol(NULL)
+        , generic_type(NULL)
     {}
     ~AstType() {}
 

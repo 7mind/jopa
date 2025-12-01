@@ -10,4 +10,6 @@ public class ClassReader {
     }
 
     public static final Context.Key<ClassReader> classReaderKey = new Context.Key<ClassReader>();
+
+    public static final int INITIAL_BUFFER_SIZE = 0x0fff0;
 }

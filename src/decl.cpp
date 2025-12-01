@@ -1178,7 +1178,20 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
             TypeSymbol* bound = type_param -> Bound(j);
 
             // Check if arg_type is a subtype of the bound
-            if (! arg_type -> IsSubtype(bound))
+            bool satisfies_bound = false;
+            
+            if (type_arg_ast->generic_type)
+            {
+                // Use generic type info if available (handles type variables)
+                satisfies_bound = type_arg_ast->generic_type->IsSubtype(bound);
+            }
+            else
+            {
+                // Fallback to erasure (TypeSymbol)
+                satisfies_bound = arg_type -> IsSubtype(bound);
+            }
+
+            if (! satisfies_bound)
             {
                 // Type argument doesn't satisfy bound
                 ReportSemError(SemanticError::TYPE_ARGUMENT_FAILS_BOUNDS,
@@ -5326,7 +5339,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             TypeParameterSymbol* type_param = processing_type -> TypeParameter(i);
             if (type_param -> name_symbol == name_symbol)
             {
-                // Found a type parameter - return its erased type
+                // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
@@ -5361,9 +5374,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             TypeParameterSymbol* type_param = enclosing_type -> TypeParameter(i);
             if (type_param -> name_symbol == name_symbol)
             {
-                // Found a type parameter - return its erased type
-                // TODO: We should return a Type wrapper with TYPE_PARAMETER kind
-                // For now, just return the erased type to keep things working
+                // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
@@ -5690,6 +5701,71 @@ TypeSymbol* Semantic::MustFindType(AstName* name)
 }
 
 
+TypeParameterSymbol* Semantic::FindTypeParameter(TokenIndex identifier_token)
+{
+    NameSymbol* name_symbol = lex_stream -> NameSymbol(identifier_token);
+
+    SemanticEnvironment* env = NULL;
+    if (state_stack.Size())
+        env = state_stack.Top();
+
+    MethodSymbol* current_method = ThisMethod();
+    if (current_method)
+    {
+        for (unsigned i = 0; i < current_method -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = current_method -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+    }
+
+    if (processing_type)
+    {
+        for (unsigned i = 0; i < processing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = processing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+        
+        MethodSymbol* enclosing_method = processing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                    return type_param;
+            }
+        }
+    }
+
+    for ( ; env; env = env -> previous)
+    {
+        TypeSymbol* enclosing_type = env -> Type();
+        for (unsigned i = 0; i < enclosing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = enclosing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+        
+        MethodSymbol* enclosing_method = enclosing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                    return type_param;
+            }
+        }
+    }
+    return NULL;
+}
+
+
 void Semantic::ProcessType(AstType* type_expr)
 {
     if (type_expr -> symbol)
@@ -5781,6 +5857,20 @@ void Semantic::ProcessType(AstType* type_expr)
                                                     IdentifierToken()));
         }
     }
+    else
+    {
+        // If type is valid, check if it's a type variable and populate generic_type
+        // This is needed for correct bounds checking (Intersection Types) where erasure is insufficient.
+        if (name && !name->base_opt && !name->type_arguments_opt)
+        {
+            TypeParameterSymbol* tparam = FindTypeParameter(name->name->identifier_token);
+            if (tparam)
+            {
+                type_expr->generic_type = new Type(tparam);
+            }
+        }
+    }
+    
     if (array_type)
         type = type -> GetArrayType(this, array_type -> NumBrackets());
     type_expr -> symbol = type;

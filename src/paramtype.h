@@ -422,6 +422,11 @@ public:
     void GenerateSignature(char* buffer, unsigned& length);
 
     //
+    // Check if this type is a subtype of the given type symbol
+    //
+    bool IsSubtype(TypeSymbol* type);
+
+    //
     // Clone this type
     //
     Type* Clone();

@@ -1058,6 +1058,7 @@ private:
     TypeSymbol* ImportType(TokenIndex, NameSymbol*);
     TypeSymbol* FindPrimitiveType(AstPrimitiveType*);
     TypeSymbol* FindType(TokenIndex);
+    TypeParameterSymbol* FindTypeParameter(TokenIndex);
     TypeSymbol* FindInaccessibleType(AstName*);
     TypeSymbol* MustFindType(AstName*);
     void ProcessType(AstType*);
