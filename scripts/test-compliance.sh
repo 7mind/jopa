@@ -123,7 +123,9 @@ TEST_TIMEOUT=30
 
 echo "Running compilation tests (timeout: ${TEST_TIMEOUT}s per test)..."
 
-# Process tests with xargs for parallelism
+# Process tests with xargs for parallelism. For each test, include its
+# directory (and sibling support files) on the classpath to avoid hiding
+# missing dependencies in the runtime.
 cat "$WHITELIST_FILE" | xargs -P "$NPROC" -I {} sh -c '
     rel_path="{}"
     java_file="'"$ASSETS_DIR"'/$rel_path"
@@ -188,9 +190,9 @@ echo "  Timeout:     ${TIMEOUT}"
     echo "| Timeout | ${TIMEOUT} |"
     echo ""
     if [[ "$FAILED" -gt 0 ]]; then
-        echo "### Sample Failed Tests (first 20)"
+        echo "### Sample Failed Tests (first 100)"
         echo '```'
-        head -20 "$FAILED_FILE" 2>/dev/null || echo 'No failures'
+        head -100 "$FAILED_FILE" 2>/dev/null || echo 'No failures'
         echo '```'
     fi
     if [[ "$TIMEOUT" -gt 0 ]]; then
