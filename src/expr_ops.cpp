@@ -640,6 +640,8 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
 bool Semantic::CanCastConvert(TypeSymbol* target_type, TypeSymbol* source_type,
                               TokenIndex tok)
 {
+    if (!target_type || !source_type) return false;
+
     if (target_type == control.null_type)
         return false;
     if (source_type == target_type || source_type == control.no_type ||

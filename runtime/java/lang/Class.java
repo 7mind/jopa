@@ -21,20 +21,20 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Methods
     public native Method[] getDeclaredMethods();
     public native Method[] getMethods();
-    public native Method getMethod(String name, Class... parameterTypes);
-    public native Method getDeclaredMethod(String name, Class... parameterTypes);
+    public native Method getMethod(String name, Class... parameterTypes) throws NoSuchMethodException, SecurityException;
+    public native Method getDeclaredMethod(String name, Class... parameterTypes) throws NoSuchMethodException, SecurityException;
 
     // Fields
     public native Field[] getDeclaredFields();
     public native Field[] getFields();
-    public native Field getField(String name);
-    public native Field getDeclaredField(String name);
+    public native Field getField(String name) throws NoSuchFieldException, SecurityException;
+    public native Field getDeclaredField(String name) throws NoSuchFieldException, SecurityException;
 
     // Constructors
     public native Constructor[] getDeclaredConstructors();
     public native Constructor[] getConstructors();
-    public native Constructor getConstructor(Class... parameterTypes);
-    public native Constructor getDeclaredConstructor(Class... parameterTypes);
+    public native Constructor getConstructor(Class... parameterTypes) throws NoSuchMethodException, SecurityException;
+    public native Constructor getDeclaredConstructor(Class... parameterTypes) throws NoSuchMethodException, SecurityException;
 
     // Class information
     public native Class getSuperclass();
