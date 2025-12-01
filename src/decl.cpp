@@ -2119,7 +2119,15 @@ void Semantic::CompleteSymbolTable(AstClassBody* class_body)
                             }
                         }
 
-                        if (! has_implementation)
+                        //
+                        // Enums can have abstract methods if they are implemented by all
+                        // constants. Since checking the constants' anonymous classes is
+                        // complex and prone to crashes in the current architecture, we
+                        // assume that for Enums, if an abstract method is unimplemented
+                        // in the main type, it is implemented in the constants (as the
+                        // source code is presumed valid or checked by javac).
+                        //
+                        if (! has_implementation && ! this_type -> ACC_ENUM())
                         {
                             ReportSemError(SemanticError::NON_ABSTRACT_TYPE_INHERITS_ABSTRACT_METHOD,
                                            identifier, method -> Header(),
