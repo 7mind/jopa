@@ -294,9 +294,8 @@ void TypeSymbol::RemoveCompilationReferences()
         semantic_environment = NULL;
         declaration = NULL;
 
-        //
-        // TODO: What else needs to be reset?
-        //
+        // Clear all AST references in the symbol table so the AST pool
+        // can be safely deleted.
         if (table)
         {
             unsigned i;
@@ -1125,11 +1124,10 @@ void FileSymbol::CleanUp()
 
     if (compilation_unit)
     {
-        // NOTE: Do NOT delete ast_pool here. AST nodes can be referenced
-        // cross-file (e.g., type arguments, wildcards) and may be accessed
-        // after this cleanup. The ast_pool will be cleaned up when the
-        // entire compilation ends and Control is destroyed.
-        // TODO: Track ast_pools in Control for proper cleanup.
+        // NOTE: The ast_pool is handled separately:
+        // - For successful compilations, it's deleted early in Control::CleanUp
+        // - For files with errors, it's deleted in Control's destructor
+        // Here we just clear the pointer since the pool is managed elsewhere.
         compilation_unit = NULL;
     }
 
