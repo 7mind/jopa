@@ -27,6 +27,8 @@ public final class String implements java.io.Serializable, Comparable<String>, C
 
     public native String substring(int beginIndex, int endIndex);
 
+    public native String concat(String str);
+
     public CharSequence subSequence(int start, int end) {
         return substring(start, end);
     }
