@@ -56,4 +56,7 @@ public final class System {
     public static SecurityManager getSecurityManager() {
         return null;
     }
+
+    public static void setSecurityManager(SecurityManager sm) {
+    }
 }
