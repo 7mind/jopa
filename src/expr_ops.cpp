@@ -488,6 +488,8 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
     if (source_type -> Primitive())
     {
         if (target_type -> Primitive()) {
+            if (source_type == target_type)
+                return true;
             bool widening_allowed = CanWideningPrimitiveConvert(target_type, source_type);
             bool narrowing_allowed = CanNarrowingPrimitiveConvert(target_type, source_type);
             if (widening_allowed || narrowing_allowed) {
