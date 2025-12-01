@@ -15,6 +15,8 @@
     *   Added `java.nio.file.Files`, `FileStore`, `CopyOption`, `attribute.FileAttribute`.
     *   Added `java.lang.String.concat(String)`.
     *   Added `java.lang.Boolean.getBoolean(String)`.
+    *   Added `java.util.StringTokenizer`.
+    *   Added `java.util.ResourceBundle`.
 
 ### Remaining High-Value Targets
 
@@ -24,5 +26,4 @@
 
 ## Next Steps
 
-1.  Stub `java.util.ResourceBundle` and `java.util.StringTokenizer`.
-2.  Investigate the type inference warning in `src/semantic.h`.
+1.  Investigate the type inference warning in `src/semantic.h`.

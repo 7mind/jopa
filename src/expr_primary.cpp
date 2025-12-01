@@ -354,6 +354,92 @@ MethodShadowSymbol* Semantic::FindMethodMember(TypeSymbol* type,
 }
 
 
+static Type* Substitute(Type* type, ParameterizedType* context)
+{
+    if (type -> IsTypeParameter())
+    {
+        TypeParameterSymbol* param = type -> GetTypeParameter();
+        if (param -> IsClassTypeParameter() && param -> ContainingType() == context -> generic_type)
+        {
+            unsigned pos = param -> position;
+            if (context -> type_arguments && pos < context -> type_arguments -> Length())
+            {
+                return (*context -> type_arguments)[pos] -> Clone();
+            }
+        }
+        return type -> Clone();
+    }
+    
+    if (type -> IsParameterized())
+    {
+        ParameterizedType* pt = type -> GetParameterizedType();
+        Tuple<Type*>* new_args = new Tuple<Type*>(pt -> type_arguments -> Length());
+        for (unsigned i = 0; i < pt -> type_arguments -> Length(); i++)
+        {
+            new_args -> Next() = Substitute((*pt -> type_arguments)[i], context);
+        }
+        return new Type(new ParameterizedType(pt -> generic_type, new_args, pt -> enclosing_type), true);
+    }
+    
+    if (type -> IsArray())
+    {
+        ArrayType* at = type -> GetArrayType();
+        Type* new_comp = Substitute(at -> component_type, context);
+        return new Type(new ArrayType(new_comp), true);
+    }
+    
+    return type -> Clone();
+}
+
+static void ResolveGenericReturnType(AstMethodInvocation* call, MethodSymbol* method, AstExpression* base)
+{
+    ParameterizedType* base_pt = NULL;
+    if (base && base -> resolved_parameterized_type)
+        base_pt = base -> resolved_parameterized_type;
+
+    if (method -> return_parameterized_type)
+    {
+        Type* ret_type = new Type(method -> return_parameterized_type, false); 
+        Type* result = NULL;
+        
+        if (base_pt) {
+            result = Substitute(ret_type, base_pt);
+        } else {
+            result = ret_type -> Clone();
+        }
+        
+        if (result && result -> IsParameterized())
+        {
+            call -> resolved_parameterized_type = result -> GetParameterizedType();
+            result -> owns_content = false;
+        }
+        delete result;
+        delete ret_type;
+    }
+    else if (method -> return_type_param_index >= 0)
+    {
+        if (base_pt)
+        {
+             unsigned pos = (unsigned)method -> return_type_param_index;
+             if (pos < base_pt -> type_arguments -> Length())
+             {
+                 Type* type_arg = (*base_pt -> type_arguments)[pos];
+                 
+                 if (type_arg -> IsParameterized())
+                 {
+                     // Clone it to avoid lifetime issues? 
+                     // For now assuming type graphs are stable during compilation phase.
+                     call -> resolved_parameterized_type = type_arg -> GetParameterizedType();
+                 }
+                 else if (type_arg -> kind == Type::SIMPLE_TYPE)
+                 {
+                     call -> resolved_type = type_arg -> GetTypeSymbol();
+                 }
+             }
+        }
+    }
+}
+
 void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
 {
     TypeSymbol* this_type = ThisType();
@@ -410,6 +496,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             //
             MethodInvocationConversion(method_call -> arguments, method);
             method_call -> symbol = method;
+            ResolveGenericReturnType(method_call, method, NULL);
 
             //
             // If the method is a private method belonging to an outer type,
@@ -482,6 +569,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             method = method_shadow -> Conflict(0);
             method_call -> symbol = method;
         }
+        ResolveGenericReturnType(method_call, method, base);
 
         SymbolSet exceptions(method -> NumThrows());
         int i, j;

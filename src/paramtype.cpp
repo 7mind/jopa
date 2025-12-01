@@ -299,9 +299,16 @@ Type* Type::Clone()
             if (parameterized_type -> enclosing_type)
             {
                 // Recursively clone enclosing type
-                Type enclosing_type_wrapper(parameterized_type -> enclosing_type);
+                Type enclosing_type_wrapper(parameterized_type -> enclosing_type, false);
                 Type* cloned_wrapper = enclosing_type_wrapper.Clone();
                 cloned_enclosing = cloned_wrapper -> GetParameterizedType();
+                // cloned_wrapper owns the cloned parameterized type, but GetParameterizedType returns ptr
+                // We need to extract it and delete wrapper?
+                // Actually Clone() returns a new Type which owns a new ParameterizedType.
+                // We need the ParameterizedType* from it, then we can delete the Type wrapper but 
+                // we must prevent it from deleting the ParameterizedType.
+                cloned_wrapper -> owns_content = false; 
+                delete cloned_wrapper;
             }
 
             ParameterizedType* cloned_pt = new ParameterizedType(
@@ -310,7 +317,7 @@ Type* Type::Clone()
                 cloned_enclosing
             );
 
-            return new Type(cloned_pt);
+            return new Type(cloned_pt, true);
         }
 
         case TYPE_PARAMETER:
@@ -327,19 +334,64 @@ Type* Type::Clone()
                 cloned_bound
             );
 
-            return new Type(cloned_wt);
+            return new Type(cloned_wt, true);
         }
 
         case ARRAY_TYPE:
         {
             Type* cloned_component = array_type -> component_type -> Clone();
             ArrayType* cloned_at = new ArrayType(cloned_component);
-            return new Type(cloned_at);
+            return new Type(cloned_at, true);
         }
 
         default:
             return NULL;
     }
+}
+
+bool Type::IsSubtype(Type* other)
+{
+    if (this == other) return true;
+    if (!other) return false;
+
+    // Fast path: Erasure check
+    TypeSymbol* this_erased = Erasure();
+    TypeSymbol* other_erased = other->Erasure();
+
+    if (!this_erased || !other_erased) return false;
+
+    // Check erased subtype relationship first
+    if (!this_erased->IsSubtype(other_erased)) return false;
+
+    // If either is raw, we allow the conversion (unchecked)
+    if (this->IsRawType() || other->IsRawType())
+        return true;
+
+    // If both are parameterized with same generic type
+    if (kind == PARAMETERIZED_TYPE && other->kind == PARAMETERIZED_TYPE)
+    {
+        if (parameterized_type->generic_type == other->parameterized_type->generic_type)
+        {
+            // Check arguments for identity (invariant)
+            // Full containment check requires more logic
+            // For now: just check strict equality of args to be safe
+            unsigned n = parameterized_type->type_arguments ? parameterized_type->type_arguments->Length() : 0;
+            unsigned m = other->parameterized_type->type_arguments ? other->parameterized_type->type_arguments->Length() : 0;
+            if (n != m) return false;
+
+            for (unsigned i = 0; i < n; i++)
+            {
+                Type* t1 = (*parameterized_type->type_arguments)[i];
+                Type* t2 = (*other->parameterized_type->type_arguments)[i];
+                // Recursive equality check? Or just erasure for now?
+                // Use erasure equality for loose check
+                if (t1->Erasure() != t2->Erasure()) return false;
+            }
+            return true;
+        }
+    }
+
+    return true; // Default to trusting erasure for now
 }
 
 

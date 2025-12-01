@@ -267,6 +267,7 @@ public:
     };
 
     TypeKind kind;
+    bool owns_content;
 
     //
     // Union of possible type representations
@@ -286,27 +287,27 @@ public:
     //
 
     Type(TypeSymbol* type)
-        : kind(SIMPLE_TYPE), simple_type(type)
+        : kind(SIMPLE_TYPE), owns_content(false), simple_type(type)
     {
     }
 
-    Type(ParameterizedType* ptype)
-        : kind(PARAMETERIZED_TYPE), parameterized_type(ptype)
+    Type(ParameterizedType* ptype, bool own = true)
+        : kind(PARAMETERIZED_TYPE), owns_content(own), parameterized_type(ptype)
     {
     }
 
     Type(TypeParameterSymbol* tparam)
-        : kind(TYPE_PARAMETER), type_parameter(tparam)
+        : kind(TYPE_PARAMETER), owns_content(false), type_parameter(tparam)
     {
     }
 
-    Type(WildcardType* wildcard)
-        : kind(WILDCARD_TYPE), wildcard_type(wildcard)
+    Type(WildcardType* wildcard, bool own = true)
+        : kind(WILDCARD_TYPE), owns_content(own), wildcard_type(wildcard)
     {
     }
 
-    Type(ArrayType* array)
-        : kind(ARRAY_TYPE), array_type(array)
+    Type(ArrayType* array, bool own = true)
+        : kind(ARRAY_TYPE), owns_content(own), array_type(array)
     {
     }
 
@@ -315,6 +316,8 @@ public:
     //
     ~Type()
     {
+        if (!owns_content) return;
+
         switch (kind)
         {
             case SIMPLE_TYPE:
@@ -334,6 +337,12 @@ public:
                 break;
         }
     }
+
+    //
+    // Check subtype relationship
+    // Returns true if this type is a subtype of 'other'
+    //
+    bool IsSubtype(Type* other);
 
     //
     // Get the erased type
