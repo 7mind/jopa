@@ -132,18 +132,38 @@ cat "$WHITELIST_FILE" | xargs -P "$NPROC" -I {} sh -c '
     test_out="'"$TEST_OUTPUT_DIR"'/classes/$(dirname "$rel_path")"
     mkdir -p "$test_out" 2>/dev/null || true
     test_dir="$(dirname "$java_file")"
-    if timeout '"$TEST_TIMEOUT"' "'"$JOPA"'" -source "'"$SOURCE_VERSION"'" -target 1.5 \
-        -classpath "'"$RUNTIME_JAR"':$test_dir" \
-        -sourcepath "'"$LIB_DIRS"':$test_dir" \
-        -d "$test_out" \
-        "$java_file" >/dev/null 2>&1; then
-        echo "PASS $rel_path"
-    else
-        exit_code=$?
-        if [ $exit_code -eq 124 ]; then
-            echo "TIMEOUT $rel_path"
+    
+    # Heuristic: if directory has few files (< 20), try compiling all to resolve sibling dependencies.
+    # If batch compilation fails (e.g. due to duplicate classes in siblings), fall back to single file.
+    
+    count=$(find "$test_dir" -maxdepth 1 -name "*.java" 2>/dev/null | wc -l)
+    batch_success=false
+    
+    if [ "$count" -lt 20 ] && [ "$count" -gt 1 ]; then
+        if timeout '"$TEST_TIMEOUT"' "'"$JOPA"'" -source "'"$SOURCE_VERSION"'" -target 1.5 \
+            -classpath "'"$RUNTIME_JAR"':$test_dir" \
+            -sourcepath "'"$LIB_DIRS"':$test_dir" \
+            -d "$test_out" \
+            "$test_dir"/*.java >/dev/null 2>&1; then
+            batch_success=true
+            echo "PASS $rel_path"
+        fi
+    fi
+
+    if [ "$batch_success" = false ]; then
+        if timeout '"$TEST_TIMEOUT"' "'"$JOPA"'" -source "'"$SOURCE_VERSION"'" -target 1.5 \
+            -classpath "'"$RUNTIME_JAR"':$test_dir" \
+            -sourcepath "'"$LIB_DIRS"':$test_dir" \
+            -d "$test_out" \
+            "$java_file" >/dev/null 2>&1; then
+            echo "PASS $rel_path"
         else
-            echo "FAIL $rel_path"
+            exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                echo "TIMEOUT $rel_path"
+            else
+                echo "FAIL $rel_path"
+            fi
         fi
     fi
 ' > "$RESULTS_FILE" 2>&1 || true

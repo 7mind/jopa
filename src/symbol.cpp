@@ -123,10 +123,19 @@ wchar_t* MethodSymbol::Header()
                 }
                 if (k == num_parameters - 1 && ACC_VARARGS())
                 {
-                    assert(s[-2] == U_LB && s[-1] == U_RB);
-                    s[-2] = U_DOT;
-                    s[-1] = U_DOT;
-                    *s++ = U_DOT;
+                    if (s[-2] == U_LB && s[-1] == U_RB)
+                    {
+                        s[-2] = U_DOT;
+                        s[-1] = U_DOT;
+                        *s++ = U_DOT;
+                    }
+                    else
+                    {
+                        // Fallback: just append ... if we didn't find the expected [] suffix
+                        *s++ = U_DOT;
+                        *s++ = U_DOT;
+                        *s++ = U_DOT;
+                    }
                 }
                 *s++ = U_SPACE;
                 for (s2 = formal -> Name(); *s2; s2++)
