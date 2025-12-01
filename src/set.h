@@ -735,6 +735,25 @@ public:
     }
 
     //
+    // Check if all bits are set (universe).
+    //
+    bool IsUniverse() const
+    {
+        int last = ((int) set_size - 1) / cell_size;
+        for (int i = 0; i < last; i++)
+        {
+            if (s[i] != ~((CELL) 0))
+                return false;
+        }
+        if (set_size == 0)
+            return true;
+        CELL mask = (set_size % cell_size
+                     ? ((CELL) 1 << (set_size % cell_size)) - (CELL) 1
+                     : ~((CELL) 0));
+        return (s[last] & mask) == mask;
+    }
+
+    //
     // Changes the size of the set. Any new bits are given the value of init.
     //
     void Resize(const unsigned new_size, const int init = EMPTY)
@@ -1093,4 +1112,3 @@ void Map<Key, Value>::Resize()
 
 
 } // Close namespace Jopa block
-

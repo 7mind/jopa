@@ -196,6 +196,8 @@ public:
     {
         break_pairs[top_index].SetUniverse();
         continue_pairs[top_index].SetUniverse();
+        break_reachable[top_index] = false;
+        continue_reachable[top_index] = false;
 
         block[top_index++] = block_;
     }
@@ -234,6 +236,20 @@ public:
         assert(top_index > 0);
         return continue_pairs[top_index - 1];
     }
+    bool TopBreakReachable() const
+    {
+        assert(top_index > 0);
+        return break_reachable[top_index - 1];
+    }
+    bool TopContinueReachable() const
+    {
+        assert(top_index > 0);
+        return continue_reachable[top_index - 1];
+    }
+    bool BreakReachable(int i) const { return break_reachable[i]; }
+    bool ContinueReachable(int i) const { return continue_reachable[i]; }
+    void MarkBreakReachable(int i) { break_reachable[i] = true; }
+    void MarkContinueReachable(int i) { continue_reachable[i] = true; }
 
     DefinitePair& ReturnPair()
     {
@@ -248,11 +264,15 @@ public:
         block = new AstBlock*[stack_size];
         break_pairs = new DefinitePair[stack_size];
         continue_pairs = new DefinitePair[stack_size];
+        break_reachable = new bool[stack_size];
+        continue_reachable = new bool[stack_size];
 
         for (int i = 0; i < stack_size; i++)
         {
             break_pairs[i].Resize(set_size);
             continue_pairs[i].Resize(set_size);
+            break_reachable[i] = false;
+            continue_reachable[i] = false;
         }
     }
 
@@ -261,6 +281,8 @@ public:
         delete [] block;
         delete [] break_pairs;
         delete [] continue_pairs;
+        delete [] break_reachable;
+        delete [] continue_reachable;
     }
 
 private:
@@ -270,6 +292,8 @@ private:
 
     DefinitePair* break_pairs;
     DefinitePair* continue_pairs;
+    bool* break_reachable;
+    bool* continue_reachable;
     DefinitePair return_pair;
 };
 
@@ -1068,7 +1092,7 @@ private:
     void (Semantic::*DefiniteStmt[Ast::_num_expr_or_stmt_kinds])(Ast*);
     inline void DefiniteStatement(Ast*);
 
-    void DefiniteLoopBody(BitSet&);
+    void DefiniteLoopBody(BitSet&, bool loop_may_repeat);
 
     void DefiniteBlock(Ast*);
     void DefiniteLocalClassStatement(Ast*);
@@ -1373,4 +1397,3 @@ private:
 
 
 } // Close namespace Jopa block
-
