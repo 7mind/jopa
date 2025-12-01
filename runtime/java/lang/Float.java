@@ -1,15 +1,18 @@
 package java.lang;
 
 public final class Float extends Number implements Comparable<Float> {
+    public static final Class TYPE = getPrimitiveClass("float");
+    private static native Class getPrimitiveClass(String name);
     public static final float POSITIVE_INFINITY = 1.0f / 0.0f;
     public static final float NEGATIVE_INFINITY = -1.0f / 0.0f;
     public static final float NaN = 0.0f / 0.0f;
-    public static final float MAX_VALUE = 0.0f;
-    public static final float MIN_NORMAL = 0.0f;
-    public static final float MIN_VALUE = 0.0f;
+    public static final float MAX_VALUE = 3.4028235e38f;
+    public static final float MIN_NORMAL = 1.17549435e-38f;
+    public static final float MIN_VALUE = 1.4e-45f;
     public static final int MAX_EXPONENT = 127;
     public static final int MIN_EXPONENT = -126;
     public static final int SIZE = 32;
+    public static final int BYTES = 4;
 
     private final float value;
 

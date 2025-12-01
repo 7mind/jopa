@@ -1506,8 +1506,9 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
         {
             for ( ; ctor; ctor = ctor -> next_method)
             {
+                int num_throws = (int) ctor -> NumThrows();
                 int k;
-                for (k = ctor -> NumThrows() - 1; k >= 0; k--)
+                for (k = num_throws - 1; k >= 0; k--)
                 {
                     if (CanAssignmentConvertReference(ctor -> Throws(k),
                                                       exception))
@@ -1521,8 +1522,9 @@ bool Semantic::UncaughtException(TypeSymbol* exception)
         else
         {
             assert(ctor);
+            int num_throws = (int) ctor -> NumThrows();
             int k = 0;
-            for (k = ctor -> NumThrows() - 1; k >= 0; k--)
+            for (k = num_throws - 1; k >= 0; k--)
             {
                 if (CanAssignmentConvertReference(ctor -> Throws(k),
                                                   exception))
@@ -2989,4 +2991,3 @@ void Semantic::ProcessExecutableBodies(AstClassBody* class_body)
 
 
 } // Close namespace Jopa block
-

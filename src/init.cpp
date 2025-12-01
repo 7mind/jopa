@@ -46,12 +46,15 @@ void Semantic::ProcessVariableInitializer(AstVariableDeclarator* variable_declar
             }
             else
             {
+                TypeSymbol* init_type = init -> Type();
+                if (! init_type)
+                    init_type = control.no_type;
                 ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_ASSIGNMENT,
                                variable_declarator,
                                field_type -> ContainingPackageName(),
                                field_type -> ExternalName(),
-                               init -> Type() -> ContainingPackageName(),
-                               init -> Type() -> ExternalName());
+                               init_type -> ContainingPackageName(),
+                               init_type -> ExternalName());
                 init -> value = NULL;
             }
         }
@@ -219,4 +222,3 @@ void Semantic::ComputeFinalValue(VariableSymbol* variable)
 
 
 } // Close namespace Jopa block
-

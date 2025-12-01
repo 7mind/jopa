@@ -480,6 +480,9 @@ bool Semantic::CanNarrowingPrimitiveConvert(const TypeSymbol* target_type,
 bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
                                           const TypeSymbol* source_type)
 {
+    if (! target_type || ! source_type)
+        return false;
+
     if (target_type == control.no_type) // Don't convert any class to bad type.
         return false;
     if (source_type == control.no_type) // Allow bad type to match anything.
@@ -563,6 +566,8 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
         return true;
 
     TypeSymbol* source_type = expr -> Type();
+    if (! source_type)
+        return false;
 
     if (CanMethodInvocationConvert(target_type, source_type))
         return true;

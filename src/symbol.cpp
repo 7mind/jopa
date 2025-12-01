@@ -1836,10 +1836,15 @@ bool TypeSymbol::HasEnclosingInstance(TypeSymbol* type, bool exact)
             : (env -> Type() -> IsSubclass(type)))
         {
             //
-            // We found the innermost candidate type, now see if it is an
-            // enclosing type that is fully initialized.
+            // We found the innermost candidate type. If we're in a static
+            // region (e.g., during an explicit constructor invocation),
+            // keep walking outward to see if an already-initialized
+            // enclosing instance satisfies the request.
             //
-            return ! env -> StaticRegion();
+            if (! env -> StaticRegion())
+                return true;
+            else
+                continue;
         }
         if (env -> Type() -> ACC_STATIC()) // No more enclosing levels exist.
             return false;
