@@ -15,6 +15,8 @@ message(STATUS "JOPA version: ${JOPA_VERSION}")
 set(JOPA_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../build" CACHE PATH "Path to the main JOPA build directory")
 set(JOPA_EXECUTABLE "${JOPA_BUILD_DIR}/src/jopa" CACHE FILEPATH "Path to JOPA executable")
 set(JOPA_RUNTIME_JAR "${JOPA_BUILD_DIR}/runtime/jopa-stub-rt.jar" CACHE FILEPATH "Path to JOPA stub runtime JAR")
+# Optional wrapper for memory tracking (defaults to JOPA_EXECUTABLE)
+set(JOPA_JAVAC_COMMAND "${JOPA_EXECUTABLE}" CACHE STRING "Command to use as JAVAC (can be a wrapper script)")
 
 if(NOT EXISTS "${JOPA_EXECUTABLE}")
     message(FATAL_ERROR "JOPA executable not found at ${JOPA_EXECUTABLE}. Please build jopa first or set JOPA_EXECUTABLE.")
@@ -64,12 +66,12 @@ set(CLASSPATH_INSTALL_DIR "${VENDOR_PREFIX}/classpath")
 if(JOPA_CLASSPATH_VERSION VERSION_LESS "0.98")
     set(CLASSPATH_EXTRA_CONF_FLAGS "--with-jikes")
     set(CLASSPATH_COMPILER_ENV
-        "JIKES=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        "JIKES=${JOPA_JAVAC_COMMAND} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
     )
 else()
     set(CLASSPATH_EXTRA_CONF_FLAGS "")
     set(CLASSPATH_COMPILER_ENV
-        "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
+        "JAVAC=${JOPA_JAVAC_COMMAND} --nowarn:unchecked -bootclasspath ${JOPA_RUNTIME_JAR}"
         "ECJ="
     )
 endif()
@@ -137,7 +139,7 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
             ${CLEAN_JAVA_ENV_VARS}
             "UBSAN_OPTIONS=halt_on_error=0"
             "ASAN_OPTIONS=detect_leaks=0"
-            "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+            "JAVAC=${JOPA_JAVAC_COMMAND} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
             <SOURCE_DIR>/configure
                 --prefix=<INSTALL_DIR>
                 --with-java-runtime-library=gnuclasspath
@@ -148,7 +150,7 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
             ${CLEAN_JAVA_ENV_VARS}
             "UBSAN_OPTIONS=halt_on_error=0"
             "ASAN_OPTIONS=detect_leaks=0"
-            "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+            "JAVAC=${JOPA_JAVAC_COMMAND} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
             ${MAKE_COMMAND} -j${NPROC}
 
         INSTALL_COMMAND ${CMAKE_COMMAND} -E env
@@ -170,9 +172,9 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
     set(ANT_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/apache-ant-${ANT_VERSION}")
     set(ANT_INSTALL_DIR "${VENDOR_PREFIX}/ant")
     
-    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" 
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh"
 "#!/bin/sh
-\"${JOPA_EXECUTABLE}\" -source 1.6 -target 1.6 -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\" 
+\"${JOPA_JAVAC_COMMAND}\" -source 1.6 -target 1.6 -bootclasspath \"${CLASSPATH_GLIBJ_ZIP}\" \"$@\"
 ")
     file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ant-java.sh" 
 "#!/bin/sh

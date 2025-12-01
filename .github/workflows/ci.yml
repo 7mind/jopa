@@ -48,7 +48,7 @@ jobs:
             cmake -S devjopak -B build-devjopak \
               -DJOPA_BUILD_DIR=build \
               -DCMAKE_BUILD_TYPE=Release \
-              -DJOPA_EXECUTABLE="$(pwd)/scripts/jopa-memory-wrapper.sh"
+              -DJOPA_JAVAC_COMMAND="$(pwd)/scripts/jopa-memory-wrapper.sh"
             cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-release.log
           '
 
@@ -169,7 +169,7 @@ jobs:
             cmake -S devjopak -B build-devjopak \
               -DJOPA_BUILD_DIR=build \
               -DCMAKE_BUILD_TYPE=Debug \
-              -DJOPA_EXECUTABLE="$(pwd)/scripts/jopa-memory-wrapper.sh"
+              -DJOPA_JAVAC_COMMAND="$(pwd)/scripts/jopa-memory-wrapper.sh"
             cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-debug.log
           '
 
