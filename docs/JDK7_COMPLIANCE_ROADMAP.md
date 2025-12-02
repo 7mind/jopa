@@ -89,18 +89,36 @@ if (!bound_type && containing_type)
 **Results:**
 - `cast/6569057/T6569057.java`: Now passes
 - Primary test suite: 214/214 tests pass
-- Minor regression: `T6650759i.java` now fails due to complex recursive type bounds (`<U extends A<U, V>, V extends B<V>>`). This exposes a latent issue with type inference on recursive bounds.
+- Minor regression: `T6650759i.java` now fails due to complex recursive type bounds (`<U extends A<U, V>, V extends B<V>>`). This exposes a latent issue with type inference on recursive bounds. **UPDATE:** Now fixed by Phase 2!
+
+### Phase 2: Target Type Inference ✅ COMPLETE (2025-12-02)
+
+**Problem:** Generic methods with no arguments (e.g., `<T> T empty()`) couldn't be assigned to a typed variable (e.g., `String s = empty()`) because the type parameter defaulted to `Object`.
+
+**Fix Applied:**
+
+1. **Track uninferred type parameters** (`ast.h`): Added `needs_target_type_inference` flag to `AstMethodInvocation` to mark method calls where the return type is a type parameter that couldn't be inferred from arguments.
+
+2. **Set flag during type inference** (`expr_primary.cpp:1190-1195`): After all argument-based inference attempts fail, set the flag to allow target type inference.
+
+3. **Apply target type in variable initializers** (`init.cpp:28-58`): After processing the initializer expression, if it's a method call needing target type inference and the variable type is compatible, use the variable type as the inferred return type.
+
+4. **Apply target type in assignments** (`expr_ops.cpp:3237-3267`): Same logic for regular assignment expressions.
+
+**Results:**
+- 6 tests now pass that were failing:
+  - `generics/inference/6369605/T6369605a.java`
+  - `generics/inference/6995200/T6995200.java`
+  - `generics/inference/6359106/T6359106.java`
+  - `generics/NameOrder.java`
+  - `generics/odersky/Test4.java`
+  - `generics/inference/6650759/T6650759i.java` (Phase 1b regression now fixed!)
+- Primary test suite: 214/214 tests pass
+- JDK7 compliance: 668/761 (87.8%)
 
 ---
 
 ## 3. Roadmap to 95%+ Compliance
-
-### Phase 2: Implement Target Type Inference
-**Goal:** Allow `<T> T empty()` to be assigned to `String s = empty()`.
-**Status:** Not started
-**Approach:**
-1. Enhance `ProcessMethodName`: If type inference from arguments is insufficient (unconstrained variables remain), use the expected result type (`target_type`) to constrain the inference variables.
-2. This requires tracking the "target type" context through expression processing.
 
 ### Phase 3: Expand API Stubs
 **Goal:** Make tool tests pass.
@@ -119,12 +137,14 @@ if (!bound_type && containing_type)
 
 ## 4. Recommendation
 
-**Phase 1a and 1b are now complete.** The next priority is **Phase 2 (Target Type Inference)**. Many failing tests involve generic methods where type inference from arguments alone is insufficient, and the expected return type needs to be used to constrain the inference.
+**Phases 1a, 1b, and 2 are now complete!** The compiler now handles:
+- Foreach loops over parameterized Iterables
+- Method lookup on bounded type variables
+- Target type inference for generic methods
 
-Example from `T6650759i.java`:
-```java
-static <W, U extends A<U, V>, V extends B<V>> W m3(Class<W> c1, C<U, V> c2);
-U res = m3(m1(u), c);  // W should be inferred as U from assignment context
-```
+The remaining 93 failing tests fall into these categories:
+1. **API stubs** (~25 tests): javadoc, javac API tests need internal stubs
+2. **Advanced generics** (~40 tests): Complex wildcard capture, recursive bounds, bridge methods
+3. **Misc** (~28 tests): Multi-catch, diagnostics, other features
 
-Currently, `W` is inferred as `Object` instead of being constrained by the assignment target type `U`.
+The next priority should be **Phase 3 (API Stubs)** if tool tests are important, or focus on the remaining generics issues in `generics/wildcards/`, `generics/rare/`, etc.
