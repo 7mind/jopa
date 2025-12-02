@@ -3154,11 +3154,26 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         PutU1(1);
         PutU1(0);
         ChangeStack(1);
-        if (component_type != control.Object())
+        
+        // Determine the actual element type of the Iterable
+        // This is needed because next() returns Object, but we need to cast it 
+        // to the generic type (e.g. Integer) before unboxing/converting to loop var type (e.g. float)
+        TypeSymbol* iterable_element_type = semantic.GetIterableElementType(expr_type, foreach->expression->resolved_parameterized_type);
+        
+        if (iterable_element_type != control.Object())
         {
             PutOp(OP_CHECKCAST);
-            PutU2(RegisterClass(component_type));
+            PutU2(RegisterClass(iterable_element_type));
         }
+        
+        // Emit conversion from element type to loop variable type
+        // This handles:
+        // 1. Identity (String -> String)
+        // 2. Unboxing (Integer -> int)
+        // 3. Unboxing + Widening (Integer -> int -> float)
+        // 4. Reference widening (String -> Object)
+        EmitCast(component_type, iterable_element_type);
+        
         u2 var_pc = code_attribute -> CodeLength();
         StoreLocal(var -> LocalVariableIndex(), component_type);
         // Clear stack state before loop body - it should be empty at this point

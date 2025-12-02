@@ -851,6 +851,9 @@ public:
     bool IsUnboxingConversion(TypeSymbol*, TypeSymbol*);
     MethodSymbol* GetBoxingMethod(TypeSymbol*);
     MethodSymbol* GetUnboxingMethod(TypeSymbol*);
+    
+    // Helper for foreach loops
+    TypeSymbol* GetIterableElementType(TypeSymbol* type, ParameterizedType* start_param = NULL);
 
 private:
     enum

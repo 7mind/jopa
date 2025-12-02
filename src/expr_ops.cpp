@@ -516,9 +516,19 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
     if (target_type -> Primitive())
     {
         // Java 5: Unboxing conversion (wrapper → primitive) for method invocation
-        if (control.option.source >= JopaOption::SDK1_5 &&
-            IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
-            return true;
+        if (control.option.source >= JopaOption::SDK1_5)
+        {
+            // 1. Direct unboxing conversion (wrapper → primitive)
+            if (IsUnboxingConversion((TypeSymbol*)source_type, (TypeSymbol*)target_type))
+                return true;
+
+            // 2. Unboxing followed by widening primitive conversion
+            // e.g., Integer -> int -> float
+            // This conversion is allowed in method invocation context (JLS 5.3)
+            TypeSymbol* unboxed_type = GetPrimitiveType((TypeSymbol*)source_type);
+            if (unboxed_type && CanWideningPrimitiveConvert(target_type, unboxed_type))
+                return true;
+        }
         return false;
     }
     return source_type == control.null_type ||

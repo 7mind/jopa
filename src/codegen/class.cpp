@@ -1998,8 +1998,6 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
             // Parse parameterized superclass from signature if present
             // Signature format: Ljava/lang/ref/Reference<TT;>;
             const char* sig_p = super_sig_start;
-            // DEBUG
-            fprintf(stderr, "DEBUG: Parsing class file. sig_start=%p\n", super_sig_start);
             
             if (sig_p && *sig_p == 'L')
             {

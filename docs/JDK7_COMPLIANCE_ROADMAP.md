@@ -1,7 +1,7 @@
 # JDK 7 Compliance Roadmap & Log
 
-**Status:** 86.2% Pass Rate (656/761)
-**Remaining Failures:** 105
+**Status:** 86.9% Pass Rate (661/761)
+**Remaining Failures:** 100
 
 ## Progress Log
 
@@ -14,7 +14,11 @@
     *   **Result:** `jopa-stub-rt` errors resolved.
 
 ### Phase 2: Remaining Semantic & Inference Issues
-*   [ ] **Fix Unboxing+Widening in Foreach**: `tools/javac/boxing/BoxedForeach.java` fails when iterating `Byte[]` to `float` (Unboxing `Byte` -> `byte` -> Widening `float`).
+*   [x] **Fix Unboxing+Widening in Foreach**:
+    *   Updated `CanMethodInvocationConvert` to allow unboxing followed by widening (JLS 5.3).
+    *   Implemented `GetIterableElementType` in `Semantic` to correctly identify element type from parameterized iterables.
+    *   Updated `EmitForeachStatement` to cast to the correct element type before unboxing/widening.
+    *   **Result:** `BoxedForeach.java` passes (and 4 other tests).
 *   [ ] **Fix Type Inference**: Many failures in `tools/javac/generics/inference/` suggest issues with type inference for generic methods (JLS 15.12.2.7).
 *   [ ] **Fix Enum Switch**: `tools/javac/enums/EnumSwitch.java` (if failing) or similar.
 *   [ ] **Investigate API/Annotation Failures**: `tools/javac/api/` failures need classification.

@@ -652,6 +652,138 @@ struct SearchNode {
      ParameterizedType* param_type;
 };
 
+TypeSymbol* Semantic::GetIterableElementType(TypeSymbol* type, ParameterizedType* start_param)
+{
+    // Default to Object
+    TypeSymbol* component_type = control.Object();
+    
+    if (!type) return component_type;
+
+    // Check for parameterized Iterable type (e.g., Iterable<Integer>)
+    ParameterizedType* param_iter = NULL;
+
+    // First check if type itself is a parameterized Iterable
+    // (this happens if type IS Iterable<T>, not a subtype)
+    if (type -> GetParameterizedType() &&
+        type -> GetParameterizedType() -> generic_type == control.Iterable())
+    {
+        param_iter = type -> GetParameterizedType();
+    }
+    else
+    {
+        // If start_param wasn't provided, try to get it from the type
+        if (!start_param && type->GetParameterizedType() && 
+            type->GetParameterizedType()->generic_type == type) {
+             start_param = type->GetParameterizedType();
+        }
+
+        SymbolSet visited_types;
+        Tuple<SearchNode> queue(16);
+        
+        SearchNode start_node;
+        start_node.type_sym = type;
+        start_node.param_type = start_param;
+        
+        queue.Next() = start_node;
+        visited_types.AddElement(type);
+        
+        int depth = 0;
+        for (unsigned i = 0; i < queue.Length() && !param_iter && depth < 50000; i++)
+        {
+            SearchNode current = queue[i];
+            TypeSymbol* t = current.type_sym;
+            ParameterizedType* p = current.param_type;
+            depth++;
+            
+            // Check if t itself is Iterable
+            if (t == control.Iterable()) {
+                param_iter = p ? p : (ParameterizedType*)1;
+                break;
+            }
+
+            // Check interfaces
+            for (unsigned k = 0; k < t -> NumInterfaces(); k++)
+            {
+                TypeSymbol* interf = t -> Interface(k);
+                ParameterizedType* decl_param = t -> ParameterizedInterface(k);
+                ParameterizedType* next_param = decl_param;
+
+                // Perform substitution if we have a context (p) and the interface is parameterized
+                if (decl_param && p) {
+                    unsigned num_args = decl_param->NumTypeArguments();
+                    Tuple<Type*>* new_args = new Tuple<Type*>(num_args);
+                    for(unsigned a=0; a<num_args; a++) {
+                        Type* arg = decl_param->TypeArgument(a);
+                        Type* subst_arg = arg; // Default to original
+
+                        if (arg->kind == Type::TYPE_PARAMETER) {
+                            unsigned pos = arg->type_parameter->position;
+                            if (pos < p->NumTypeArguments()) {
+                                // Substitute with argument from context
+                                subst_arg = new Type(*p->TypeArgument(pos));
+                            } else {
+                                 subst_arg = new Type(*arg);
+                            }
+                        } else {
+                            // Clone other types to avoid ownership issues if needed
+                            // For now, simple clone
+                            subst_arg = new Type(*arg);
+                        }
+                        new_args->Next() = subst_arg;
+                    }
+                    next_param = new ParameterizedType(decl_param->generic_type, new_args);
+                    control.RegisterParameterizedType(next_param);
+                }
+
+                if (interf == control.Iterable())
+                {
+                    param_iter = next_param ? next_param : (ParameterizedType*)1;
+                    break;
+                }
+                
+                // Add interface to queue if not visited
+                if (!visited_types.IsElement(interf))
+                {
+                    visited_types.AddElement(interf);
+                    SearchNode next_node;
+                    next_node.type_sym = interf;
+                    next_node.param_type = next_param;
+                    queue.Next() = next_node;
+                }
+            }
+            
+            if (param_iter) break;
+            
+            // Add superclass to queue if not visited
+            if (t -> super && !visited_types.IsElement(t -> super))
+            {
+                visited_types.AddElement(t -> super);
+                
+                SearchNode next_node;
+                next_node.type_sym = t -> super;
+                next_node.param_type = p; // Pass through
+                
+                queue.Next() = next_node;
+            }
+        }
+    }
+
+    if (param_iter && param_iter != (ParameterizedType*)1 && param_iter -> NumTypeArguments() > 0)
+    {
+        Type* arg = param_iter -> TypeArgument(0);
+        // Resolve the type argument (erasure + generics info)
+        TypeSymbol* type_arg = arg -> Erasure();
+        if (type_arg)
+        {
+            component_type = type_arg;
+        }
+    }
+    return component_type;
+}
+
+//
+// Enhanced for loops (or foreach loops) were added in JDK 1.5, by JSR 201.
+//
 void Semantic::ProcessForeachStatement(Ast* stmt)
 {
     AstForeachStatement* foreach = (AstForeachStatement*) stmt;
@@ -778,168 +910,7 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
     }
     else if (cond_type -> IsSubtype(control.Iterable()))
     {
-        // Default to Object
-        component_type = control.Object();
-
-        // Check for parameterized Iterable type (e.g., Iterable<Integer>)
-        ParameterizedType* param_iter = NULL;
-
-        // First check if cond_type itself is a parameterized Iterable
-        // (this happens if cond_type IS Iterable<T>, not a subtype)
-        if (cond_type -> GetParameterizedType() &&
-            cond_type -> GetParameterizedType() -> generic_type == control.Iterable())
-        {
-            param_iter = cond_type -> GetParameterizedType();
-        }
-        else
-        {
-            ParameterizedType* start_param = NULL;
-            if (foreach->expression->resolved_parameterized_type) {
-                start_param = foreach->expression->resolved_parameterized_type;
-            } else if (cond_type->GetParameterizedType() && 
-                       cond_type->GetParameterizedType()->generic_type == cond_type) {
-                 // This handles the case where cond_type is a ParameterizedType but resolved_parameterized_type was not set
-                 // (though usually resolved_parameterized_type is preferred)
-                 start_param = cond_type->GetParameterizedType();
-            }
-
-            // BFS Queue nodes
-            
-            SymbolSet visited_types;
-            Tuple<SearchNode> queue(16);
-            
-            SearchNode start_node;
-            start_node.type_sym = cond_type;
-            start_node.param_type = start_param;
-            
-            queue.Next() = start_node;
-            visited_types.AddElement(cond_type);
-
-            // DEBUG: Trace hierarchy traversal
-            bool debug = false; 
-            if (debug) {
-                 fprintf(stderr, "Foreach debug: Searching Iterable in %s (param: %s) Queue Length: %d\n", 
-                         cond_type->Name(), start_param ? "yes" : "no", queue.Length());
-            }
-            
-                        int depth = 0;
-                        for (unsigned i = 0; i < queue.Length() && !param_iter && depth < 50000; i++)
-                        {
-                            SearchNode current = queue[i];
-                            TypeSymbol* t = current.type_sym;
-                            ParameterizedType* p = current.param_type;
-                            depth++;
-                            
-                            // Check if t itself is Iterable
-                            if (t == control.Iterable()) {
-                                param_iter = p ? p : (ParameterizedType*)1;
-                                break;
-                            }
-
-                            // Check interfaces
-                            for (unsigned k = 0; k < t -> NumInterfaces(); k++)
-                            {
-                                TypeSymbol* interf = t -> Interface(k);
-                                ParameterizedType* decl_param = t -> ParameterizedInterface(k);
-                                ParameterizedType* next_param = decl_param;
-
-                                // Perform substitution if we have a context (p) and the interface is parameterized
-                                if (decl_param && p) {
-                                    unsigned num_args = decl_param->NumTypeArguments();
-                                    Tuple<Type*>* new_args = new Tuple<Type*>(num_args);
-                                    for(unsigned a=0; a<num_args; a++) {
-                                        Type* arg = decl_param->TypeArgument(a);
-                                        Type* subst_arg = arg; // Default to original
-
-                                        if (arg->kind == Type::TYPE_PARAMETER) {
-                                            unsigned pos = arg->type_parameter->position;
-                                            if (pos < p->NumTypeArguments()) {
-                                                // Substitute with argument from context
-                                                subst_arg = new Type(*p->TypeArgument(pos));
-                                            } else {
-                                                 subst_arg = new Type(*arg);
-                                            }
-                                        } else {
-                                            // Clone other types to avoid ownership issues if needed
-                                            // For now, simple clone
-                                            subst_arg = new Type(*arg);
-                                        }
-                                        new_args->Next() = subst_arg;
-                                    }
-                                    next_param = new ParameterizedType(decl_param->generic_type, new_args);
-                                    control.RegisterParameterizedType(next_param);
-                                }
-
-                                if (interf == control.Iterable())
-                                {
-                                    param_iter = next_param ? next_param : (ParameterizedType*)1;
-                                    break;
-                                }
-                                
-                                // Add interface to queue if not visited
-                                if (!visited_types.IsElement(interf))
-                                {
-                                    visited_types.AddElement(interf);
-                                    SearchNode next_node;
-                                    next_node.type_sym = interf;
-                                    next_node.param_type = next_param;
-                                    queue.Next() = next_node;
-                                }
-                            }
-                            
-                            if (param_iter) break;
-                            
-                            // Add superclass to queue if not visited
-                            if (t -> super && !visited_types.IsElement(t -> super))
-                            {
-                                visited_types.AddElement(t -> super);
-                                
-                                // Substitution for superclass?
-                                // t -> super is TypeSymbol*.
-                                // Does t have ParameterizedSuper?
-                                // Jikes doesn't explicitly store ParameterizedSuper in TypeSymbol usually, 
-                                // but it might have it in similar way to interfaces.
-                                // Looking at TypeSymbol definition, it has supertype_field.
-                                // But we need the parameterized version.
-                                // It seems TypeSymbol doesn't easily expose parameterized superclass 
-                                // in the same way as interfaces.
-                                // However, for Iterable search, interfaces are most important.
-                                // If a class extends a class that implements Iterable, that superclass
-                                // will have Iterable in its interfaces.
-                                // So traversing raw superclass is fine as long as we carry the parameterization?
-                                // Wait, if A<T> extends B<T>, and B<T> implements Iterable<T>.
-                                // We visit A<String>. p=[String].
-                                // We visit B. We need to map A's T to B's T.
-                                // This requires knowing the superclass parameterization.
-                                // If Jopa stores it, we should use it.
-                                // Assuming for now raw superclass traversal might be enough if Iterable comes from interfaces directly.
-                                // But if Iterable comes from superclass...
-                                // Let's check if TypeSymbol has info about parameterized super.
-                                // It likely does not. This might be a limitation.
-                                // But let's proceed with raw super for now.
-                                
-                                SearchNode next_node;
-                                next_node.type_sym = t -> super;
-                                next_node.param_type = p; // Pass through? Incorrect if super has different params.
-                                // If A<T> extends B, then p is valid for A, but maybe not B?
-                                // If B is not generic, p is ignored.
-                                // If B is generic, we assume B<T>? That's risky.
-                                // But standard collections usually put Iterable in interfaces.
-                                
-                                queue.Next() = next_node;
-                            }
-                        }        }
-
-        if (param_iter && param_iter != (ParameterizedType*)1 && param_iter -> NumTypeArguments() > 0)
-        {
-            Type* arg = param_iter -> TypeArgument(0);
-            // Resolve the type argument (erasure + generics info)
-            TypeSymbol* type_arg = arg -> Erasure();
-            if (type_arg)
-            {
-                component_type = type_arg;
-            }
-        }
+        component_type = GetIterableElementType(cond_type, foreach->expression->resolved_parameterized_type);
 
         if (! CanAssignmentConvertReference(index_type, component_type))
         {
