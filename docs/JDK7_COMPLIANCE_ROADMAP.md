@@ -1,7 +1,7 @@
 # JDK 7 Compliance Roadmap & Log
 
-**Status:** 86.9% Pass Rate (661/761)
-**Remaining Failures:** 100
+**Status:** 86.7% Pass Rate (660/761)
+**Remaining Failures:** 101
 
 ## Progress Log
 
@@ -19,7 +19,13 @@
     *   Implemented `GetIterableElementType` in `Semantic` to correctly identify element type from parameterized iterables.
     *   Updated `EmitForeachStatement` to cast to the correct element type before unboxing/widening.
     *   **Result:** `BoxedForeach.java` passes (and 4 other tests).
-*   [ ] **Fix Type Inference**: Many failures in `tools/javac/generics/inference/` suggest issues with type inference for generic methods (JLS 15.12.2.7).
+*   [~] **Fix Type Inference**:
+    *   Implemented `Control&` passing to `Erasure` methods to handle unbounded wildcards/type parameters correctly (accessing `Object`).
+    *   Fixed wildcard handling in `ProcessTypeArguments` (was defaulting to `SIMPLE_TYPE`).
+    *   Implemented wildcard capture logic in `ProcessMethodName` to use type parameter bounds when wildcard bound is less specific.
+    *   **Result:** `T5034571.java` partially fixed (unbounded wildcard case `f1` works). Intersection type issues remain for `f2`.
+*   [ ] **Fix Enum Switch**: `tools/javac/enums/EnumSwitch.java` (if failing) or similar.
+*   [ ] **Investigate API/Annotation Failures**: `tools/javac/api/` failures need classification.
 *   [ ] **Fix Enum Switch**: `tools/javac/enums/EnumSwitch.java` (if failing) or similar.
 *   [ ] **Investigate API/Annotation Failures**: `tools/javac/api/` failures need classification.
 

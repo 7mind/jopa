@@ -772,7 +772,7 @@ TypeSymbol* Semantic::GetIterableElementType(TypeSymbol* type, ParameterizedType
     {
         Type* arg = param_iter -> TypeArgument(0);
         // Resolve the type argument (erasure + generics info)
-        TypeSymbol* type_arg = arg -> Erasure();
+        TypeSymbol* type_arg = arg -> Erasure(control);
         if (type_arg)
         {
             component_type = type_arg;

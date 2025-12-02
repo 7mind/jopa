@@ -36,7 +36,7 @@ void TypeParameterSymbol::AddParameterizedBound(Type* bound)
 //
 // Get the erased type for this type parameter
 //
-TypeSymbol* TypeParameterSymbol::ErasedType()
+TypeSymbol* TypeParameterSymbol::ErasedType(Control& control)
 {
     // If there are explicit bounds, erase to the first bound
     if (IsBounded())
@@ -47,8 +47,7 @@ TypeSymbol* TypeParameterSymbol::ErasedType()
         return upper_bound;
 
     // Otherwise, erase to Object
-    // This will be filled in during semantic analysis when Control is available
-    return NULL;  // Will be replaced with Object during processing
+    return control.Object();
 }
 
 //

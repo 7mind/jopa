@@ -3,8 +3,8 @@
 #include "platform.h"
 #include "tuple.h"
 
-
 namespace Jopa { // Open namespace Jopa block
+class Control; // Forward declaration
 class TypeSymbol;
 class MethodSymbol;
 class NameSymbol;
@@ -106,7 +106,7 @@ public:
     //   T extends Number   -> Number
     //   T extends List & Serializable -> List (first bound)
     //
-    TypeSymbol* ErasedType();
+    TypeSymbol* ErasedType(Control& control);
 
     //
     // Check if this type parameter has explicit bounds

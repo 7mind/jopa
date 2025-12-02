@@ -1653,7 +1653,7 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                                         if (i < base_param_type -> NumTypeArguments())
                                         {
                                             Type* type_arg = base_param_type -> TypeArgument(i);
-                                            name -> resolved_type = type_arg -> Erasure();
+                                            name -> resolved_type = type_arg -> Erasure(control);
                                         }
                                         break;
                                     }
@@ -1761,7 +1761,7 @@ void Semantic::ProcessFieldAccess(Ast* expr)
                                         if (i < receiver_param_type -> NumTypeArguments())
                                         {
                                             Type* type_arg = receiver_param_type -> TypeArgument(i);
-                                            field_access -> resolved_type = type_arg -> Erasure();
+                                            field_access -> resolved_type = type_arg -> Erasure(control);
                                             if (type_arg -> kind == Type::PARAMETERIZED_TYPE)
                                                 field_access -> resolved_parameterized_type = type_arg -> parameterized_type;
                                         }

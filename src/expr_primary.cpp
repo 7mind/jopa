@@ -589,6 +589,41 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 if (base_param_type -> generic_type == method -> containing_type)
                 {
                     param_type = base_param_type;
+                    
+                    // Direct match logic (duplicated from inheritance loop, needs consolidation ideally)
+                    if (param_index < param_type -> NumTypeArguments())
+                    {
+                        Type* substituted_arg = param_type -> TypeArgument(param_index);
+                        if (substituted_arg)
+                        {
+                            TypeSymbol* result = substituted_arg -> Erasure(control);
+                            
+                                                                                        // Wildcard capture logic:
+                                                                                        // If substituted_arg is a wildcard, we must also respect the
+                                                                                        // type parameter's bound from the generic type definition.
+                                                                                        // If wildcard is unbounded ('?'), the erasure is Object, 
+                                                                                        // but the type parameter bound might be more specific (e.g. 'I1').
+                                                                                        if (substituted_arg -> IsWildcard())
+                                                                                        {
+                                                                                            TypeParameterSymbol* tparam = current_generic -> TypeParameter(k);
+                                                                                            TypeSymbol* bound_erasure = tparam -> ErasedType(control);
+                                                                                            
+                                                                                            // If the result is Object (unbounded) or less specific than the bound,
+                                                                                            // use the bound.
+                                                                                            if (result == control.Object() || 
+                                                                                                (bound_erasure != control.Object() && !bound_erasure->IsSubtype(result)))
+                                                                                            {
+                                                                                                result = bound_erasure;
+                                                                                            }
+                                                                                        }
+                            if (result && result -> fully_qualified_name && ! result -> Primitive())
+                            {
+                                method_call -> resolved_type = result;
+                                if (substituted_arg -> IsParameterized())
+                                    method_call -> resolved_parameterized_type = substituted_arg -> GetParameterizedType();
+                            }
+                        }
+                    }
                 }
                 else
                 {
@@ -635,7 +670,27 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                             current_param -> TypeArgument(k);
                                                         if (substituted_arg)
                                                         {
-                                                            TypeSymbol* result = substituted_arg -> Erasure();
+                                                            TypeSymbol* result = substituted_arg -> Erasure(control);
+                                                            
+                                                            // Wildcard capture logic:
+                                                            // If substituted_arg is a wildcard, we must also respect the
+                                                            // type parameter's bound from the generic type definition.
+                                                            // If wildcard is unbounded ('?'), the erasure is Object, 
+                                                            // but the type parameter bound might be more specific (e.g. 'I1').
+                                                            if (substituted_arg -> IsWildcard())
+                                                            {
+                                                                TypeParameterSymbol* tparam = current_generic -> TypeParameter(k);
+                                                                TypeSymbol* bound_erasure = tparam -> ErasedType(control);
+                                                                
+                                                                // If the result is Object (unbounded) or less specific than the bound,
+                                                                // use the bound.
+                                                                if (result == control.Object() || 
+                                                                    (bound_erasure != control.Object() && !bound_erasure->IsSubtype(result)))
+                                                                {
+                                                                    result = bound_erasure;
+                                                                }
+                                                            }
+
                                                             if (result && result -> fully_qualified_name &&
                                                                 ! result -> Primitive())
                                                             {
@@ -696,7 +751,21 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                                 current_param -> TypeArgument(k);
                                                             if (substituted_arg)
                                                             {
-                                                                TypeSymbol* result = substituted_arg -> Erasure();
+                                                                TypeSymbol* result = substituted_arg -> Erasure(control);
+
+                                                                // Wildcard capture logic
+                                                                if (substituted_arg -> IsWildcard())
+                                                                {
+                                                                    TypeParameterSymbol* tparam = current_generic -> TypeParameter(k);
+                                                                    TypeSymbol* bound_erasure = tparam -> ErasedType(control);
+                                                                    
+                                                                    if (result == control.Object() || 
+                                                                        (bound_erasure != control.Object() && !bound_erasure->IsSubtype(result)))
+                                                                    {
+                                                                        result = bound_erasure;
+                                                                    }
+                                                                }
+
                                                                 if (result && result -> fully_qualified_name &&
                                                                     ! result -> Primitive())
                                                                 {
@@ -813,7 +882,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                             Type* substituted_type = current_param_super -> TypeArgument(k);
                                             if (substituted_type)
                                             {
-                                                TypeSymbol* result = substituted_type -> Erasure();
+                                                TypeSymbol* result = substituted_type -> Erasure(control);
                                                 if (result && result -> fully_qualified_name &&
                                                     ! result -> Primitive())
                                                 {
@@ -860,7 +929,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             Type* type_arg = param_type -> TypeArgument(param_index);
             if (type_arg)
             {
-                TypeSymbol* substituted = type_arg -> Erasure();
+                TypeSymbol* substituted = type_arg -> Erasure(control);
                 // Make sure we have a valid reference type (not primitive)
                 // Primitives don't have fully_qualified_name and can't be type arguments
                 if (substituted &&
@@ -956,8 +1025,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                             // For PrivilegedAction<Provider>, get Provider
                             Type* type_arg = class_creation -> class_type ->
                                 parameterized_type -> TypeArgument(0);
-                            if (type_arg)
-                                arg_type = type_arg -> Erasure();
+                                arg_type = type_arg -> Erasure(control);
                         }
                         // No explicit type arguments - check if the created class implements
                         // the parameter interface with type arguments
@@ -985,7 +1053,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                             {
                                                 Type* type_arg = param_interf -> TypeArgument(0);
                                                 if (type_arg)
-                                                    arg_type = type_arg -> Erasure();
+                                                    arg_type = type_arg -> Erasure(control);
                                             }
                                             break;
                                         }
@@ -1059,7 +1127,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                             {
                                                 Type* type_arg = param_interf -> TypeArgument(0);
                                                 if (type_arg)
-                                                    inferred_from_interface = type_arg -> Erasure();
+                                                    inferred_from_interface = type_arg -> Erasure(control);
                                             }
                                             break;
                                         }
@@ -1150,7 +1218,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                         if (pinterface && pinterface -> NumTypeArguments() > 0)
                         {
                             Type* type_arg = pinterface -> TypeArgument(0);
-                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure() : NULL;
+                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure(control) : NULL;
                             if (erasure && erasure != control.no_type && erasure -> fully_qualified_name)
                                 inferred_type = erasure;
                         }
@@ -1163,7 +1231,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                         if (psuper && psuper -> NumTypeArguments() > 0)
                         {
                             Type* type_arg = psuper -> TypeArgument(0);
-                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure() : NULL;
+                            TypeSymbol* erasure = type_arg ? type_arg -> Erasure(control) : NULL;
                             if (erasure && erasure != control.no_type && erasure -> fully_qualified_name)
                                 inferred_type = erasure;
                         }

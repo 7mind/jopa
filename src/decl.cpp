@@ -935,6 +935,21 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
             }
 
+            // Try to find in the enclosing type (if nested)
+            // This handles cases where a type parameter bound refers to a sibling inner class
+            if (!bound_type && type->IsNested())
+            {
+                TypeSymbol* enclosing = type->owner->TypeCast();
+                while (enclosing) {
+                    if (enclosing->Table())
+                        bound_type = enclosing->Table()->FindTypeSymbol(bound_name);
+                    
+                    if (bound_type) break;
+                    
+                    enclosing = enclosing->owner->TypeCast();
+                }
+            }
+
             // Try to find in the current package
             if (!bound_type)
             {
@@ -1204,7 +1219,7 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
             if (type_arg_ast->generic_type)
             {
                 // Use generic type info if available (handles type variables)
-                satisfies_bound = type_arg_ast->generic_type->IsSubtype(bound);
+                satisfies_bound = type_arg_ast->generic_type->IsSubtype(bound, control);
             }
             else
             {
@@ -1236,6 +1251,72 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     for (unsigned i = 0; i < num_args; i++)
     {
         AstType* type_arg_ast = type_arguments -> TypeArgument(i);
+
+        // Check for wildcard
+        if (AstWildcard* wildcard_ast = type_arg_ast -> WildcardCast())
+        {
+            Type* bound_type = NULL;
+            WildcardType::BoundKind kind = WildcardType::UNBOUNDED;
+
+            if (wildcard_ast -> extends_token_opt)
+                kind = WildcardType::EXTENDS;
+            else if (wildcard_ast -> super_token_opt)
+                kind = WildcardType::SUPER;
+
+            if (wildcard_ast -> bounds_opt)
+            {
+                // Reconstruct the Type for the bound
+                // This mimics the logic below for type arguments
+                AstTypeName* bound_name = wildcard_ast -> bounds_opt -> TypeNameCast();
+                if (bound_name && bound_name -> parameterized_type)
+                {
+                    Type temp_wrapper(bound_name -> parameterized_type);
+                    bound_type = temp_wrapper.Clone();
+                    temp_wrapper.kind = Type::SIMPLE_TYPE;
+                    temp_wrapper.simple_type = NULL;
+                }
+                else
+                {
+                    // Check for type parameter reference
+                    TypeParameterSymbol* type_param_sym = NULL;
+                    if (bound_name && ! bound_name -> type_arguments_opt)
+                    {
+                        const NameSymbol* arg_name = lex_stream -> NameSymbol(
+                            bound_name -> name -> identifier_token);
+                        if (processing_type)
+                        {
+                            for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
+                            {
+                                TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
+                                if (tp -> name_symbol == arg_name) { type_param_sym = tp; break; }
+                            }
+                        }
+                        if (! type_param_sym && ThisMethod())
+                        {
+                            for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
+                            {
+                                TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
+                                if (tp -> name_symbol == arg_name) { type_param_sym = tp; break; }
+                            }
+                        }
+                    }
+
+                    if (type_param_sym)
+                        bound_type = new Type(type_param_sym);
+                    else
+                    {
+                        TypeSymbol* bound_sym = wildcard_ast -> bounds_opt -> symbol;
+                        if (! bound_sym || bound_sym -> Bad())
+                            bound_sym = control.no_type;
+                        bound_type = new Type(bound_sym);
+                    }
+                }
+            }
+
+            WildcardType* wt = new WildcardType(kind, bound_type);
+            type_arg_tuple -> Next() = new Type(wt);
+            continue;
+        }
 
         // Check if the type argument is itself a parameterized type
         AstTypeName* type_name = type_arg_ast -> TypeNameCast();
@@ -5342,7 +5423,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             if (type_param -> name_symbol == name_symbol)
             {
                 // Found a method type parameter - return its erased type
-                TypeSymbol* erased = type_param -> ErasedType();
+                TypeSymbol* erased = type_param -> ErasedType(control);
                 
                 if (!erased) {
                      // Debugging T7022054pos1
@@ -5375,7 +5456,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             if (type_param -> name_symbol == name_symbol)
             {
                 // Found a method type parameter - return its erased type
-                TypeSymbol* erased = type_param -> ErasedType();
+                TypeSymbol* erased = type_param -> ErasedType(control);
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
             }
@@ -5393,7 +5474,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
                 TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
                 if (type_param -> name_symbol == name_symbol)
                 {
-                    TypeSymbol* erased = type_param -> ErasedType();
+                    TypeSymbol* erased = type_param -> ErasedType(control);
                     return erased ? erased : control.Object();
                 }
             }
@@ -5410,7 +5491,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             if (type_param -> name_symbol == name_symbol)
             {
                 // Found a method type parameter - return its erased type
-                TypeSymbol* erased = type_param -> ErasedType();
+                TypeSymbol* erased = type_param -> ErasedType(control);
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
             }
@@ -5425,7 +5506,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
                 TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
                 if (type_param -> name_symbol == name_symbol)
                 {
-                    TypeSymbol* erased = type_param -> ErasedType();
+                    TypeSymbol* erased = type_param -> ErasedType(control);
                     return erased ? erased : control.Object();
                 }
             }

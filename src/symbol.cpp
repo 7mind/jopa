@@ -736,9 +736,9 @@ unsigned TypeSymbol::NumLocalTypes()
 //
 // Get the erased type for this TypeSymbol
 //
-TypeSymbol* TypeSymbol::Erasure()
+TypeSymbol* TypeSymbol::Erasure(Control& control)
 {
-    return parameterized_type ? parameterized_type -> Erasure() : this;
+    return parameterized_type ? parameterized_type -> Erasure(control) : this;
 }
 
 

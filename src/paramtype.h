@@ -1,8 +1,5 @@
-#pragma once
-
 #include "platform.h"
 #include "tuple.h"
-
 
 namespace Jopa { // Open namespace Jopa block
 class TypeSymbol;
@@ -73,14 +70,7 @@ public:
     //
     ~ParameterizedType();
 
-    //
-    // Get the erased type (just the raw generic type)
-    // List<String> -> List
-    //
-    TypeSymbol* Erasure()
-    {
-        return generic_type;
-    }
+    TypeSymbol* Erasure(Control& control);
 
     //
     // Check if this is a raw type (generic type without type arguments)
@@ -164,7 +154,7 @@ public:
     // For ? super Integer, returns Object
     // For ?, returns Object
     //
-    TypeSymbol* UpperBound();
+    TypeSymbol* UpperBound(Control& control);
 
     //
     // Get the lower bound of this wildcard
@@ -172,7 +162,7 @@ public:
     // For ? extends Number, returns null (no lower bound)
     // For ?, returns null
     //
-    TypeSymbol* LowerBound();
+    TypeSymbol* LowerBound(Control& control);
 
     //
     // Check if this is an unbounded wildcard
@@ -231,12 +221,7 @@ public:
         // component_type is managed by symbol table, don't delete
     }
 
-    //
-    // Get the erased type for this array
-    // If component erases to Object, array erases to Object[]
-    // If component erases to Number, array erases to Number[]
-    //
-    TypeSymbol* Erasure();
+    TypeSymbol* Erasure(Control& control);
 
     //
     // Generate signature
@@ -335,11 +320,7 @@ public:
         }
     }
 
-    //
-    // Get the erased type
-    // Converts this Type to its erasure (TypeSymbol*)
-    //
-    TypeSymbol* Erasure();
+    TypeSymbol* Erasure(Control& control);
 
     //
     // Check if this type is generic (has type parameters or arguments)
@@ -424,7 +405,7 @@ public:
     //
     // Check if this type is a subtype of the given type symbol
     //
-    bool IsSubtype(TypeSymbol* type);
+    bool IsSubtype(TypeSymbol* type, Control& control);
 
     //
     // Clone this type

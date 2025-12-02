@@ -1572,8 +1572,8 @@ public:
         return is_generic && ! IsParameterized();
     }
 
-    // Get the erased type (for parameterized types, returns the raw type)
-    TypeSymbol* Erasure();
+    // Get the erased type for this TypeSymbol
+    TypeSymbol* Erasure(Control& control);
 
     // Set the generic signature for Signature attribute
     void SetGenericSignature(Control&);

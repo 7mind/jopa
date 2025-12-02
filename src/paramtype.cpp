@@ -22,60 +22,33 @@ ParameterizedType::~ParameterizedType()
     delete enclosing_type;
 }
 
-
-void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
+TypeSymbol* ParameterizedType::Erasure(Control& /*control*/)
 {
-    // Format: L<classname><TypeArguments>;
-    // Example: Ljava/util/List<Ljava/lang/String;>;
-
-    // Get the fully qualified signature (e.g., "Ljava/util/List;")
-    const char* full_sig = generic_type -> SignatureString();
-    unsigned sig_len = strlen(full_sig);
-
-    // Copy everything except the trailing ';'
-    for (unsigned i = 0; i < sig_len - 1; i++)
-    {
-        buffer[length++] = full_sig[i];
-    }
-
-    // Add type arguments if present
-    if (type_arguments && type_arguments -> Length() > 0)
-    {
-        buffer[length++] = '<';
-
-        for (unsigned i = 0; i < type_arguments -> Length(); i++)
-        {
-            Type* arg = (*type_arguments)[i];
-            arg -> GenerateSignature(buffer, length);
-        }
-
-        buffer[length++] = '>';
-    }
-
-    buffer[length++] = ';';
+    // Erasure of a parameterized type is its generic type (raw type)
+    return generic_type;
 }
+
 
 //
 // WildcardType implementation
 //
 
-TypeSymbol* WildcardType::UpperBound()
+TypeSymbol* WildcardType::UpperBound(Control& control)
 {
     if (bound_kind == EXTENDS && bound)
     {
-        return bound -> Erasure();
+        return bound -> Erasure(control);
     }
 
     // For UNBOUNDED and SUPER, upper bound is Object
-    // This will be set properly during semantic analysis
-    return NULL;  // Placeholder - will be replaced with Object
+    return control.Object();
 }
 
-TypeSymbol* WildcardType::LowerBound()
+TypeSymbol* WildcardType::LowerBound(Control& control)
 {
     if (bound_kind == SUPER && bound)
     {
-        return bound -> Erasure();
+        return bound -> Erasure(control);
     }
 
     // No lower bound for EXTENDS and UNBOUNDED
@@ -113,16 +86,21 @@ void WildcardType::GenerateSignature(char* buffer, unsigned& length)
 // ArrayType implementation
 //
 
-TypeSymbol* ArrayType::Erasure()
+TypeSymbol* ArrayType::Erasure(Control& control)
 {
     // Array erasure depends on component type erasure
     // T[] where T erases to Object -> Object[]
     // T[] where T extends Number -> Number[]
     // List<String>[] -> List[]
 
-    // This will be implemented properly when we have access to Control
-    // and can create array types
-    return NULL;  // Placeholder
+    TypeSymbol* erased_component_type = component_type->Erasure(control);
+    if (erased_component_type)
+    {
+        // GetArrayType is a method of TypeSymbol, so it needs a Semantic* context.
+        // We use system_semantic from control as a fallback context
+        return erased_component_type->GetArrayType(control.system_semantic, 1);
+    }
+    return NULL;  // Should not happen
 }
 
 void ArrayType::GenerateSignature(char* buffer, unsigned& length)
@@ -136,7 +114,7 @@ void ArrayType::GenerateSignature(char* buffer, unsigned& length)
 // Type implementation
 //
 
-TypeSymbol* Type::Erasure()
+TypeSymbol* Type::Erasure(Control& control)
 {
     switch (kind)
     {
@@ -144,16 +122,17 @@ TypeSymbol* Type::Erasure()
             return simple_type;
 
         case PARAMETERIZED_TYPE:
-            return parameterized_type -> Erasure();
+            return parameterized_type -> Erasure(control);
 
         case TYPE_PARAMETER:
-            return type_parameter -> ErasedType();
+            // TypeParameter's ErasedType needs control
+            return type_parameter -> ErasedType(control);
 
         case WILDCARD_TYPE:
-            return wildcard_type -> UpperBound();
+            return wildcard_type -> UpperBound(control);
 
         case ARRAY_TYPE:
-            return array_type -> Erasure();
+            return array_type -> Erasure(control);
 
         default:
             return NULL;
@@ -273,7 +252,7 @@ void Type::GenerateSignature(char* buffer, unsigned& length)
     }
 }
 
-bool Type::IsSubtype(TypeSymbol* type)
+bool Type::IsSubtype(TypeSymbol* type, Control& control)
 {
     if (!type) return false;
 
@@ -283,7 +262,7 @@ bool Type::IsSubtype(TypeSymbol* type)
             return simple_type && simple_type -> IsSubtype(type);
 
         case PARAMETERIZED_TYPE:
-            return parameterized_type -> Erasure() -> IsSubtype(type);
+            return parameterized_type -> Erasure(control) -> IsSubtype(type);
 
         case TYPE_PARAMETER:
         {
@@ -291,33 +270,23 @@ bool Type::IsSubtype(TypeSymbol* type)
             // If no bounds, T <: Object
             if (type_parameter -> NumBounds() == 0)
             {
-                return type == NULL; // Should check against Object, but we don't have Control here easily.
-                // Assuming type is not null, and unbounded T only extends Object.
-                // We need Control to get Object.
-                // However, Erasure() returns Object (or NULL).
-                // If Erasure() is NULL, we can't check properly without Control.
-                // But TypeParameterSymbol::ErasedType() handles this if we trust it.
-                // Wait, ErasedType returns NULL if unbounded and no Control.
-                
-                // If we assume type is valid, we can check if type is Object by name?
-                // Or just rely on Erasure logic if possible.
-                
-                // Better: check bounds.
+                // Check against Object explicitly
+                return control.Object() -> IsSubtype(type);
             }
             
             for (unsigned i = 0; i < type_parameter -> NumBounds(); i++)
             {
-                if (type_parameter -> Bound(i) -> IsSubtype(type))
+                if (type_parameter -> Bound(i) -> IsSubtype(type)) // Bound is TypeSymbol*, already has IsSubtype
                     return true;
             }
             return false;
         }
 
         case WILDCARD_TYPE:
-            return wildcard_type -> UpperBound() && wildcard_type -> UpperBound() -> IsSubtype(type);
+            return wildcard_type -> UpperBound(control) && wildcard_type -> UpperBound(control) -> IsSubtype(type);
 
         case ARRAY_TYPE:
-            return array_type -> Erasure() && array_type -> Erasure() -> IsSubtype(type);
+            return array_type -> Erasure(control) && array_type -> Erasure(control) -> IsSubtype(type);
 
         default:
             return false;
@@ -391,6 +360,38 @@ Type* Type::Clone()
         default:
             return NULL;
     }
+}
+
+void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
+{
+    // Format: L<classname><TypeArguments>;
+    // Example: Ljava/util/List<Ljava/lang/String;>;
+
+    // Get the fully qualified signature (e.g., "Ljava/util/List;")
+    const char* full_sig = generic_type -> SignatureString();
+    unsigned sig_len = strlen(full_sig);
+
+    // Copy everything except the trailing ';'
+    for (unsigned i = 0; i < sig_len - 1; i++)
+    {
+        buffer[length++] = full_sig[i];
+    }
+
+    // Add type arguments if present
+    if (type_arguments && type_arguments -> Length() > 0)
+    {
+        buffer[length++] = '<';
+
+        for (unsigned i = 0; i < type_arguments -> Length(); i++)
+        {
+            Type* arg = (*type_arguments)[i];
+            arg -> GenerateSignature(buffer, length);
+        }
+
+        buffer[length++] = '>';
+    }
+
+    buffer[length++] = ';';
 }
 
 
