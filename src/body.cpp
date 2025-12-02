@@ -995,20 +995,36 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
             }
         }
 
-        if (! CanAssignmentConvertReference(index_type, component_type))
+        // Check type compatibility for foreach.
+        // The conversion path is: component_type -> (unbox if needed) -> (widen if needed) -> index_type
+        bool compatible = CanAssignmentConvertReference(index_type, component_type);
+
+        if (! compatible && index_type -> Primitive())
         {
-            // For primitive index types, we need autoboxing support
-            // Check if component type is a boxed version of the primitive
-            TypeSymbol* boxed_type = GetWrapperType(index_type);
-            if (! boxed_type || ! CanAssignmentConvertReference(boxed_type, component_type))
+            // index_type is primitive - check if component_type can be unboxed and widened
+            TypeSymbol* unboxed_component = component_type -> UnboxedType(control);
+            if (unboxed_component && unboxed_component != component_type)
             {
-                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_FOREACH,
-                               foreach -> expression,
-                               component_type -> ContainingPackageName(),
-                               component_type -> ExternalName(),
-                               index_type -> ContainingPackageName(),
-                               index_type -> ExternalName());
+                // unboxed_component is the primitive type - check if it can widen to index_type
+                compatible = CanWideningPrimitiveConvert(index_type, unboxed_component);
             }
+        }
+        else if (! compatible)
+        {
+            // For primitive index types, check if boxed index_type can be assigned from component_type
+            TypeSymbol* boxed_type = GetWrapperType(index_type);
+            if (boxed_type)
+                compatible = CanAssignmentConvertReference(boxed_type, component_type);
+        }
+
+        if (! compatible)
+        {
+            ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_FOREACH,
+                           foreach -> expression,
+                           component_type -> ContainingPackageName(),
+                           component_type -> ExternalName(),
+                           index_type -> ContainingPackageName(),
+                           index_type -> ExternalName());
         }
         // Need synthetic local variable to stash iterator.
         enclosing_block_symbol -> helper_variable_index =

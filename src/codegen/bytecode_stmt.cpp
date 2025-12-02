@@ -3154,7 +3154,19 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         PutU1(1);
         PutU1(0);
         ChangeStack(1);
-        if (component_type != control.Object())
+        if (component_type -> Primitive())
+        {
+            // Loop variable is primitive - need to cast to boxed type and unbox
+            TypeSymbol* boxed_type = component_type -> BoxedType(control);
+            if (boxed_type && boxed_type != component_type)
+            {
+                PutOp(OP_CHECKCAST);
+                PutU2(RegisterClass(boxed_type));
+                // Emit unboxing call (e.g., Integer.intValue())
+                EmitCast(component_type, boxed_type);
+            }
+        }
+        else if (component_type != control.Object())
         {
             PutOp(OP_CHECKCAST);
             PutU2(RegisterClass(component_type));
