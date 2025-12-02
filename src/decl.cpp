@@ -1042,7 +1042,24 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
             {
                 bound_type = containing_type;
             }
-            
+
+            // Check nested classes within the containing type (e.g., E extends B where B is a nested class)
+            if (!bound_type && containing_type)
+            {
+                bound_type = containing_type -> FindTypeSymbol(bound_name);
+            }
+
+            // Check enclosing types for nested classes (for deeply nested types)
+            if (!bound_type && containing_type)
+            {
+                for (TypeSymbol* enclosing = containing_type -> ContainingType();
+                     enclosing && !bound_type;
+                     enclosing = enclosing -> ContainingType())
+                {
+                    bound_type = enclosing -> FindTypeSymbol(bound_name);
+                }
+            }
+
             if (!bound_type)
             {
                 // Try to find using ImportType (checks single type imports and same package)
@@ -5343,20 +5360,6 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             {
                 // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
-                
-                if (!erased) {
-                     // Debugging T7022054pos1
-                     if (type_param->name_symbol->Name()[0] == 'X') {
-                         Coutput << "FindType: Type param " << name_symbol->Name() << " has no erasure (unbounded?)" << endl;
-                         if (type_param->NumBounds() > 0) {
-                            Coutput << "  But has " << type_param->NumBounds() << " bounds!" << endl;
-                            Coutput << "  Bound 0: " << type_param->Bound(0)->Name() << endl;
-                         } else {
-                            Coutput << "  And has 0 bounds." << endl;
-                         }
-                     }
-                }
-
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
             }
