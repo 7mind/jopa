@@ -116,9 +116,48 @@ if (!bound_type && containing_type)
 - Primary test suite: 214/214 tests pass
 - JDK7 compliance: 668/761 (87.8%)
 
+### Phase 2b: Nested Parameterized Type Inference in Foreach ✅ COMPLETE (2025-12-02)
+
+**Problem:** Foreach loops over `Map.entrySet()` were failing because the element type `Map.Entry<K,V>` wasn't being properly inferred. The pattern `for (Map.Entry<String, Integer> e : map.entrySet())` was treating the element as `Object`.
+
+**Root Cause:** The `entrySet()` method returns `Set<Map.Entry<K,V>>` - a nested parameterized type. When looking up `Map.Entry` as a nested class, the type table lookup was failing because nested classes use `$` notation internally (`java/util/Map$Entry`).
+
+**Fix Applied:**
+In `body.cpp`, added special handling for `entrySet()` to look up `Entry` through the containing type (`Map`) using `FindTypeSymbol()`:
+```cpp
+else if (strcmp(method_name, "entrySet") == 0)
+{
+    // Map.entrySet() returns Set<Map.Entry<K,V>>
+    // Look up Entry via the containing type (Map)
+    NameSymbol* entry_name = control.FindOrInsertName(
+        (const wchar_t*)L"Entry", 5);
+    TypeSymbol* entry_type = containing -> FindTypeSymbol(entry_name);
+    if (entry_type)
+    {
+        component_type = entry_type;
+        foreach -> iterator_element_type = component_type;
+    }
+}
+```
+
+**Results:**
+- `for (Map.Entry<K,V> e : map.entrySet())` now compiles and runs correctly
+- Primary test suite: 214/214 tests pass
+
 ---
 
-## 3. Roadmap to 95%+ Compliance
+## 3. Bootstrap Build Verification ✅ COMPLETE (2025-12-02)
+
+**GNU Classpath:** ✅ Builds successfully with JOPA
+**JamVM:** ✅ Builds successfully with JOPA
+**Apache Ant:** ✅ Builds and bootstraps successfully (compiled by JOPA, running on JamVM)
+**ECJ (Eclipse Compiler):** 🔄 IN PROGRESS - Compiles successfully, needs resource bundling fix
+
+The ECJ build target has been added to `vendor/CMakeLists.txt`. ECJ 4.2.1 compiles with JOPA (excluding Ant integration and JSR 199/269 tool packages which depend on APIs not in GNU Classpath). The resulting `ecj.jar` (414 classes, 1.3MB) runs on JamVM but needs `.properties` resource files included.
+
+---
+
+## 4. Roadmap to 95%+ Compliance
 
 ### Phase 3: Expand API Stubs
 **Goal:** Make tool tests pass.
