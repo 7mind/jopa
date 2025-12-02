@@ -469,7 +469,7 @@ void TypeSymbol::SetSignature(Control& control)
 void TypeSymbol::SetGenericSignature(Control& control)
 {
     // Check if we need a signature attribute
-    bool needs_signature = IsGeneric() || HasParameterizedSuper();
+    bool needs_signature = IsGeneric() || HasParameterizedSuper() || HasParameterizedInterface();
 
     if (! needs_signature)
         return;
@@ -518,13 +518,24 @@ void TypeSymbol::SetGenericSignature(Control& control)
     }
 
     // Add interface signatures
+    // Use parameterized interface signatures when available
     for (unsigned i = 0; i < NumInterfaces(); i++)
     {
-        TypeSymbol* interface = Interface(i);
-        const char* interface_sig = interface -> SignatureString();
-        unsigned interface_len = strlen(interface_sig);
-        for (unsigned j = 0; j < interface_len; j++)
-            buffer[length++] = interface_sig[j];
+        ParameterizedType* param_interface = ParameterizedInterface(i);
+        if (param_interface)
+        {
+            // Use parameterized interface signature (e.g., Ljava/lang/Iterable<TE;>;)
+            param_interface -> GenerateSignature(buffer, length);
+        }
+        else
+        {
+            // Use raw interface signature
+            TypeSymbol* interface = Interface(i);
+            const char* interface_sig = interface -> SignatureString();
+            unsigned interface_len = strlen(interface_sig);
+            for (unsigned j = 0; j < interface_len; j++)
+                buffer[length++] = interface_sig[j];
+        }
     }
 
     // Null terminate and store

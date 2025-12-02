@@ -3,6 +3,8 @@
 #include "control.h"
 #include "option.h"
 #include "stream.h"
+#include "paramtype.h"
+#include "typeparam.h"
 
 
 namespace Jopa { // Open namespace Jopa block
@@ -643,6 +645,190 @@ void Semantic::ProcessForStatement(Ast* stmt)
 
 
 //
+// FindIterableTypeArgument - Extract the type argument T from Iterable<T>
+// by walking up the type hierarchy.
+//
+// This handles cases like:
+//   - Iterable<Integer> -> Integer
+//   - ArrayList<String> (implements List<E> extends Collection<E> extends Iterable<E>) -> String
+//   - Iterable<? extends Number> -> Number (upper bound)
+//   - Iterable<T> where T extends Integer -> Integer (type variable bound)
+//
+Type* Semantic::FindIterableTypeArgument(ParameterizedType* param_type)
+{
+    if (! param_type)
+        return NULL;
+
+    TypeSymbol* iterable = control.Iterable();
+    TypeSymbol* generic_type = param_type -> generic_type;
+
+    // Case 1: Direct match - param_type is Iterable<T>
+    if (generic_type == iterable)
+    {
+        if (param_type -> NumTypeArguments() > 0)
+        {
+            Type* type_arg = param_type -> TypeArgument(0);
+            // Handle wildcards: ? extends T -> use upper bound
+            if (type_arg && type_arg -> IsWildcard())
+            {
+                WildcardType* wildcard = type_arg -> GetWildcard();
+                if (wildcard -> bound)
+                    return wildcard -> bound;
+                // Unbounded wildcard - return NULL to default to Object
+                return NULL;
+            }
+            return type_arg;
+        }
+        return NULL;
+    }
+
+    // Case 2: Walk up the inheritance hierarchy to find Iterable<T>
+    // Check superclass
+    if (generic_type -> HasParameterizedSuper())
+    {
+        ParameterizedType* super_param = generic_type -> GetParameterizedSuper();
+        Type* result = FindIterableTypeArgumentInSuper(param_type, super_param);
+        if (result)
+            return result;
+    }
+
+    // Check interfaces
+    for (unsigned i = 0; i < generic_type -> NumInterfaces(); i++)
+    {
+        ParameterizedType* iface_param = generic_type -> ParameterizedInterface(i);
+        if (iface_param)
+        {
+            Type* result = FindIterableTypeArgumentInSuper(param_type, iface_param);
+            if (result)
+                return result;
+        }
+    }
+
+    return NULL;
+}
+
+//
+// Helper to substitute type arguments when walking the type hierarchy.
+// Given a concrete parameterized type (e.g., ArrayList<String>) and a supertype
+// (e.g., List<E>), substitute the type arguments to get List<String>.
+//
+Type* Semantic::FindIterableTypeArgumentInSuper(ParameterizedType* concrete_type,
+                                                 ParameterizedType* super_type)
+{
+    if (! super_type)
+        return NULL;
+
+    TypeSymbol* iterable = control.Iterable();
+
+    // If super_type is Iterable<T>, extract T with substitution
+    if (super_type -> generic_type == iterable)
+    {
+        if (super_type -> NumTypeArguments() > 0)
+        {
+            Type* super_arg = super_type -> TypeArgument(0);
+            // Substitute type parameter with concrete type argument
+            return SubstituteTypeArgument(concrete_type, super_arg);
+        }
+        return NULL;
+    }
+
+    // Recursively check super_type's supertypes
+    TypeSymbol* super_generic = super_type -> generic_type;
+
+    // Check superclass
+    if (super_generic -> HasParameterizedSuper())
+    {
+        ParameterizedType* super_super = super_generic -> GetParameterizedSuper();
+        // Recurse with super_type as the new context - super_super's type args
+        // reference super_generic's type params, which are bound by super_type's args
+        Type* result = FindIterableTypeArgumentInSuper(super_type, super_super);
+        if (result)
+            return SubstituteTypeArgument(concrete_type, result);
+    }
+
+    // Check interfaces
+    for (unsigned i = 0; i < super_generic -> NumInterfaces(); i++)
+    {
+        ParameterizedType* iface_param = super_generic -> ParameterizedInterface(i);
+        if (iface_param)
+        {
+            // Recurse with super_type as context - iface_param's type args
+            // reference super_generic's type params
+            Type* result = FindIterableTypeArgumentInSuper(super_type, iface_param);
+            if (result)
+                return SubstituteTypeArgument(concrete_type, result);
+        }
+    }
+
+    return NULL;
+}
+
+//
+// Substitute type parameters in type_arg with concrete type arguments from concrete_type.
+// E.g., if concrete_type is ArrayList<String> and type_arg is E (the type parameter),
+// return String.
+//
+Type* Semantic::SubstituteTypeArgument(ParameterizedType* concrete_type, Type* type_arg)
+{
+    if (! type_arg)
+        return NULL;
+
+    // If type_arg is not a type parameter, return it as-is
+    if (! type_arg -> IsTypeParameter())
+    {
+        // Handle wildcards
+        if (type_arg -> IsWildcard())
+        {
+            WildcardType* wildcard = type_arg -> GetWildcard();
+            if (wildcard -> bound)
+            {
+                Type* substituted_bound = SubstituteTypeArgument(concrete_type, wildcard -> bound);
+                if (substituted_bound)
+                    return substituted_bound;
+            }
+            return type_arg;
+        }
+        return type_arg;
+    }
+
+    // type_arg is a type parameter - find its position and substitute
+    TypeParameterSymbol* type_param = type_arg -> GetTypeParameter();
+    TypeSymbol* generic_type = concrete_type -> generic_type;
+
+    // Find which type parameter index this is
+    for (unsigned i = 0; i < generic_type -> NumTypeParameters(); i++)
+    {
+        if (generic_type -> TypeParameter(i) == type_param)
+        {
+            // Substitute with concrete_type's type argument at this position
+            if (i < concrete_type -> NumTypeArguments())
+            {
+                Type* substituted = concrete_type -> TypeArgument(i);
+                if (substituted)
+                {
+                    // Handle wildcards in the substituted type
+                    if (substituted -> IsWildcard())
+                    {
+                        WildcardType* wildcard = substituted -> GetWildcard();
+                        if (wildcard -> bound)
+                            return wildcard -> bound;
+                    }
+                    return substituted;
+                }
+            }
+            break;
+        }
+    }
+
+    // Type parameter not found in concrete_type - use its bound
+    TypeSymbol* bound = type_param -> ErasedType();
+    if (bound)
+        return new Type(bound);
+    return NULL;
+}
+
+
+//
 // Enhanced for loops (or foreach loops) were added in JDK 1.5, by JSR 201.
 //
 void Semantic::ProcessForeachStatement(Ast* stmt)
@@ -771,23 +957,58 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
     }
     else if (cond_type -> IsSubtype(control.Iterable()))
     {
-        // FIXME: Support generics. Until then, we blindly accept all types,
-        // and cause a ClassCastException if the user was wrong (this is not
-        // semantically correct, but it allows testing).
+        // Extract element type from Iterable<T>
+        // Default to Object if we can't determine the type argument
         component_type = control.Object();
+
+        // Try to get the parameterized type from the expression
+        ParameterizedType* expr_param_type = NULL;
+
+        // Case 1: Check if the expression symbol is a variable with parameterized type
+        AstExpression* expr = foreach -> expression -> ExpressionCast();
+        if (expr && expr -> symbol)
+        {
+            VariableSymbol* var = expr -> symbol -> VariableCast();
+            if (var && var -> parameterized_type)
+            {
+                expr_param_type = var -> parameterized_type;
+            }
+        }
+
+        // Case 2: Check if the expression has a resolved_parameterized_type (from method call)
+        if (! expr_param_type && expr && expr -> resolved_parameterized_type)
+        {
+            expr_param_type = expr -> resolved_parameterized_type;
+        }
+
+        // If we have a parameterized type, find the Iterable<T> type argument
+        if (expr_param_type)
+        {
+            Type* element_type = FindIterableTypeArgument(expr_param_type);
+            if (element_type)
+            {
+                // Get the erasure of the element type for type checking
+                // Handle TYPE_PARAMETER (e.g., T extends Integer) - use its bound
+                component_type = element_type -> Erasure();
+                if (! component_type)
+                    component_type = control.Object();
+            }
+        }
+
         if (! CanAssignmentConvertReference(index_type, component_type))
         {
-            // HACK. Only complain about primitives, until generics are
-            // fully supported and we can see if cond_type is parameterized,
-            // and until autounboxing is implemented.
-            if (index_type -> Primitive())
-            ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_FOREACH,
-                           foreach -> expression,
-                           component_type -> ContainingPackageName(),
-                           component_type -> ExternalName(),
-                           index_type -> ContainingPackageName(),
-                           index_type -> ExternalName());
-            
+            // For primitive index types, we need autoboxing support
+            // Check if component type is a boxed version of the primitive
+            TypeSymbol* boxed_type = GetWrapperType(index_type);
+            if (! boxed_type || ! CanAssignmentConvertReference(boxed_type, component_type))
+            {
+                ReportSemError(SemanticError::INCOMPATIBLE_TYPE_FOR_FOREACH,
+                               foreach -> expression,
+                               component_type -> ContainingPackageName(),
+                               component_type -> ExternalName(),
+                               index_type -> ContainingPackageName(),
+                               index_type -> ExternalName());
+            }
         }
         // Need synthetic local variable to stash iterator.
         enclosing_block_symbol -> helper_variable_index =

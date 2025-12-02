@@ -1557,6 +1557,19 @@ public:
     // Check if superclass is parameterized (for Signature attribute)
     bool HasParameterizedSuper() const { return parameterized_super != NULL; }
 
+    // Check if any interface is parameterized (for Signature attribute)
+    bool HasParameterizedInterface() const
+    {
+        if (! parameterized_interfaces)
+            return false;
+        for (unsigned i = 0; i < parameterized_interfaces -> Length(); i++)
+        {
+            if ((*parameterized_interfaces)[i])
+                return true;
+        }
+        return false;
+    }
+
     // Set parameterized superclass (for anonymous classes)
     void SetParameterizedSuper(ParameterizedType* ptype) { parameterized_super = ptype; }
 

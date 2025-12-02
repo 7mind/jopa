@@ -2115,6 +2115,211 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
             }
         }
     }
+    //
+    // Parse interface signatures from class signature to get parameterized interfaces.
+    // Class signature format: <TypeParams>SuperclassSig InterfaceSig*
+    // We need to parse interface signatures in order, then add them in reverse.
+    //
+    Tuple<ParameterizedType*> param_interfaces(8);
+    if (control.option.source >= JopaOption::SDK1_5 && class_data -> Signature())
+    {
+        const CPUtf8Info* sig_info = class_data -> Signature() -> Signature(pool);
+        const char* sig = sig_info -> Bytes();
+        const char* p = sig;
+
+        // Skip type parameters if present
+        if (p && *p == '<')
+        {
+            int depth = 1;
+            p++;
+            while (*p && depth > 0)
+            {
+                if (*p == '<') depth++;
+                else if (*p == '>') depth--;
+                p++;
+            }
+        }
+
+        // Skip superclass signature (one type signature starting with L)
+        if (p && *p == 'L')
+        {
+            int depth = 0;
+            while (*p)
+            {
+                if (*p == '<') depth++;
+                else if (*p == '>') depth--;
+                else if (*p == ';' && depth == 0)
+                {
+                    p++;
+                    break;
+                }
+                p++;
+            }
+        }
+
+        // Now p points to interface signatures - parse them in order
+        while (p && *p == 'L')
+        {
+            p++;  // skip 'L'
+
+            // Find class name end (at '<' or ';')
+            while (*p && *p != '<' && *p != ';')
+                p++;
+
+            ParameterizedType* param_iface = NULL;
+
+            if (*p == '<')
+            {
+                // Has type arguments - parse them
+                p++;  // skip '<'
+                Tuple<Type*>* type_args = new Tuple<Type*>(4);
+
+                while (*p && *p != '>')
+                {
+                    if (*p == 'T')
+                    {
+                        // Type variable reference like "TE;"
+                        p++;  // skip 'T'
+                        const char* var_start = p;
+                        while (*p && *p != ';')
+                            p++;
+                        int var_len = p - var_start;
+                        if (*p == ';')
+                            p++;  // skip ';'
+
+                        // Find matching type parameter
+                        wchar_t* var_name = new wchar_t[var_len + 1];
+                        Control::ConvertUtf8ToUnicode(var_name, var_start, var_len);
+                        var_name[var_len] = U_NULL;
+
+                        TypeParameterSymbol* found_param = NULL;
+                        for (unsigned j = 0; j < type -> NumTypeParameters(); j++)
+                        {
+                            TypeParameterSymbol* tp = type -> TypeParameter(j);
+                            if (tp -> name_symbol &&
+                                wcscmp(tp -> name_symbol -> Name(), var_name) == 0)
+                            {
+                                found_param = tp;
+                                break;
+                            }
+                        }
+                        delete[] var_name;
+
+                        if (found_param)
+                            type_args -> Next() = new Type(found_param);
+                        else
+                            type_args -> Next() = new Type(control.Object());
+                    }
+                    else if (*p == 'L')
+                    {
+                        // Class type argument
+                        const char* sig_ptr = p;
+                        TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                        type_args -> Next() = new Type(arg_type);
+                        p = sig_ptr;
+                    }
+                    else if (*p == '[')
+                    {
+                        // Array type argument
+                        const char* sig_ptr = p;
+                        TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                        type_args -> Next() = new Type(arg_type);
+                        p = sig_ptr;
+                    }
+                    else if (*p == '*')
+                    {
+                        // Unbounded wildcard
+                        p++;
+                        WildcardType* wildcard = new WildcardType(WildcardType::UNBOUNDED, NULL);
+                        type_args -> Next() = new Type(wildcard);
+                    }
+                    else if (*p == '+')
+                    {
+                        // Upper-bounded wildcard (extends)
+                        p++;
+                        if (*p == 'L' || *p == 'T' || *p == '[')
+                        {
+                            const char* sig_ptr = p;
+                            TypeSymbol* bound_type = ProcessSignature(type, sig_ptr, tok);
+                            WildcardType* wildcard = new WildcardType(WildcardType::EXTENDS, new Type(bound_type));
+                            type_args -> Next() = new Type(wildcard);
+                            p = sig_ptr;
+                        }
+                    }
+                    else if (*p == '-')
+                    {
+                        // Lower-bounded wildcard (super)
+                        p++;
+                        if (*p == 'L' || *p == 'T' || *p == '[')
+                        {
+                            const char* sig_ptr = p;
+                            TypeSymbol* bound_type = ProcessSignature(type, sig_ptr, tok);
+                            WildcardType* wildcard = new WildcardType(WildcardType::SUPER, new Type(bound_type));
+                            type_args -> Next() = new Type(wildcard);
+                            p = sig_ptr;
+                        }
+                    }
+                    else
+                    {
+                        p++;
+                    }
+                }
+
+                if (*p == '>')
+                    p++;
+
+                if (type_args -> Length() > 0)
+                {
+                    // Create the parameterized type with the matching interface
+                    // The interface is at this index in class_data->Interface()
+                    unsigned iface_idx = param_interfaces.Length();
+                    if (iface_idx < (unsigned) class_data -> InterfacesCount())
+                    {
+                        CPClassInfo* iface_info = class_data -> Interface(iface_idx);
+                        TypeSymbol* iface = GetType(type, iface_info, pool, tok);
+                        param_iface = new ParameterizedType(iface, type_args);
+                        control.RegisterParameterizedType(param_iface);
+                    }
+                    else
+                    {
+                        delete type_args;
+                    }
+                }
+                else
+                {
+                    delete type_args;
+                }
+            }
+
+            // Skip to end of this signature (find trailing ';')
+            while (*p && *p != ';')
+            {
+                if (*p == '<')
+                {
+                    int depth = 1;
+                    p++;
+                    while (*p && depth > 0)
+                    {
+                        if (*p == '<') depth++;
+                        else if (*p == '>') depth--;
+                        p++;
+                    }
+                }
+                else
+                {
+                    p++;
+                }
+            }
+            if (*p == ';')
+                p++;
+
+            // Store parameterized interface (may be NULL for non-generic interface)
+            param_interfaces.Next() = param_iface;
+        }
+    }
+
+    // Now add interfaces in reverse order, with their parameterized types
+    unsigned num_param_ifaces = param_interfaces.Length();
     for (i = class_data -> InterfacesCount() - 1; i >= 0; i--)
     {
         class_info = class_data -> Interface(i);
@@ -2125,6 +2330,10 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         type -> supertypes_closure -> Union(*interf -> supertypes_closure);
         if (! interf -> ACC_INTERFACE())
             type -> MarkBad();
+
+        // Add the corresponding parameterized interface
+        ParameterizedType* param_iface = (i < (int) num_param_ifaces) ? param_interfaces[i] : NULL;
+        type -> AddParameterizedInterface(param_iface);
     }
 
     //

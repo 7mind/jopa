@@ -1689,10 +1689,12 @@ void ByteCode::FinishCode()
         AddAttribute(CreateEnclosingMethodAttribute(enclosing));
     }
 
-    // Add Signature attribute for generic classes and classes with parameterized superclasses (Java 5+)
-    // (the latter is needed for TypeToken pattern and similar reflection-based code)
+    // Add Signature attribute for generic classes, classes with parameterized superclasses,
+    // or classes with parameterized interfaces (Java 5+)
+    // (needed for TypeToken pattern, foreach with generics, and similar reflection-based code)
     if (control.option.target >= JopaOption::SDK1_5 &&
-        (unit_type -> IsGeneric() || unit_type -> HasParameterizedSuper()))
+        (unit_type -> IsGeneric() || unit_type -> HasParameterizedSuper() ||
+         unit_type -> HasParameterizedInterface()))
     {
         unit_type -> SetGenericSignature(control);
         if (unit_type -> GenericSignature())

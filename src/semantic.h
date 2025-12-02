@@ -1310,6 +1310,12 @@ private:
     void ProcessBlock(Ast*);
     void ProcessForStatement(Ast*);
     void ProcessForeachStatement(Ast*);
+    // Helpers for ProcessForeachStatement: find the type argument T for Iterable<T>
+    // in the given parameterized type or its supertype hierarchy
+    Type* FindIterableTypeArgument(ParameterizedType* param_type);
+    Type* FindIterableTypeArgumentInSuper(ParameterizedType* concrete_type,
+                                          ParameterizedType* super_type);
+    Type* SubstituteTypeArgument(ParameterizedType* concrete_type, Type* type_arg);
     void ProcessSwitchStatement(Ast*);
     void ProcessThrowStatement(Ast*);
     void ProcessTryStatement(Ast*);
