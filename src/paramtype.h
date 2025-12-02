@@ -74,6 +74,11 @@ public:
     ~ParameterizedType();
 
     //
+    // Deep clone this parameterized type
+    //
+    ParameterizedType* Clone() const;
+
+    //
     // Get the erased type (just the raw generic type)
     // List<String> -> List
     //

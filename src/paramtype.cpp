@@ -23,6 +23,30 @@ ParameterizedType::~ParameterizedType()
 }
 
 
+ParameterizedType* ParameterizedType::Clone() const
+{
+    // Clone type arguments
+    Tuple<Type*>* cloned_args = NULL;
+    if (type_arguments)
+    {
+        cloned_args = new Tuple<Type*>(type_arguments -> Length());
+        for (unsigned i = 0; i < type_arguments -> Length(); i++)
+        {
+            cloned_args -> Next() = (*type_arguments)[i] -> Clone();
+        }
+    }
+
+    // Clone enclosing type
+    ParameterizedType* cloned_enclosing = NULL;
+    if (enclosing_type)
+    {
+        cloned_enclosing = enclosing_type -> Clone();
+    }
+
+    return new ParameterizedType(generic_type, cloned_args, cloned_enclosing);
+}
+
+
 void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
 {
     // Format: L<classname><TypeArguments>;

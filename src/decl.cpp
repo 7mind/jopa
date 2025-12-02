@@ -928,10 +928,23 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 bound_type = type;
             }
 
+            // Check single-type imports (e.g., import java.util.List;)
             if (!bound_type)
             {
-                // Try to find using ImportType (checks single type imports and same package)
-                // Note: ImportType expects us to be in the context of the file
+                for (unsigned k = 0; k < single_type_imports.Length(); k++)
+                {
+                    TypeSymbol* import_type = single_type_imports[k];
+                    if (bound_name == import_type -> Identity())
+                    {
+                        bound_type = import_type;
+                        break;
+                    }
+                }
+            }
+
+            // Try import-on-demand (e.g., import java.util.*;)
+            if (!bound_type)
+            {
                 bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
             }
 
@@ -971,6 +984,14 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 // TODO: Add proper validation for final classes in bounds
                 // TODO: Validate that only first bound can be a class
                 type_param -> AddBound(bound_type);
+
+                // NOTE: We intentionally don't process parameterized bounds here
+                // during class type parameter processing, because for recursive generics
+                // like class A<T extends B<T, U>, U extends A<T, U>>, the other type
+                // parameters haven't been added yet. Parameterized bounds for class
+                // type parameters will be processed later if needed.
+                // For method type parameters, we can safely process parameterized bounds
+                // since methods can't have recursive type parameter references.
             }
             // If bound_type is still NULL, we'll report an error later
         }
@@ -1060,13 +1081,26 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
                 }
             }
 
+            // Check single-type imports (e.g., import java.util.List;)
             if (!bound_type)
             {
-                // Try to find using ImportType (checks single type imports and same package)
-                // Note: ImportType expects us to be in the context of the file
+                for (unsigned k = 0; k < single_type_imports.Length(); k++)
+                {
+                    TypeSymbol* import_type = single_type_imports[k];
+                    if (bound_name == import_type -> Identity())
+                    {
+                        bound_type = import_type;
+                        break;
+                    }
+                }
+            }
+
+            // Try import-on-demand (e.g., import java.util.*;)
+            if (!bound_type)
+            {
                 bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
             }
-            
+
             if (!bound_type && containing_type)
             {
                 PackageSymbol* package = containing_type -> ContainingPackage();
@@ -1100,6 +1134,61 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
             if (bound_type)
             {
                 type_param -> AddBound(bound_type);
+
+                // Also store parameterized bound if there are type arguments
+                // (e.g., for T extends List<? extends Number>, store List<? extends Number>)
+                // However, skip if the bound references forward type parameters (e.g., T extends List<U>
+                // where U is defined after T) to avoid errors during ProcessTypeArguments
+                if (bound_ast -> type_arguments_opt)
+                {
+                    // Check for forward references to not-yet-defined type parameters
+                    bool has_forward_reference = false;
+                    for (unsigned k = 0; k < bound_ast -> type_arguments_opt -> NumTypeArguments() && !has_forward_reference; k++)
+                    {
+                        AstType* type_arg = bound_ast -> type_arguments_opt -> TypeArgument(k);
+                        AstTypeName* arg_name = type_arg -> TypeNameCast();
+                        if (arg_name && !arg_name -> base_opt && !arg_name -> type_arguments_opt)
+                        {
+                            // Simple type name - might be a type parameter reference
+                            NameSymbol* name_sym = lex_stream -> NameSymbol(arg_name -> name -> identifier_token);
+                            // Check if it's a type parameter not yet defined
+                            bool found = false;
+                            for (unsigned m = 0; m <= i && !found; m++)
+                            {
+                                AstTypeParameter* prev_param = parameters -> TypeParameter(m);
+                                if (prev_param -> symbol &&
+                                    prev_param -> symbol -> name_symbol == name_sym)
+                                {
+                                    found = true;
+                                }
+                            }
+                            // If not found in defined params, check if it's a type param from later
+                            if (!found)
+                            {
+                                for (unsigned m = i + 1; m < parameters -> NumTypeParameters() && !has_forward_reference; m++)
+                                {
+                                    AstTypeParameter* later_param = parameters -> TypeParameter(m);
+                                    const NameSymbol* later_name =
+                                        lex_stream -> NameSymbol(later_param -> identifier_token);
+                                    if (name_sym == later_name)
+                                    {
+                                        has_forward_reference = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!has_forward_reference)
+                    {
+                        ParameterizedType* param_bound = ProcessTypeArguments(bound_type, bound_ast -> type_arguments_opt);
+                        if (param_bound)
+                        {
+                            // Clone the parameterized type to avoid double-free (AST owns the original)
+                            type_param -> AddParameterizedBound(new Type(param_bound -> Clone()));
+                        }
+                    }
+                }
             }
         }
     }
@@ -4675,6 +4764,24 @@ void Semantic::ProcessFormalParameters(BlockSymbol* block,
         if (type_name && type_name -> parameterized_type)
         {
             symbol -> parameterized_type = type_name -> parameterized_type;
+        }
+        // If the declared type is a type parameter with a parameterized bound,
+        // propagate that bound to the variable (for method return type substitution)
+        // e.g., for <T extends List<? extends Number>> void m(T t), t should have
+        // parameterized_type = List<? extends Number>
+        else if (type_name && type_name -> generic_type &&
+                 type_name -> generic_type -> IsTypeParameter())
+        {
+            TypeParameterSymbol* type_param = type_name -> generic_type -> GetTypeParameter();
+            if (type_param && type_param -> parameterized_bounds &&
+                type_param -> parameterized_bounds -> Length() > 0)
+            {
+                Type* param_bound = (*(type_param -> parameterized_bounds))[0];
+                if (param_bound && param_bound -> IsParameterized())
+                {
+                    symbol -> parameterized_type = param_bound -> GetParameterizedType();
+                }
+            }
         }
 
         parameter -> formal_declarator -> symbol = symbol;

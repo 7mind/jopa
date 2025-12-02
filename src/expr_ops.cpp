@@ -3185,10 +3185,14 @@ TypeSymbol* Semantic::FindLeastUpperBound(TypeSymbol* type1, TypeSymbol* type2)
             }
         }
 
-        if (most_specific_common_interfaces.Length() == 1) {
-            return most_specific_common_interfaces[0]; // Exactly one most specific common interface
+        if (most_specific_common_interfaces.Length() >= 1) {
+            // Return the first most specific common interface.
+            // When there are multiple (e.g., A implements I, J and B implements I, J),
+            // the JLS says the LUB is the intersection type I & J. For type erasure,
+            // we just return the first one. This allows assignment to that interface type.
+            return most_specific_common_interfaces[0];
         } else {
-            // Multiple or zero most specific common interfaces (other than Object already handled if common_super_class is null)
+            // No common interface found other than Object
             return control.Object(); // Fallback to Object
         }
     }

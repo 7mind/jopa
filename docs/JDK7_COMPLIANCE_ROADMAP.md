@@ -175,6 +175,24 @@ else if (strcmp(method_name, "entrySet") == 0)
 - `for (Map.Entry<K,V> e : map.entrySet())` now compiles and runs correctly
 - Primary test suite: 214/214 tests pass
 
+### Phase 3a: Type Parameter Bound Improvements ✅ COMPLETE (2025-12-02)
+
+**Problem:** Method type parameters with bounds from single-type imports (e.g., `import java.util.List`) weren't being resolved. Also, forward references in mutually recursive type parameters caused errors.
+
+**Root Causes Fixed:**
+
+1. **Single-type import lookup for type parameter bounds** (`decl.cpp:1063-1075`): Added lookup in `single_type_imports` before falling back to `ImportType`. This fixes cases like `<T extends List>` where `List` is from `import java.util.List`.
+
+2. **Parameterized bound storage** (`decl.cpp:1138-1190`): For method type parameters with parameterized bounds like `<T extends List<? extends Number>>`, we now store the parameterized bound using `type_param->AddParameterizedBound()` and propagate it to formal parameters for correct method return type substitution.
+
+3. **Forward reference handling** (`decl.cpp:1144-1180`): For mutually recursive method type parameters like `<T extends List<U>, U extends List<T>>`, added check to skip parameterized bound processing when the bound references not-yet-defined type parameters.
+
+4. **Ternary operator LUB improvement** (`expr_ops.cpp:3188-3193`): When multiple common interfaces exist for a ternary expression, now returns the first most specific common interface instead of `Object`.
+
+**Results:**
+- Primary test suite: 214/214 tests pass
+- JDK7 compliance: 671/761 (88.2%, +2 from baseline)
+
 ---
 
 ## 3. Bootstrap Build Verification ✅ COMPLETE (2025-12-02)
@@ -225,15 +243,20 @@ Key issues to address:
 
 ## 5. Summary
 
-**Current Status: 87.9% (669/761)**
+**Current Status: 88.2% (671/761)**
 
 | Category | Tests | Priority | Notes |
 |----------|-------|----------|-------|
-| Type Inference | 30 | HIGH | Real compiler bugs |
+| Type Inference | 28 | HIGH | Real compiler bugs |
 | API Stubs | 34 | MEDIUM | Infrastructure only |
 | Boxing/Generics | 4 | MEDIUM | Related to type inference |
 | Misc | 24 | LOW | Edge cases |
 
-**Recommendation:** Focus on Phase 3 (Advanced Type Inference) to improve real-world compilation. The API stub tests (Phase 4) are infrastructure-only and don't affect JOPA's ability to compile real Java code.
+**Remaining Phase 3 Issues:**
+- Intersection types in ternary operator (when multiple common interfaces exist)
+- Nested generic method call inference (`testSet(getGenericValue(...))`)
+- Wildcard capture with `? super` bounds
+
+**Recommendation:** Continue Phase 3 (Advanced Type Inference) to improve real-world compilation. The API stub tests (Phase 4) are infrastructure-only and don't affect JOPA's ability to compile real Java code.
 
 **Bootstrap Status:** COMPLETE - JOPA can compile GNU Classpath, JamVM, Apache Ant, and ECJ from source, creating a fully self-contained Java development environment with no binary blobs.
