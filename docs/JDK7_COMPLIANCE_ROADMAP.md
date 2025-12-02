@@ -1,7 +1,7 @@
 # JDK 7 Compliance Roadmap & Log
 
-**Status:** 87.3% Pass Rate (664/761)
-**Remaining Failures:** 97
+**Status:** 86.2% Pass Rate (656/761)
+**Remaining Failures:** 105
 
 ## Progress Log
 
