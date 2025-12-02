@@ -169,7 +169,7 @@ add_jopa_run_test(InheritedGenericTest "${TEST_DIR}/generics/InheritedGenericTes
 add_jopa_run_test(PassthroughGenericTest "${TEST_DIR}/generics/PassthroughGenericTest.java" "PassthroughGenericTest")
 add_jopa_run_test(InheritedInterfaceTest "${TEST_DIR}/generics/InheritedInterfaceTest.java" "InheritedInterfaceTest")
 add_jopa_run_test(MultiInterfaceGenericsTest "${TEST_DIR}/generics/MultiInterfaceGenericsTest.java" "generics/MultiInterfaceGenericsTest")
-# add_jopa_run_test(IterableHierarchyTest "${TEST_DIR}/generics/IterableHierarchyTest.java" "generics/IterableHierarchyTest")
+add_jopa_run_test(IterableHierarchyTest "${TEST_DIR}/generics/IterableHierarchyTest.java" "generics/IterableHierarchyTest")
 
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")

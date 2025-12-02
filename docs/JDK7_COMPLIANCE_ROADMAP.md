@@ -13,5 +13,12 @@
     *   Implemented parameterized interface parsing in `ProcessClassFile` (ClassReader) to support binary dependencies.
     *   **Result:** `jopa-stub-rt` errors resolved.
 
-### Next Steps
-1.  Move to Phase 2 (Lambda Expressions / Method References if applicable, or other Java 7 features).
+### Phase 2: Remaining Semantic & Inference Issues
+*   [ ] **Fix Unboxing+Widening in Foreach**: `tools/javac/boxing/BoxedForeach.java` fails when iterating `Byte[]` to `float` (Unboxing `Byte` -> `byte` -> Widening `float`).
+*   [ ] **Fix Type Inference**: Many failures in `tools/javac/generics/inference/` suggest issues with type inference for generic methods (JLS 15.12.2.7).
+*   [ ] **Fix Enum Switch**: `tools/javac/enums/EnumSwitch.java` (if failing) or similar.
+*   [ ] **Investigate API/Annotation Failures**: `tools/javac/api/` failures need classification.
+
+### Phase 3: Polish & Optimization
+*   Clean up debug prints.
+*   Optimize type search performance.

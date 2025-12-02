@@ -1681,7 +1681,6 @@ TypeSymbol* Semantic::ReadTypeFromSignature(TypeSymbol* base_type,
 //
 void Semantic::ReadClassFile(TypeSymbol* type, TokenIndex tok)
 {
-    fprintf(stderr, "HELLO ReadClassFile %s\n", type->Utf8Name());
     if (type -> HeaderProcessed())
         return;
 #ifdef JOPA_DEBUG
@@ -2133,8 +2132,6 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
             
             // Parse parameterized interfaces
             if (control.option.source >= JopaOption::SDK1_5 && sig_p) {
-                 // DEBUG
-                 fprintf(stderr, "DEBUG: Parsing interfaces for %s from sig: %s\n", type->Utf8Name(), sig_p);
                  
                  while (*sig_p == 'L') {
                       const char* p = sig_p + 1; // skip L

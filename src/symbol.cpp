@@ -520,11 +520,20 @@ void TypeSymbol::SetGenericSignature(Control& control)
     // Add interface signatures
     for (unsigned i = 0; i < NumInterfaces(); i++)
     {
-        TypeSymbol* interface = Interface(i);
-        const char* interface_sig = interface -> SignatureString();
-        unsigned interface_len = strlen(interface_sig);
-        for (unsigned j = 0; j < interface_len; j++)
-            buffer[length++] = interface_sig[j];
+        // If we have a parameterized interface, use its full signature
+        ParameterizedType* param_interf = ParameterizedInterface(i);
+        if (param_interf)
+        {
+            param_interf -> GenerateSignature(buffer, length);
+        }
+        else
+        {
+            TypeSymbol* interface = Interface(i);
+            const char* interface_sig = interface -> SignatureString();
+            unsigned interface_len = strlen(interface_sig);
+            for (unsigned j = 0; j < interface_len; j++)
+                buffer[length++] = interface_sig[j];
+        }
     }
 
     // Null terminate and store
