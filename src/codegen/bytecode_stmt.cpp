@@ -3154,17 +3154,26 @@ void ByteCode::EmitForeachStatement(AstForeachStatement* foreach)
         PutU1(1);
         PutU1(0);
         ChangeStack(1);
+        // Get the actual iterator element type (e.g., Integer for Iterable<Integer>)
+        // This may differ from the loop variable type when unboxing/widening is needed
+        TypeSymbol* iterator_elem_type = foreach -> iterator_element_type;
+        if (! iterator_elem_type)
+            iterator_elem_type = component_type;  // Fallback to loop variable type
         if (component_type -> Primitive())
         {
-            // Loop variable is primitive - need to cast to boxed type and unbox
-            TypeSymbol* boxed_type = component_type -> BoxedType(control);
-            if (boxed_type && boxed_type != component_type)
+            // Loop variable is primitive - need to cast to iterator element type and convert
+            // e.g., for "for (float f : Iterable<Integer>)":
+            //   - CHECKCAST Integer
+            //   - invokevirtual Integer.intValue() -> int
+            //   - i2f -> float
+            if (iterator_elem_type != control.Object())
             {
                 PutOp(OP_CHECKCAST);
-                PutU2(RegisterClass(boxed_type));
-                // Emit unboxing call (e.g., Integer.intValue())
-                EmitCast(component_type, boxed_type);
+                PutU2(RegisterClass(iterator_elem_type));
             }
+            // Convert from iterator element type to loop variable type
+            // This handles unboxing (Integer -> int) and widening (int -> float)
+            EmitCast(component_type, iterator_elem_type);
         }
         else if (component_type != control.Object())
         {

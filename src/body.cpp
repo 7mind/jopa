@@ -992,6 +992,8 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
                 component_type = element_type -> Erasure();
                 if (! component_type)
                     component_type = control.Object();
+                // Store the element type for bytecode generation
+                foreach -> iterator_element_type = component_type;
             }
         }
 

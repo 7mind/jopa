@@ -3116,9 +3116,11 @@ public:
     AstFormalParameter* formal_parameter;
     AstExpression* expression;
     AstBlock* statement;
+    TypeSymbol* iterator_element_type; // Actual element type from iterator (for bytecode generation)
 
     inline AstForeachStatement()
         : AstStatement(FOREACH)
+        , iterator_element_type(NULL)
     {}
     ~AstForeachStatement() {}
 
