@@ -171,6 +171,8 @@ add_jopa_run_test(InheritedInterfaceTest "${TEST_DIR}/generics/InheritedInterfac
 add_jopa_run_test(MultiInterfaceGenericsTest "${TEST_DIR}/generics/MultiInterfaceGenericsTest.java" "generics/MultiInterfaceGenericsTest")
 add_jopa_run_test(IterableHierarchyTest "${TEST_DIR}/generics/IterableHierarchyTest.java" "generics/IterableHierarchyTest")
 
+add_jopa_run_test(IntersectionTest "${TEST_DIR}/generics/IntersectionTest.java" "generics/IntersectionTest")
+
 # Autoboxing/Unboxing Tests
 add_jopa_run_test(BasicBoxingTest "${TEST_DIR}/autoboxing/BasicBoxingTest.java" "BasicBoxingTest")
 add_jopa_run_test(AutoboxingTest "${TEST_DIR}/autoboxing/AutoboxingTest.java" "AutoboxingTest")

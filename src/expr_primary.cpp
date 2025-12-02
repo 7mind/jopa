@@ -598,24 +598,24 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                         {
                             TypeSymbol* result = substituted_arg -> Erasure(control);
                             
-                                                                                        // Wildcard capture logic:
-                                                                                        // If substituted_arg is a wildcard, we must also respect the
-                                                                                        // type parameter's bound from the generic type definition.
-                                                                                        // If wildcard is unbounded ('?'), the erasure is Object, 
-                                                                                        // but the type parameter bound might be more specific (e.g. 'I1').
-                                                                                        if (substituted_arg -> IsWildcard())
-                                                                                        {
-                                                                                            TypeParameterSymbol* tparam = current_generic -> TypeParameter(k);
-                                                                                            TypeSymbol* bound_erasure = tparam -> ErasedType(control);
-                                                                                            
-                                                                                            // If the result is Object (unbounded) or less specific than the bound,
-                                                                                            // use the bound.
-                                                                                            if (result == control.Object() || 
-                                                                                                (bound_erasure != control.Object() && !bound_erasure->IsSubtype(result)))
-                                                                                            {
-                                                                                                result = bound_erasure;
-                                                                                            }
-                                                                                        }
+                                                            // Wildcard capture logic:
+                                                            // If substituted_arg is a wildcard, we must also respect the
+                                                            // type parameter's bound from the generic type definition.
+                                                            // If wildcard is unbounded ('?'), the erasure is Object, 
+                                                            // but the type parameter bound might be more specific (e.g. 'I1').
+                                                            if (substituted_arg -> IsWildcard())
+                                                            {
+                                                                TypeParameterSymbol* tparam = method -> containing_type -> TypeParameter(param_index);
+                                                                TypeSymbol* bound_erasure = tparam -> ErasedType(control);
+                                                                
+                                                                // If the result is Object (unbounded) or less specific than the bound,
+                                                                // use the bound.
+                                                                if (result == control.Object() || 
+                                                                    (bound_erasure != control.Object() && !bound_erasure->IsSubtype(result)))
+                                                                {
+                                                                    result = bound_erasure;
+                                                                }
+                                                            }
                             if (result && result -> fully_qualified_name && ! result -> Primitive())
                             {
                                 method_call -> resolved_type = result;
