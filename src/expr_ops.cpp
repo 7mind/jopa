@@ -1093,6 +1093,13 @@ void Semantic::ProcessCastExpression(Ast* expr)
                               target_type -> ContainingPackageName(),
                               target_type -> ExternalName());
             }
+
+            // Propagate the parameterized type from the cast target to the expression
+            // This enables foreach loops and method calls to use the type arguments
+            if (target_name -> parameterized_type)
+            {
+                cast_expression -> resolved_parameterized_type = target_name -> parameterized_type;
+            }
         }
         else if (target_type -> IsGeneric() && !target_name)
         {

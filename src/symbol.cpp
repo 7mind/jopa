@@ -1721,6 +1721,289 @@ void MethodSymbol::ProcessMethodSignature(Semantic* sem,
         assert(! *signature);
 
         //
+        // Parse the generic signature to create return_parameterized_type if the
+        // return type is a parameterized type (e.g., Collection<V> for Map.values()).
+        // This enables proper type inference for foreach loops and method chaining.
+        //
+        if (GenericSignatureString() && ! return_parameterized_type &&
+            containing_type && containing_type -> NumTypeParameters() > 0)
+        {
+            const char* gen_sig = GenericSignatureString();
+            const char* p = gen_sig;
+
+            // Skip method type parameters if present: <T:Ljava/lang/Object;>
+            if (*p == '<')
+            {
+                int depth = 1;
+                p++;
+                while (*p && depth > 0)
+                {
+                    if (*p == '<') depth++;
+                    else if (*p == '>') depth--;
+                    p++;
+                }
+            }
+
+            // Skip parameters: (...)
+            if (*p == '(')
+            {
+                p++;
+                int depth = 0;
+                while (*p && !(*p == ')' && depth == 0))
+                {
+                    if (*p == '<') depth++;
+                    else if (*p == '>') depth--;
+                    p++;
+                }
+                if (*p == ')') p++;
+            }
+
+            // p now points to return type
+            // Skip array dimensions
+            while (*p == '[') p++;
+
+            // Check for parameterized return type: Ljava/util/Collection<TV;>;
+            if (*p == 'L')
+            {
+                const char* class_start = p + 1;
+                const char* class_end = class_start;
+
+                // Find end of class name (before '<' or ';')
+                while (*class_end && *class_end != '<' && *class_end != ';')
+                    class_end++;
+
+                // Check if this is a parameterized type
+                if (*class_end == '<')
+                {
+                    // Parse the type arguments to check if any are class type parameters
+                    const char* type_args_start = class_end + 1;
+
+                    // Build a list of type arguments
+                    // Store actual Type* objects to handle nested parameterized types
+                    const int MAX_TYPE_ARGS = 8;
+                    class Type* type_arg_types[MAX_TYPE_ARGS];
+                    int num_type_args = 0;
+                    bool has_class_type_params = false;
+
+                    // Helper lambda to find class type parameter by name
+                    auto findTypeParam = [&](const char* name_start, int name_len) -> TypeParameterSymbol* {
+                        for (unsigned i = 0; i < containing_type -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = containing_type -> TypeParameter(i);
+                            const wchar_t* param_name = type_param -> name_symbol -> Name();
+                            bool match = true;
+                            int j = 0;
+                            for (; j < name_len && param_name[j]; j++)
+                            {
+                                if ((wchar_t)(unsigned char)name_start[j] != param_name[j])
+                                {
+                                    match = false;
+                                    break;
+                                }
+                            }
+                            if (match && j == name_len && param_name[j] == 0)
+                                return type_param;
+                        }
+                        return NULL;
+                    };
+
+                    const char* ta = type_args_start;
+                    while (*ta && *ta != '>' && num_type_args < MAX_TYPE_ARGS)
+                    {
+                        // Skip wildcard prefixes
+                        if (*ta == '+' || *ta == '-') ta++;
+
+                        if (*ta == 'T')
+                        {
+                            // Type parameter reference: TName;
+                            const char* name_start = ta + 1;
+                            const char* name_end = name_start;
+                            while (*name_end && *name_end != ';') name_end++;
+                            int name_len = name_end - name_start;
+
+                            TypeParameterSymbol* tp = findTypeParam(name_start, name_len);
+                            if (tp)
+                            {
+                                type_arg_types[num_type_args] = new class Type(tp);
+                                has_class_type_params = true;
+                            }
+                            else
+                            {
+                                type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                            }
+                            num_type_args++;
+                            ta = name_end;
+                            if (*ta == ';') ta++;
+                        }
+                        else if (*ta == 'L')
+                        {
+                            // Reference type - may be parameterized: Ljava/util/Map$Entry<TK;TV;>;
+                            const char* ref_start = ta + 1;
+                            const char* ref_class_end = ref_start;
+                            while (*ref_class_end && *ref_class_end != '<' && *ref_class_end != ';')
+                                ref_class_end++;
+
+                            if (*ref_class_end == '<')
+                            {
+                                // This is a nested parameterized type like Map$Entry<TK;TV;>
+                                const char* nested_type_args_start = ref_class_end + 1;
+
+                                // Parse nested type arguments
+                                const int MAX_NESTED_ARGS = 8;
+                                class Type* nested_arg_types[MAX_NESTED_ARGS];
+                                int num_nested_args = 0;
+                                bool nested_has_type_params = false;
+
+                                const char* nta = nested_type_args_start;
+                                while (*nta && *nta != '>' && num_nested_args < MAX_NESTED_ARGS)
+                                {
+                                    if (*nta == '+' || *nta == '-') nta++;
+
+                                    if (*nta == 'T')
+                                    {
+                                        const char* np_start = nta + 1;
+                                        const char* np_end = np_start;
+                                        while (*np_end && *np_end != ';') np_end++;
+                                        int np_len = np_end - np_start;
+
+                                        TypeParameterSymbol* ntp = findTypeParam(np_start, np_len);
+                                        if (ntp)
+                                        {
+                                            nested_arg_types[num_nested_args] = new class Type(ntp);
+                                            nested_has_type_params = true;
+                                        }
+                                        else
+                                        {
+                                            nested_arg_types[num_nested_args] = new class Type(sem -> control.Object());
+                                        }
+                                        num_nested_args++;
+                                        nta = np_end;
+                                        if (*nta == ';') nta++;
+                                    }
+                                    else if (*nta == 'L')
+                                    {
+                                        // Skip nested reference type (don't go 3 levels deep)
+                                        nested_arg_types[num_nested_args] = new class Type(sem -> control.Object());
+                                        num_nested_args++;
+                                        int ndepth = 0;
+                                        while (*nta)
+                                        {
+                                            if (*nta == '<') ndepth++;
+                                            else if (*nta == '>') { if (ndepth == 0) break; ndepth--; }
+                                            else if (*nta == ';' && ndepth == 0) { nta++; break; }
+                                            nta++;
+                                        }
+                                    }
+                                    else if (*nta == '[')
+                                    {
+                                        nested_arg_types[num_nested_args] = new class Type(sem -> control.Object());
+                                        num_nested_args++;
+                                        while (*nta == '[') nta++;
+                                        if (*nta == 'L' || *nta == 'T')
+                                        {
+                                            while (*nta && *nta != ';') nta++;
+                                            if (*nta == ';') nta++;
+                                        }
+                                        else if (*nta) nta++;
+                                    }
+                                    else if (*nta)
+                                    {
+                                        nested_arg_types[num_nested_args] = new class Type(sem -> control.Object());
+                                        num_nested_args++;
+                                        nta++;
+                                    }
+                                }
+
+                                // If nested type has class type params, create nested ParameterizedType
+                                if (nested_has_type_params && num_nested_args > 0)
+                                {
+                                    int ref_class_len = ref_class_end - ref_start;
+                                    TypeSymbol* nested_base = sem -> control.type_table.
+                                        FindType(ref_start, ref_class_len);
+
+                                    if (nested_base)
+                                    {
+                                        Tuple<class Type*>* nested_args = new Tuple<class Type*>(num_nested_args);
+                                        for (int ni = 0; ni < num_nested_args; ni++)
+                                            nested_args -> Next() = nested_arg_types[ni];
+                                        ParameterizedType* nested_param = new ParameterizedType(nested_base, nested_args);
+                                        type_arg_types[num_type_args] = new class Type(nested_param);
+                                        has_class_type_params = true;
+                                    }
+                                    else
+                                    {
+                                        type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                                    }
+                                }
+                                else
+                                {
+                                    type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                                }
+                            }
+                            else
+                            {
+                                // Simple reference type without type parameters
+                                type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                            }
+                            num_type_args++;
+                            // Skip to end of this type argument
+                            int depth = 0;
+                            while (*ta)
+                            {
+                                if (*ta == '<') depth++;
+                                else if (*ta == '>') { if (depth == 0) break; depth--; }
+                                else if (*ta == ';' && depth == 0) { ta++; break; }
+                                ta++;
+                            }
+                        }
+                        else if (*ta == '[')
+                        {
+                            // Array type
+                            type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                            num_type_args++;
+                            while (*ta == '[') ta++;
+                            // Skip element type
+                            if (*ta == 'L' || *ta == 'T')
+                            {
+                                while (*ta && *ta != ';') ta++;
+                                if (*ta == ';') ta++;
+                            }
+                            else if (*ta) ta++; // primitive
+                        }
+                        else if (*ta)
+                        {
+                            // Primitive or other
+                            type_arg_types[num_type_args] = new class Type(sem -> control.Object());
+                            num_type_args++;
+                            ta++;
+                        }
+                    }
+
+                    // If we found class type parameters in the return type args,
+                    // create a ParameterizedType
+                    if (has_class_type_params && num_type_args > 0)
+                    {
+                        // Resolve the base type
+                        int class_name_len = class_end - class_start;
+                        TypeSymbol* base_type = sem -> control.type_table.
+                            FindType(class_start, class_name_len);
+
+                        if (base_type)
+                        {
+                            // Create type arguments tuple from already-parsed Type* objects
+                            Tuple<class Type*>* type_args = new Tuple<class Type*>(num_type_args);
+                            for (int i = 0; i < num_type_args; i++)
+                                type_args -> Next() = type_arg_types[i];
+
+                            // Create the ParameterizedType
+                            return_parameterized_type = new ParameterizedType(base_type, type_args);
+                        }
+                    }
+                }
+            }
+        }
+
+        //
         // Create a symbol table for this method for consistency, and in
         // order to release the space used by the variable paramaters later.
         //

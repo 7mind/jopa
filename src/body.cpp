@@ -981,6 +981,143 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
             expr_param_type = expr -> resolved_parameterized_type;
         }
 
+        // Case 2b: Non-generic class implementing generic interface (e.g., CipherSuiteList implements Iterable<CipherSuite>)
+        // If the expression type is a non-generic class that implements Iterable with concrete type args,
+        // look at the class's interface implementations directly
+        if (! expr_param_type && cond_type && ! cond_type -> NumTypeParameters())
+        {
+            // Check if the type implements Iterable<T> with a concrete T
+            for (unsigned i = 0; i < cond_type -> NumInterfaces(); i++)
+            {
+                ParameterizedType* iface_param = cond_type -> ParameterizedInterface(i);
+                if (iface_param && iface_param -> generic_type == control.Iterable())
+                {
+                    // Found Iterable<T> implementation - extract T
+                    if (iface_param -> NumTypeArguments() > 0)
+                    {
+                        Type* element_type = iface_param -> TypeArgument(0);
+                        if (element_type)
+                        {
+                            TypeSymbol* erasure = element_type -> Erasure();
+                            if (erasure && erasure != control.no_type)
+                            {
+                                component_type = erasure;
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            // If not directly implementing Iterable, walk up to superclass
+            if (component_type == control.Object() && cond_type -> super)
+            {
+                TypeSymbol* super = cond_type -> super;
+                while (super && super != control.Object())
+                {
+                    for (unsigned i = 0; i < super -> NumInterfaces(); i++)
+                    {
+                        ParameterizedType* iface_param = super -> ParameterizedInterface(i);
+                        if (iface_param && iface_param -> generic_type == control.Iterable())
+                        {
+                            if (iface_param -> NumTypeArguments() > 0)
+                            {
+                                Type* element_type = iface_param -> TypeArgument(0);
+                                if (element_type)
+                                {
+                                    TypeSymbol* erasure = element_type -> Erasure();
+                                    if (erasure && erasure != control.no_type)
+                                    {
+                                        component_type = erasure;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (component_type != control.Object())
+                        break;
+                    super = super -> super;
+                }
+            }
+        }
+
+        // Case 3: Target type inference for method calls
+        // If the expression is a method call that needs target type inference,
+        // use the foreach variable type to infer the element type
+        if (! expr_param_type && index_type && index_type != control.Object())
+        {
+            // Try to get method call directly from foreach expression
+            AstMethodInvocation* method_call = foreach -> expression -> MethodInvocationCast();
+            if (method_call && method_call -> needs_target_type_inference)
+            {
+                // The method's return type couldn't be fully inferred from arguments
+                // Use the foreach variable type as the element type
+                component_type = index_type;
+                foreach -> iterator_element_type = component_type;
+                method_call -> needs_target_type_inference = false;
+            }
+        }
+
+        // Case 4: Method calls on parameterized receivers with parameterized return types
+        // E.g., map.values() where map is Map<String, String[]> and values() returns Collection<V>
+        // We need to substitute V with the actual type argument from the receiver
+        if (! expr_param_type && component_type == control.Object())
+        {
+            AstMethodInvocation* method_call = foreach -> expression -> MethodInvocationCast();
+            if (method_call && method_call -> symbol)
+            {
+                MethodSymbol* method = method_call -> symbol -> MethodCast();
+                if (method && method -> return_parameterized_type && method_call -> base_opt)
+                {
+                    ParameterizedType* ret_ptype = method -> return_parameterized_type;
+                    // Get the receiver's parameterized type
+                    ParameterizedType* base_param_type = NULL;
+                    AstExpression* base_expr = method_call -> base_opt -> ExpressionCast();
+                    if (base_expr)
+                    {
+                        VariableSymbol* var = base_expr -> symbol ? base_expr -> symbol -> VariableCast() : NULL;
+                        if (var && var -> parameterized_type)
+                            base_param_type = var -> parameterized_type;
+                        else if (base_expr -> resolved_parameterized_type)
+                            base_param_type = base_expr -> resolved_parameterized_type;
+                    }
+
+                    if (base_param_type && ret_ptype -> NumTypeArguments() > 0)
+                    {
+                        // Check if the return type has a type parameter we can substitute
+                        Type* ret_type_arg = ret_ptype -> TypeArgument(0);
+                        if (ret_type_arg && ret_type_arg -> IsTypeParameter())
+                        {
+                            TypeParameterSymbol* tparam = ret_type_arg -> GetTypeParameter();
+                            TypeSymbol* containing = method -> containing_type;
+                            // Find which type parameter index this is in the containing class
+                            for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                            {
+                                if (containing -> TypeParameter(k) == tparam)
+                                {
+                                    // Substitute with base_param_type's type argument
+                                    if (k < base_param_type -> NumTypeArguments())
+                                    {
+                                        Type* substituted = base_param_type -> TypeArgument(k);
+                                        if (substituted)
+                                        {
+                                            TypeSymbol* erasure = substituted -> Erasure();
+                                            if (erasure && erasure != control.no_type)
+                                            {
+                                                component_type = erasure;
+                                                foreach -> iterator_element_type = component_type;
+                                            }
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // If we have a parameterized type, find the Iterable<T> type argument
         if (expr_param_type)
         {
@@ -992,8 +1129,147 @@ void Semantic::ProcessForeachStatement(Ast* stmt)
                 component_type = element_type -> Erasure();
                 if (! component_type)
                     component_type = control.Object();
+
+                // If the element type is a type parameter (unsubstituted), try to substitute it
+                // E.g., Collection<V> from map.values() where V should be substituted from Map<K,V>
+                if (element_type -> IsTypeParameter() && component_type == control.Object())
+                {
+                    AstMethodInvocation* method_call = foreach -> expression -> MethodInvocationCast();
+                    if (method_call && method_call -> symbol && method_call -> base_opt)
+                    {
+                        MethodSymbol* method = method_call -> symbol -> MethodCast();
+                        if (method)
+                        {
+                            // Get the receiver's parameterized type
+                            ParameterizedType* base_param_type = NULL;
+                            AstExpression* base_expr = method_call -> base_opt -> ExpressionCast();
+                            if (base_expr)
+                            {
+                                VariableSymbol* var = base_expr -> symbol ? base_expr -> symbol -> VariableCast() : NULL;
+                                if (var && var -> parameterized_type)
+                                    base_param_type = var -> parameterized_type;
+                                else if (base_expr -> resolved_parameterized_type)
+                                    base_param_type = base_expr -> resolved_parameterized_type;
+                            }
+
+                            if (base_param_type)
+                            {
+                                TypeParameterSymbol* tparam = element_type -> GetTypeParameter();
+                                TypeSymbol* containing = method -> containing_type;
+                                // Find which type parameter index this is in the containing class
+                                for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                                {
+                                    if (containing -> TypeParameter(k) == tparam)
+                                    {
+                                        // Substitute with base_param_type's type argument
+                                        if (k < base_param_type -> NumTypeArguments())
+                                        {
+                                            Type* substituted = base_param_type -> TypeArgument(k);
+                                            if (substituted)
+                                            {
+                                                TypeSymbol* erasure = substituted -> Erasure();
+                                                if (erasure && erasure != control.no_type)
+                                                {
+                                                    component_type = erasure;
+                                                }
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Store the element type for bytecode generation
                 foreach -> iterator_element_type = component_type;
+            }
+        }
+
+        // Fallback: If component_type is still Object and we have a method call on a parameterized
+        // receiver, try to infer the element type from the method's generic signature
+        if (component_type == control.Object())
+        {
+            AstMethodInvocation* method_call = foreach -> expression -> MethodInvocationCast();
+            if (method_call && method_call -> symbol && method_call -> base_opt)
+            {
+                MethodSymbol* method = method_call -> symbol -> MethodCast();
+                if (method)
+                {
+                    // Get the receiver's parameterized type
+                    ParameterizedType* base_param_type = NULL;
+                    AstExpression* base_expr = method_call -> base_opt -> ExpressionCast();
+                    if (base_expr)
+                    {
+                        VariableSymbol* var = base_expr -> symbol ? base_expr -> symbol -> VariableCast() : NULL;
+                        if (var && var -> parameterized_type)
+                            base_param_type = var -> parameterized_type;
+                    }
+
+                    if (base_param_type)
+                    {
+                        // For methods that return parameterized types (like values() returning Collection<V>),
+                        // we need to figure out which type parameter of the containing class
+                        // corresponds to the element type of the return value.
+                        //
+                        // Use heuristics based on the method return type and containing class:
+                        // - Collection/Iterable methods on Map<K,V>: values() -> V (index 1)
+                        // - Set methods on Map<K,V>: keySet() -> K (index 0)
+                        // - More general: if return type implements Iterable and containing type is generic,
+                        //   try the last type parameter (common pattern for value types)
+
+                        TypeSymbol* containing = method -> containing_type;
+                        TypeSymbol* return_type = method -> Type();
+                        const char* method_name = method -> Utf8Name();
+
+                        // Known patterns for Map methods
+                        if (containing && containing -> NumTypeParameters() >= 2 && return_type)
+                        {
+                            unsigned type_param_index = (unsigned)-1;
+
+                            // Check for common patterns
+                            if (strcmp(method_name, "values") == 0)
+                            {
+                                // Map.values() returns Collection<V>, V is at index 1
+                                type_param_index = 1;
+                            }
+                            else if (strcmp(method_name, "keySet") == 0)
+                            {
+                                // Map.keySet() returns Set<K>, K is at index 0
+                                type_param_index = 0;
+                            }
+                            else if (strcmp(method_name, "entrySet") == 0)
+                            {
+                                // Map.entrySet() returns Set<Map.Entry<K,V>>
+                                // The element type is Map.Entry - find it via the containing type
+                                // The containing type is Map, and Entry is a nested interface
+                                NameSymbol* entry_name = control.FindOrInsertName(
+                                    (const wchar_t*)L"Entry", 5);
+                                TypeSymbol* entry_type = containing -> FindTypeSymbol(entry_name);
+                                if (entry_type)
+                                {
+                                    component_type = entry_type;
+                                    foreach -> iterator_element_type = component_type;
+                                }
+                            }
+
+                            if (type_param_index < base_param_type -> NumTypeArguments())
+                            {
+                                Type* substituted = base_param_type -> TypeArgument(type_param_index);
+                                if (substituted)
+                                {
+                                    TypeSymbol* erasure = substituted -> Erasure();
+                                    if (erasure && erasure != control.no_type)
+                                    {
+                                        component_type = erasure;
+                                        foreach -> iterator_element_type = component_type;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

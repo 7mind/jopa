@@ -2448,6 +2448,11 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
             const char* sig = sig_info -> Bytes();
             if (sig)
             {
+                // Store the generic signature on the MethodSymbol for later use
+                Utf8LiteralValue* gen_sig_literal = control.Utf8_pool.
+                    FindOrInsert(sig, sig_info -> Length());
+                symbol -> SetGenericSignature(gen_sig_literal);
+
                 // First, collect method type parameter names if signature starts with <
                 // Format: <T:Ljava/lang/Object;U:LBound;>
                 const int MAX_METHOD_TYPE_PARAMS = 16;

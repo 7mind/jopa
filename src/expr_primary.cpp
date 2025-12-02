@@ -1197,13 +1197,179 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     }
 
     //
+    // Check for generic methods (methods with type parameters) whose return type
+    // is itself generic. These may need target type inference if we haven't already
+    // resolved the concrete return type.
+    // Examples: <T> Container<T> of(Class<T> clazz), <T> List<T> emptyList()
+    //
+    if (method && method -> NumTypeParameters() > 0 &&
+        ! method_call -> resolved_parameterized_type &&
+        ! method_call -> needs_target_type_inference)
+    {
+        TypeSymbol* return_type = method -> Type();
+        // If the return type is a generic class (has type parameters), mark for inference
+        if (return_type && return_type -> NumTypeParameters() > 0)
+        {
+            method_call -> needs_target_type_inference = true;
+        }
+    }
+
+    //
     // Direct parameterized return type: If the method's return type is directly
     // parameterized (e.g., Map<String, Integer> getMap()), propagate the parameterized
     // type to the method call for chained calls like getMap().get(key).
+    // Skip if needs_target_type_inference is set - those need special handling.
     //
-    if (method && method -> return_parameterized_type && ! method_call -> resolved_parameterized_type)
+    // When the return type contains type parameter references (e.g., Set<Map.Entry<K,V>>),
+    // substitute them with the actual type arguments from the receiver expression.
+    //
+    if (method && method -> return_parameterized_type &&
+        ! method_call -> resolved_parameterized_type &&
+        ! method_call -> needs_target_type_inference)
     {
-        method_call -> resolved_parameterized_type = method -> return_parameterized_type;
+        ParameterizedType* ret_ptype = method -> return_parameterized_type;
+
+        // Get the receiver's parameterized type for substitution
+        ParameterizedType* base_param_type = NULL;
+        if (method_call -> base_opt)
+        {
+            AstExpression* base_expr = method_call -> base_opt -> ExpressionCast();
+            if (base_expr)
+            {
+                VariableSymbol* var = base_expr -> symbol ?
+                    base_expr -> symbol -> VariableCast() : NULL;
+                if (var && var -> parameterized_type)
+                    base_param_type = var -> parameterized_type;
+                else if (base_expr -> resolved_parameterized_type)
+                    base_param_type = base_expr -> resolved_parameterized_type;
+            }
+        }
+
+        // Check if substitution is needed: the return type has type arguments that
+        // might reference type parameters from the containing class
+        bool needs_substitution = false;
+        if (base_param_type && ret_ptype -> NumTypeArguments() > 0)
+        {
+            for (unsigned i = 0; i < ret_ptype -> NumTypeArguments() && !needs_substitution; i++)
+            {
+                Type* type_arg = ret_ptype -> TypeArgument(i);
+                if (type_arg)
+                {
+                    if (type_arg -> IsTypeParameter())
+                        needs_substitution = true;
+                    else if (type_arg -> IsParameterized())
+                    {
+                        // Check nested parameterized type for type params
+                        ParameterizedType* nested = type_arg -> GetParameterizedType();
+                        if (nested)
+                        {
+                            for (unsigned j = 0; j < nested -> NumTypeArguments(); j++)
+                            {
+                                Type* nested_arg = nested -> TypeArgument(j);
+                                if (nested_arg && nested_arg -> IsTypeParameter())
+                                {
+                                    needs_substitution = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (needs_substitution)
+        {
+            // Perform substitution: create new type arguments with substituted types
+            TypeSymbol* containing = method -> containing_type;
+            Tuple<Type*>* new_type_args = new Tuple<Type*>(ret_ptype -> NumTypeArguments());
+
+            for (unsigned i = 0; i < ret_ptype -> NumTypeArguments(); i++)
+            {
+                Type* type_arg = ret_ptype -> TypeArgument(i);
+                Type* new_arg = NULL;
+
+                if (type_arg -> IsTypeParameter())
+                {
+                    // Simple type parameter - substitute directly
+                    TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                    for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                    {
+                        if (containing -> TypeParameter(k) == tparam &&
+                            k < base_param_type -> NumTypeArguments())
+                        {
+                            // Use the receiver's type argument
+                            new_arg = base_param_type -> TypeArgument(k);
+                            break;
+                        }
+                    }
+                    if (!new_arg)
+                        new_arg = new Type(control.Object());
+                }
+                else if (type_arg -> IsParameterized())
+                {
+                    // Nested parameterized type (e.g., Map.Entry<K,V>) - substitute its type args
+                    ParameterizedType* nested = type_arg -> GetParameterizedType();
+                    bool has_type_params = false;
+                    for (unsigned j = 0; j < nested -> NumTypeArguments(); j++)
+                    {
+                        Type* nested_arg = nested -> TypeArgument(j);
+                        if (nested_arg && nested_arg -> IsTypeParameter())
+                        {
+                            has_type_params = true;
+                            break;
+                        }
+                    }
+
+                    if (has_type_params)
+                    {
+                        // Create substituted nested parameterized type
+                        Tuple<Type*>* nested_args = new Tuple<Type*>(nested -> NumTypeArguments());
+                        for (unsigned j = 0; j < nested -> NumTypeArguments(); j++)
+                        {
+                            Type* nested_arg = nested -> TypeArgument(j);
+                            Type* subst_arg = NULL;
+
+                            if (nested_arg && nested_arg -> IsTypeParameter())
+                            {
+                                TypeParameterSymbol* tparam = nested_arg -> GetTypeParameter();
+                                for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                                {
+                                    if (containing -> TypeParameter(k) == tparam &&
+                                        k < base_param_type -> NumTypeArguments())
+                                    {
+                                        subst_arg = base_param_type -> TypeArgument(k);
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!subst_arg)
+                                subst_arg = nested_arg ? nested_arg : new Type(control.Object());
+                            nested_args -> Next() = subst_arg;
+                        }
+                        ParameterizedType* new_nested = new ParameterizedType(nested -> generic_type, nested_args);
+                        new_arg = new Type(new_nested);
+                    }
+                    else
+                    {
+                        new_arg = type_arg;
+                    }
+                }
+                else
+                {
+                    new_arg = type_arg;
+                }
+
+                new_type_args -> Next() = new_arg;
+            }
+
+            ParameterizedType* substituted = new ParameterizedType(ret_ptype -> generic_type, new_type_args);
+            method_call -> resolved_parameterized_type = substituted;
+        }
+        else
+        {
+            method_call -> resolved_parameterized_type = ret_ptype;
+        }
     }
 
     //
