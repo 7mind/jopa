@@ -25,7 +25,7 @@ Bad things:
 - Claude can easily get sidetracked and forget main goal
 - Claude's CLI tool has insane memory leaks, the experience is very painful
 - Frequently, Claude cannot see "obvious" solutions
-- Claude loves to tell you that something alike to "we did a lot, let's make a coffee break". It's hard to make it work in a loop until it delivers.
+- Claude loves to tell you something alike to "we did a lot, let's make a coffee break". It's hard to make it work in a loop until it delivers.
 - Codex and Geminin cannot work in a loop at all. Despite all the effort, they stop fast.
 - You have to be always in the loop (more on that below). You cannot leave them unsupervised - they won't deliver.
 - Models cannot concentrate on guidelines long enough.
@@ -35,7 +35,7 @@ Bad things:
 Usage patterns:
 
 - Be in the loop, monitor what the agent does, think and steer it towards the goal.
-- Record important patters into your [CLAUDE.md](./CLAUDE.md). Try to be precise, 
+- Record important patterns into your [CLAUDE.md](./CLAUDE.md). Try to be precise, 
 - It might help to setup one model (Codex in my case) as a reviewer, so it would steer another (Claude) towards the goal. Unfortunately, there is no nice and convenient tool to organize such setup (there are some though), so at this point in time it's a good idea to be creative and write (vibe-code) your own.
 - Always ensure that your model is working in reproducible environment (like Nix), instruct it to use your environment and tooling, start by writing tests and implementing reproducible builds. Toolings and environments are extremely important for model efficiency. Make your tests and builds fast. Apply TDD. Insist that the model should always run tests and ensure they all pass. It helped a lot to switch build to `CMake` early, add `cpptrace` into the compiler, switch to `CLang` and turn on sanitizers.
 - Run models in [FireJail](https://github.com/netblue30/firejail) without their own sandboxes, that's the only way to be at least a bit productive.
