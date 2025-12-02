@@ -1681,6 +1681,9 @@ TypeSymbol* Semantic::ReadTypeFromSignature(TypeSymbol* base_type,
 //
 void Semantic::ReadClassFile(TypeSymbol* type, TokenIndex tok)
 {
+    fprintf(stderr, "HELLO ReadClassFile %s\n", type->Utf8Name());
+    if (type -> HeaderProcessed())
+        return;
 #ifdef JOPA_DEBUG
     control.class_files_read++;
 #endif // JOPA_DEBUG
@@ -1975,6 +1978,7 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
     //
     // Tie this type to its supertypes.
     //
+    Tuple<Tuple<Type*>*> interface_type_args(4);
     class_info = class_data -> SuperClass();
     if ((type == control.Object()) != (class_info == NULL))
         type -> MarkBad();
@@ -1994,9 +1998,13 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
 
             // Parse parameterized superclass from signature if present
             // Signature format: Ljava/lang/ref/Reference<TT;>;
-            if (super_sig_start && type -> super && *super_sig_start == 'L')
+            const char* sig_p = super_sig_start;
+            // DEBUG
+            fprintf(stderr, "DEBUG: Parsing class file. sig_start=%p\n", super_sig_start);
+            
+            if (sig_p && *sig_p == 'L')
             {
-                const char* p = super_sig_start + 1;  // skip 'L'
+                const char* p = sig_p + 1;  // skip 'L'
                 // Find class name end (at '<' or ';')
                 while (*p && *p != '<' && *p != ';')
                     p++;
@@ -2100,18 +2108,94 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                         }
                     }
 
-                    if (type_args -> Length() > 0)
-                    {
-                        ParameterizedType* param_super = new ParameterizedType(
-                            type -> super, type_args);
-                        control.RegisterParameterizedType(param_super);
-                        type -> SetParameterizedSuper(param_super);
-                    }
-                    else
-                    {
+                    // Apply to superclass if valid
+                    if (type -> super) {
+                        if (type_args -> Length() > 0)
+                        {
+                            ParameterizedType* param_super = new ParameterizedType(
+                                type -> super, type_args);
+                            control.RegisterParameterizedType(param_super);
+                            type -> SetParameterizedSuper(param_super);
+                        }
+                        else
+                        {
+                            delete type_args;
+                        }
+                    } else {
                         delete type_args;
                     }
                 }
+                
+                // Advance sig_p to end of superclass signature
+                if (*p == ';') p++;
+                sig_p = p;
+            }
+            
+            // Parse parameterized interfaces
+            if (control.option.source >= JopaOption::SDK1_5 && sig_p) {
+                 // DEBUG
+                 fprintf(stderr, "DEBUG: Parsing interfaces for %s from sig: %s\n", type->Utf8Name(), sig_p);
+                 
+                 while (*sig_p == 'L') {
+                      const char* p = sig_p + 1; // skip L
+                      while (*p && *p != '<' && *p != ';') p++;
+                      
+                      Tuple<Type*>* type_args = NULL;
+                      if (*p == '<') {
+                           p++; // skip <
+                           type_args = new Tuple<Type*>(4);
+                           // Parse args (DUPLICATED LOGIC from superclass parsing)
+                           while (*p && *p != '>')
+                           {
+                               if (*p == 'T') {
+                                   p++; const char* var_start = p; while (*p && *p != ';') p++;
+                                   int var_len = p - var_start; if (*p == ';') p++;
+                                   wchar_t* var_name = new wchar_t[var_len + 1];
+                                   Control::ConvertUtf8ToUnicode(var_name, var_start, var_len);
+                                   var_name[var_len] = U_NULL;
+                                   TypeParameterSymbol* found_param = NULL;
+                                   for (unsigned j = 0; j < type -> NumTypeParameters(); j++) {
+                                       TypeParameterSymbol* tp = type -> TypeParameter(j);
+                                       if (tp -> name_symbol && wcscmp(tp -> name_symbol -> Name(), var_name) == 0) {
+                                           found_param = tp; break;
+                                       }
+                                   }
+                                   delete[] var_name;
+                                   if (found_param) type_args -> Next() = new Type(found_param);
+                                   else type_args -> Next() = new Type(control.Object());
+                               }
+                               else if (*p == 'L') {
+                                   const char* class_start = p; int depth = 0;
+                                   while (*p && !(*p == ';' && depth == 0)) { if (*p == '<') depth++; else if (*p == '>') depth--; p++; }
+                                   if (*p == ';') p++;
+                                   const char* sig_ptr = class_start;
+                                   TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                                   type_args -> Next() = new Type(arg_type);
+                               }
+                               else if (*p == '[') {
+                                   const char* sig_ptr = p;
+                                   TypeSymbol* arg_type = ProcessSignature(type, sig_ptr, tok);
+                                   type_args -> Next() = new Type(arg_type);
+                                   p = sig_ptr;
+                               }
+                               else if (*p == '*') { p++; type_args -> Next() = new Type(control.Object()); }
+                               else if (*p == '+' || *p == '-') {
+                                   p++;
+                                   if (*p == 'L' || *p == 'T' || *p == '[') {
+                                       const char* sig_ptr = p;
+                                       TypeSymbol* bound_type = ProcessSignature(type, sig_ptr, tok);
+                                       type_args -> Next() = new Type(bound_type);
+                                       p = sig_ptr;
+                                   }
+                               }
+                               else { p++; }
+                           }
+                           if (*p == '>') p++; // skip >
+                      }
+                      if (*p == ';') p++; // skip ;
+                      sig_p = p;
+                      interface_type_args.Next() = type_args;
+                 }
             }
         }
     }
@@ -2123,6 +2207,19 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         type -> AddInterface(interf);
         type -> supertypes_closure -> AddElement(interf);
         type -> supertypes_closure -> Union(*interf -> supertypes_closure);
+        
+        // Add parameterized interface if available
+        // interface_type_args is in order (idx 0 corresponds to Interface(0))
+        // But loop iterates backwards.
+        // If we access index i, we get correct args.
+        if ((unsigned)i < interface_type_args.Length() && interface_type_args[i]) {
+             ParameterizedType* pt = new ParameterizedType(interf, interface_type_args[i]);
+             control.RegisterParameterizedType(pt);
+             type -> AddParameterizedInterface(pt);
+        } else {
+             type -> AddParameterizedInterface(NULL);
+        }
+
         if (! interf -> ACC_INTERFACE())
             type -> MarkBad();
     }

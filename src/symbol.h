@@ -1554,6 +1554,9 @@ public:
     // Check if this is a parameterized type (e.g., List<String>)
     bool IsParameterized() const { return parameterized_type != NULL; }
 
+    // Get the parameterized type
+    ParameterizedType* GetParameterizedType() const { return parameterized_type; }
+
     // Check if superclass is parameterized (for Signature attribute)
     bool HasParameterizedSuper() const { return parameterized_super != NULL; }
 

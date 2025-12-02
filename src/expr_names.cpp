@@ -1238,6 +1238,10 @@ void Semantic::ProcessAmbiguousName(AstName* name)
             name -> value = variable_symbol -> initial_value;
             name -> symbol = variable_symbol;
 
+            // Propagate parameterized type info (for generics)
+            if (variable_symbol -> parameterized_type)
+                name -> resolved_parameterized_type = variable_symbol -> parameterized_type;
+
             CheckSimpleName(name, where_found);
 
             //
@@ -1705,6 +1709,12 @@ void Semantic::ProcessFieldAccess(Ast* expr)
             assert(! field_access -> symbol -> VariableCast() ||
                    field_access -> symbol -> VariableCast() -> IsTyped());
 
+            VariableSymbol* field = field_access -> symbol -> VariableCast();
+
+            // Propagate parameterized type info (for generics)
+            if (field && field -> parameterized_type)
+                field_access -> resolved_parameterized_type = field -> parameterized_type;
+
             //
             // Type substitution for generics: If the receiver has a parameterized type,
             // and the field's type is a type parameter, substitute it with the
@@ -1714,7 +1724,6 @@ void Semantic::ProcessFieldAccess(Ast* expr)
             // (e.g., obj.field where obj is an expression, not a simple name).
             // Most field access goes through ProcessAmbiguousName instead.
             //
-            VariableSymbol* field = field_access -> symbol -> VariableCast();
             if (field && field_access -> base && field -> field_declaration)
             {
                 // Get the receiver's parameterized type (if any)
@@ -1753,6 +1762,8 @@ void Semantic::ProcessFieldAccess(Ast* expr)
                                         {
                                             Type* type_arg = receiver_param_type -> TypeArgument(i);
                                             field_access -> resolved_type = type_arg -> Erasure();
+                                            if (type_arg -> kind == Type::PARAMETERIZED_TYPE)
+                                                field_access -> resolved_parameterized_type = type_arg -> parameterized_type;
                                         }
                                         break;
                                     }
