@@ -3990,9 +3990,17 @@ public:
     //
     AstExpression* resolution_opt;
 
+    //
+    // For target type inference: set to true when the method's return type
+    // is a type parameter that couldn't be inferred from arguments.
+    // In this case, the return type can be inferred from the assignment context.
+    //
+    bool needs_target_type_inference;
+
     inline AstMethodInvocation(TokenIndex t)
         : AstExpression(CALL)
         , identifier_token(t)
+        , needs_target_type_inference(false)
     {}
     ~AstMethodInvocation() {}
 

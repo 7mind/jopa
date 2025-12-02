@@ -1,8 +1,8 @@
 # JDK 7 Compliance Failure Analysis & Roadmap
 
 **Date:** 2025-12-02
-**Status:** 87.0% Pass Rate (663/761)
-**Remaining Failures:** 98 (99 old - 1 fixed + 1 regression)
+**Status:** 87.8% Pass Rate (668/761)
+**Remaining Failures:** 93
 
 ## 1. Failure Categories
 
@@ -12,13 +12,13 @@
 **Symptoms:**
 *   ~~`boxing/BoxedForeach.java`: `for (int i : iterableOfInteger)` fails because `next()` returns `Object`.~~ **FIXED (2025-12-02)**
 *   ~~`cast/6569057/T6569057.java`: `x.get()` fails because `get()` is not found on `Object` (erasure of `E`).~~ **FIXED (2025-12-02)**
-*   `generics/inference/6369605/T6369605a.java`: Generic method return types degrade to `Object`.
+*   ~~`generics/inference/6369605/T6369605a.java`: Generic method return types degrade to `Object`.~~ **FIXED (2025-12-02)**
 
-### 1.2 Missing Target Type Inference
+### 1.2 Missing Target Type Inference ✅ LARGELY ADDRESSED (2025-12-02)
 **Impact:** Medium (Affects generic methods called without arguments)
 **Description:** The compiler fails to infer type arguments based on the context (assignment target) when explicit arguments are missing or insufficient.
 **Symptoms:**
-*   `List<?> l = m()` where `m` is `<T> List<T> m()`: Fails to infer `T` and defaults to `Object` or raw type, leading to "incompatible types" error.
+*   ~~`String s = empty()` where `empty` is `<T> T empty()`: Fails to infer `T` and defaults to `Object`.~~ **FIXED (2025-12-02)**
 
 ### 1.3 Missing API Stubs (Infrastructure)
 **Impact:** Medium (Affects specific tool tests)

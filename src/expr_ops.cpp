@@ -3233,6 +3233,39 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
     }
 
     TypeSymbol* left_type = left_hand_side -> Type();
+
+    // Target type inference: If the right side is a method call with an
+    // uninferred type parameter return type, use the target type (left_type).
+    AstExpression* right_expr = assignment_expression -> expression;
+    AstMethodInvocation* method_call = right_expr -> MethodInvocationCast();
+    if (method_call && method_call -> needs_target_type_inference &&
+        left_type && left_type != control.no_type && left_type != control.Object())
+    {
+        // Get the method to verify it's a generic method
+        MethodSymbol* method = method_call -> symbol ? method_call -> symbol -> MethodCast() : NULL;
+        if (method && method -> method_return_type_param_index >= 0)
+        {
+            // The method's return type is a type parameter - use target type
+            TypeSymbol* method_return_type = method -> Type();
+            unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+            if (return_dims > 0)
+            {
+                // Return type is T[] - target must be an array with matching dimensions
+                if (left_type -> num_dimensions >= return_dims)
+                {
+                    method_call -> resolved_type = left_type;
+                    method_call -> needs_target_type_inference = false;
+                }
+            }
+            else
+            {
+                // Simple return type T - use target type directly
+                method_call -> resolved_type = left_type;
+                method_call -> needs_target_type_inference = false;
+            }
+        }
+    }
+
     TypeSymbol* right_type = assignment_expression -> expression -> Type();
 
     if (left_type == control.no_type ||

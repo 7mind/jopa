@@ -1187,6 +1187,12 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     method_call -> resolved_type = inferred_type;
                 }
             }
+            else
+            {
+                // No inference from arguments succeeded - mark for target type inference
+                // The return type will be inferred from the assignment context if available
+                method_call -> needs_target_type_inference = true;
+            }
         }
     }
 

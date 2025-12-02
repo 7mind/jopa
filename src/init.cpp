@@ -25,6 +25,38 @@ void Semantic::ProcessVariableInitializer(AstVariableDeclarator* variable_declar
     {
         ProcessExpressionOrStringConstant(init);
 
+        // Target type inference: If the initializer is a method call with an
+        // uninferred type parameter return type, use the target type (field_type).
+        AstMethodInvocation* method_call = init -> MethodInvocationCast();
+        if (method_call && method_call -> needs_target_type_inference &&
+            field_type && field_type != control.no_type && field_type != control.Object())
+        {
+            // Get the method to verify it's a generic method
+            MethodSymbol* method = method_call -> symbol ? method_call -> symbol -> MethodCast() : NULL;
+            if (method && method -> method_return_type_param_index >= 0)
+            {
+                // The method's return type is a type parameter - use target type
+                // Handle array return types
+                TypeSymbol* method_return_type = method -> Type();
+                unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+                if (return_dims > 0)
+                {
+                    // Return type is T[] - target must be an array with matching dimensions
+                    if (field_type -> num_dimensions >= return_dims)
+                    {
+                        method_call -> resolved_type = field_type;
+                        method_call -> needs_target_type_inference = false;
+                    }
+                }
+                else
+                {
+                    // Simple return type T - use target type directly
+                    method_call -> resolved_type = field_type;
+                    method_call -> needs_target_type_inference = false;
+                }
+            }
+        }
+
         if (field_type != init -> Type() && init -> Type() != control.no_type)
         {
             if (CanAssignmentConvert(field_type, init))
