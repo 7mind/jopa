@@ -422,7 +422,7 @@ jobs:
           retention-days: 7
 
   compliance-tests-jdk8:
-    name: JDK8 Compliance Tests (62% threshold)
+    name: JDK8 Compliance Tests (64% threshold)
     runs-on: ubuntu-latest
 
     steps:
@@ -444,7 +444,7 @@ jobs:
         run: |
           nix develop --command bash ./scripts/test-java8-compliance.sh --build
 
-      - name: Check JDK8 Success Threshold (62%)
+      - name: Check JDK8 Success Threshold (64%)
         run: |
           source build/compliance_jdk8_results.env
           echo "JDK8 Compliance Results:"
@@ -462,8 +462,8 @@ jobs:
           echo "  Success rate: ${SUCCESS_RATE}%"
           echo ""
 
-          # Check if success rate is at least 62%
-          THRESHOLD=62
+          # Check if success rate is at least 64%
+          THRESHOLD=64
           PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
           if [ "$PASSED_THRESHOLD" -eq 1 ]; then
