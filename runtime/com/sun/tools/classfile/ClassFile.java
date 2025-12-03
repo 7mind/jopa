@@ -9,6 +9,10 @@ public class ClassFile {
     public final Method[] methods;
     public final Attributes attributes;
 
+    public String getName() throws ConstantPoolException {
+        return "";
+    }
+
     public ClassFile() {
         this.constant_pool = new ConstantPool();
         this.methods = new Method[0];

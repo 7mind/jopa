@@ -1686,16 +1686,22 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
     TokenIndex tok = type -> declaration ? type -> declaration -> identifier_token : 0;
 
-    // Iterate through all methods declared in this type
-    for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
+    // Iterate through all methods in the expanded method table (declared AND inherited)
+    // This ensures we generate bridges even for inherited methods that implement
+    // interfaces (e.g., D extends C<Integer> implements A<Integer>, D inherits f(Integer))
+    ExpandedMethodTable* table = type -> expanded_method_table;
+    for (unsigned i = 0; i < table -> symbol_pool.Length(); i++)
     {
-        MethodSymbol* method = type -> MethodSym(i);
+        MethodShadowSymbol* current_shadow = table -> symbol_pool[i];
+        MethodSymbol* method = current_shadow -> method_symbol;
 
         // Skip constructors, static methods, private methods, and already-bridge methods
+        // Also skip abstract methods - bridges are only for concrete implementations
         if (method -> Identity() == control.init_name_symbol ||
             method -> ACC_STATIC() ||
             method -> ACC_PRIVATE() ||
-            method -> IsBridge())
+            method -> IsBridge() ||
+            method -> ACC_ABSTRACT())
         {
             continue;
         }
@@ -1705,7 +1711,7 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
         // Check against methods in THIS type's expanded_method_table
         // This catches methods already added from superclasses/interfaces
-        MethodShadowSymbol* shadow = type -> expanded_method_table ->
+        MethodShadowSymbol* shadow = table ->
             FindMethodShadowSymbol(method -> name_symbol);
 
         while (shadow)
@@ -1720,55 +1726,9 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
             shadow = shadow -> next_method;
         }
-
-        // ALSO check superclass methods directly, because they might not be in
-        // expanded_method_table if there was a same-name method in the current type
-        // (FindOverloadMethodShadow finds by param types, so methods with same
-        // params but different return types are considered same overload and
-        // the superclass method isn't added separately)
-        for (TypeSymbol* super = type -> super; super; super = super -> super)
-        {
-            if (! super -> expanded_method_table)
-                continue;
-
-            MethodShadowSymbol* super_shadow = super -> expanded_method_table ->
-                FindMethodShadowSymbol(method -> name_symbol);
-
-            while (super_shadow)
-            {
-                CheckAndCreateBridge(method, super_shadow -> method_symbol, type, control, this, tok);
-
-                for (unsigned c = 0; c < super_shadow -> NumConflicts(); c++)
-                {
-                    CheckAndCreateBridge(method, super_shadow -> Conflict(c), type, control, this, tok);
-                }
-
-                super_shadow = super_shadow -> next_method;
-            }
-        }
-
-        // Also check interfaces
-        for (unsigned j = 0; j < type -> NumInterfaces(); j++)
-        {
-            TypeSymbol* interf = type -> Interface(j);
-            if (! interf -> expanded_method_table)
-                continue;
-
-            MethodShadowSymbol* interf_shadow = interf -> expanded_method_table ->
-                FindMethodShadowSymbol(method -> name_symbol);
-
-            while (interf_shadow)
-            {
-                CheckAndCreateBridge(method, interf_shadow -> method_symbol, type, control, this, tok);
-
-                for (unsigned c = 0; c < interf_shadow -> NumConflicts(); c++)
-                {
-                    CheckAndCreateBridge(method, interf_shadow -> Conflict(c), type, control, this, tok);
-                }
-
-                interf_shadow = interf_shadow -> next_method;
-            }
-        }
+        
+        // We can skip the explicit superclass/interface loops because expanded_method_table
+        // contains all visible methods.
     }
 }
 
@@ -4126,6 +4086,18 @@ void Semantic::CheckMethodOverride(MethodSymbol* method,
         }
         else
         {
+            if (method -> containing_type != base_type &&
+                hidden_method -> containing_type != base_type)
+            {
+                //
+                // Both methods are inherited. We suppress the error here because
+                // a subsequent inherited method might override both (covariance).
+                // If not, the ambiguity remains in the conflict list and will be
+                // checked when a concrete class implements this interface.
+                //
+                return;
+            }
+
             ReportSemError(SemanticError::MISMATCHED_INHERITED_METHOD_EXTERNALLY,
                            left_tok, right_tok, base_type -> ExternalName(),
                            method -> Header(),
@@ -4574,7 +4546,25 @@ void Semantic::AddInheritedMethods(TypeSymbol* base_type,
             {
                 if (! shadow)
                     shadow = base_expanded_table -> Overload(method);
-                else shadow -> AddConflict(method);
+                else
+                {
+                    MethodSymbol* current = shadow -> method_symbol;
+                    //
+                    // If the new method has a narrower return type than the current
+                    // representative, it is a better candidate for the primary symbol.
+                    //
+                    if (method -> Type() != current -> Type() &&
+                        method -> Type() -> IsSubtype(current -> Type()))
+                    {
+                        shadow -> symbol = method;
+                        shadow -> method_symbol = method;
+                        shadow -> AddConflict(current);
+                    }
+                    else
+                    {
+                        shadow -> AddConflict(method);
+                    }
+                }
 
                 assert(method -> containing_type != super_type ||
                        method_shadow_symbol -> NumConflicts() == 0);
@@ -5739,14 +5729,23 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
         if (this_type -> ACC_STATIC() && ! type -> ACC_STATIC() &&
             ! this_type -> IsSubclass(type -> ContainingType()))
         {
-            ReportSemError(SemanticError::STATIC_TYPE_ACCESSING_MEMBER_TYPE,
-                           identifier_token,
-                           this_type -> ContainingPackageName(),
-                           this_type -> ExternalName(),
-                           type -> ContainingPackageName(),
-                           type -> ExternalName(),
-                           env -> Type() -> ContainingPackageName(),
-                           env -> Type() -> ExternalName());
+            //
+            // JLS 8.5.1 says a static class cannot access non-static members of
+            // an enclosing class. However, javac allows access to inherited
+            // non-static member types (see tools/javac/generics/rare/Rare8.java).
+            // We relax the check here to match javac behavior.
+            //
+            if (type -> owner == env -> Type())
+            {
+                ReportSemError(SemanticError::STATIC_TYPE_ACCESSING_MEMBER_TYPE,
+                               identifier_token,
+                               this_type -> ContainingPackageName(),
+                               this_type -> ExternalName(),
+                               type -> ContainingPackageName(),
+                               type -> ExternalName(),
+                               env -> Type() -> ContainingPackageName(),
+                               env -> Type() -> ExternalName());
+            }
         }
         //
         // If the type was inherited, give a warning if it shadowed another

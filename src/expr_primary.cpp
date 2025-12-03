@@ -562,6 +562,31 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     // from the receiver's parameterized type.
     //
     MethodSymbol* method = method_call -> symbol -> MethodCast();
+
+    //
+    // Special handling for Object.getClass()
+    // JLS 4.3.2: The type of a method invocation expression of getClass is Class<? extends |T|>,
+    // where T is the class or interface that was searched for getClass.
+    //
+    if (method == control.Object_getClassMethod())
+    {
+        TypeSymbol* receiver_type = base_type;
+        if (! receiver_type && ! base)
+            receiver_type = ThisType();
+
+        if (receiver_type && receiver_type != control.no_type)
+        {
+            // Construct Class<? extends |receiver_type|>
+            // Note: receiver_type is already the erasure (TypeSymbol) of the receiver expression's type
+            WildcardType* wildcard = new WildcardType(WildcardType::EXTENDS, new Type(receiver_type));
+            Type* type_arg = new Type(wildcard);
+            Tuple<Type*>* type_args = new Tuple<Type*>(1);
+            type_args -> Next() = type_arg;
+            
+            method_call -> resolved_parameterized_type = new ParameterizedType(control.Class(), type_args);
+        }
+    }
+
     if (method && method -> return_type_param_index >= 0)
     {
         unsigned param_index = (unsigned) method -> return_type_param_index;
