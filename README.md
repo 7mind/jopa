@@ -6,10 +6,11 @@
 
 A totally Claude'd effort in modernizing [`jikes`](https://github.com/daveshields/jikes), the historical independent `javac` implementation in C++.
 
-Fully supports Java 5, 6 and 7 both in syntax and bytecode. Can emit older bytecode versions for newer syntax (e.g. Java 5 bytecode for Java 7 programs).
-Java 8 support is limited to default methods; other Java 8 features are intentionally not implemented.
-
-Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
+- Fully supports Java 5, 6 and 7 both in syntax and bytecode. 
+- Can emit older bytecode versions for newer syntax (e.g. Java 5 bytecode for Java 7 programs).
+- Java 8 support is limited to default methods; other Java 8 features are intentionally not implemented.
+- Does not support Annotations Processing (APT).
+- Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
 ## FAQ
 
