@@ -116,6 +116,9 @@ void Semantic::ProcessPostUnaryExpression(Ast* expr)
 
     ProcessExpression(expression);
     postfix_expression -> symbol = expression -> symbol;
+    // Java 5: Copy resolved_type from inner expression for generics
+    // (e.g., for i.value++ where i has parameterized type)
+    postfix_expression -> resolved_type = expression -> resolved_type;
 
     //
     // JLS2 added ability for parenthesized variable to remain a variable.
@@ -137,37 +140,46 @@ void Semantic::ProcessPostUnaryExpression(Ast* expr)
                            postfix_expression -> expression -> Type() -> Name());
             postfix_expression -> symbol = control.no_type;
         }
-        else if (! control.IsNumeric(expression -> Type()))
+        else
         {
-            ReportSemError(SemanticError::TYPE_NOT_NUMERIC,
-                           postfix_expression -> expression,
-                           expression -> Type() -> ContainingPackageName(),
-                           expression -> Type() -> ExternalName());
-            postfix_expression -> symbol = control.no_type;
-        }
-        else if (! expression -> ArrayAccessCast()) // some kind of name
-        {
-            MethodSymbol* read_method = NULL;
-            AstName* name = expression -> NameCast();
-            if (name)
-            {
-                if (name -> resolution_opt)
-                    read_method =
-                        name -> resolution_opt -> symbol -> MethodCast();
-            }
-            else
-            {
-                AstFieldAccess* field_access = (AstFieldAccess*) expression;
-                if (field_access -> resolution_opt)
-                    read_method = field_access -> resolution_opt ->
-                        symbol -> MethodCast();
-            }
+            // Java 5: Check if type is numeric or can be unboxed to a numeric type
+            TypeSymbol* expr_type = expression -> Type();
+            TypeSymbol* unboxed_type = expr_type -> UnboxedType(control);
+            bool is_numeric = control.IsNumeric(expr_type) ||
+                              (unboxed_type != expr_type && control.IsNumeric(unboxed_type));
 
-            if (read_method)
+            if (! is_numeric)
             {
-                postfix_expression -> write_method =
-                    read_method -> containing_type ->
-                    GetWriteAccessFromReadAccess(read_method);
+                ReportSemError(SemanticError::TYPE_NOT_NUMERIC,
+                               postfix_expression -> expression,
+                               expression -> Type() -> ContainingPackageName(),
+                               expression -> Type() -> ExternalName());
+                postfix_expression -> symbol = control.no_type;
+            }
+            else if (! expression -> ArrayAccessCast()) // some kind of name
+            {
+                MethodSymbol* read_method = NULL;
+                AstName* name = expression -> NameCast();
+                if (name)
+                {
+                    if (name -> resolution_opt)
+                        read_method =
+                            name -> resolution_opt -> symbol -> MethodCast();
+                }
+                else
+                {
+                    AstFieldAccess* field_access = (AstFieldAccess*) expression;
+                    if (field_access -> resolution_opt)
+                        read_method = field_access -> resolution_opt ->
+                            symbol -> MethodCast();
+                }
+
+                if (read_method)
+                {
+                    postfix_expression -> write_method =
+                        read_method -> containing_type ->
+                        GetWriteAccessFromReadAccess(read_method);
+                }
             }
         }
     }
@@ -332,6 +344,9 @@ void Semantic::ProcessPLUSPLUSOrMINUSMINUS(AstPreUnaryExpression* prefix_express
 
     ProcessExpression(expression);
     prefix_expression -> symbol = expression -> symbol;
+    // Java 5: Copy resolved_type from inner expression for generics
+    // (e.g., for ++i.value where i has parameterized type)
+    prefix_expression -> resolved_type = expression -> resolved_type;
 
     //
     // JLS2 added ability for parenthesized variable to remain a variable.
@@ -353,37 +368,46 @@ void Semantic::ProcessPLUSPLUSOrMINUSMINUS(AstPreUnaryExpression* prefix_express
                            prefix_expression -> expression -> Type() -> Name());
             prefix_expression -> symbol = control.no_type;
         }
-        else if (! control.IsNumeric(expression -> Type()))
+        else
         {
-            ReportSemError(SemanticError::TYPE_NOT_NUMERIC,
-                           prefix_expression -> expression,
-                           expression -> Type() -> ContainingPackageName(),
-                           expression -> Type() -> ExternalName());
-            prefix_expression -> symbol = control.no_type;
-        }
-        else if (! expression -> ArrayAccessCast()) // some kind of name
-        {
-            MethodSymbol* read_method = NULL;
-            AstName* name = expression -> NameCast();
-            if (name)
-            {
-                if (name -> resolution_opt)
-                   read_method =
-                       name -> resolution_opt -> symbol -> MethodCast();
-            }
-            else
-            {
-                AstFieldAccess* field_access = (AstFieldAccess*) expression;
-                if (field_access -> resolution_opt)
-                    read_method = field_access -> resolution_opt -> symbol ->
-                        MethodCast();
-            }
+            // Java 5: Check if type is numeric or can be unboxed to a numeric type
+            TypeSymbol* expr_type = expression -> Type();
+            TypeSymbol* unboxed_type = expr_type -> UnboxedType(control);
+            bool is_numeric = control.IsNumeric(expr_type) ||
+                              (unboxed_type != expr_type && control.IsNumeric(unboxed_type));
 
-            if (read_method)
+            if (! is_numeric)
             {
-                prefix_expression -> write_method =
-                    read_method -> containing_type ->
-                    GetWriteAccessFromReadAccess(read_method);
+                ReportSemError(SemanticError::TYPE_NOT_NUMERIC,
+                               prefix_expression -> expression,
+                               expression -> Type() -> ContainingPackageName(),
+                               expression -> Type() -> ExternalName());
+                prefix_expression -> symbol = control.no_type;
+            }
+            else if (! expression -> ArrayAccessCast()) // some kind of name
+            {
+                MethodSymbol* read_method = NULL;
+                AstName* name = expression -> NameCast();
+                if (name)
+                {
+                    if (name -> resolution_opt)
+                       read_method =
+                           name -> resolution_opt -> symbol -> MethodCast();
+                }
+                else
+                {
+                    AstFieldAccess* field_access = (AstFieldAccess*) expression;
+                    if (field_access -> resolution_opt)
+                        read_method = field_access -> resolution_opt -> symbol ->
+                            MethodCast();
+                }
+
+                if (read_method)
+                {
+                    prefix_expression -> write_method =
+                        read_method -> containing_type ->
+                        GetWriteAccessFromReadAccess(read_method);
+                }
             }
         }
     }
@@ -571,6 +595,38 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
 
     if (CanMethodInvocationConvert(target_type, source_type))
         return true;
+
+    // Intersection type support for conditional expressions:
+    // If the expression is a conditional (ternary) expression and both
+    // branches are assignable to the target type, then the conditional
+    // expression as a whole is assignable to the target type.
+    // This handles cases like: I i = cond ? a : b; where A and B both
+    // implement I and J, but the computed LUB is only one of them.
+    AstConditionalExpression* conditional = expr -> ConditionalExpressionCast();
+    if (conditional)
+    {
+        // Get the original branch types before any LUB conversion was applied.
+        // After ProcessConditionalExpression, branches may be wrapped in casts.
+        AstExpression* true_expr = conditional -> true_expression;
+        AstExpression* false_expr = conditional -> false_expression;
+
+        // Unwrap casts to get the original expression types
+        AstCastExpression* true_cast = true_expr -> CastExpressionCast();
+        if (true_cast)
+            true_expr = true_cast -> expression;
+        AstCastExpression* false_cast = false_expr -> CastExpressionCast();
+        if (false_cast)
+            false_expr = false_cast -> expression;
+
+        TypeSymbol* true_type = true_expr -> Type();
+        TypeSymbol* false_type = false_expr -> Type();
+        if (true_type && false_type &&
+            CanMethodInvocationConvert(target_type, true_type) &&
+            CanMethodInvocationConvert(target_type, false_type))
+        {
+            return true;
+        }
+    }
 
     // Allow constant narrowing into wrapper types by checking representability
     if (control.option.source >= JopaOption::SDK1_5 &&
@@ -1093,6 +1149,13 @@ void Semantic::ProcessCastExpression(Ast* expr)
                               target_type -> ContainingPackageName(),
                               target_type -> ExternalName());
             }
+
+            // Propagate the parameterized type from the cast target to the expression
+            // This enables foreach loops and method calls to use the type arguments
+            if (target_name -> parameterized_type)
+            {
+                cast_expression -> resolved_parameterized_type = target_name -> parameterized_type;
+            }
         }
         else if (target_type -> IsGeneric() && !target_name)
         {
@@ -1530,7 +1593,12 @@ void Semantic::ProcessShift(AstBinaryExpression* expr)
     TypeSymbol* left_type = expr -> left_expression -> Type();
     TypeSymbol* right_type = expr -> right_expression -> Type();
 
-    if (! control.IsIntegral(left_type))
+    // Java 5: Check if type is integral or can be unboxed to an integral type
+    TypeSymbol* unboxed_left = left_type -> UnboxedType(control);
+    bool left_is_integral = control.IsIntegral(left_type) ||
+                            (unboxed_left != left_type && control.IsIntegral(unboxed_left));
+
+    if (! left_is_integral)
     {
         if (left_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
@@ -1549,7 +1617,12 @@ void Semantic::ProcessShift(AstBinaryExpression* expr)
     // byte, char, or short, and narrowing of long, since the bytecode
     // requires an int shift amount.
     //
-    if (! control.IsIntegral(right_type))
+    // Java 5: Check if type is integral or can be unboxed to an integral type
+    TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
+    bool right_is_integral = control.IsIntegral(right_type) ||
+                             (unboxed_right != right_type && control.IsIntegral(unboxed_right));
+
+    if (! right_is_integral)
     {
         if (right_type != control.no_type)
             ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
@@ -3178,10 +3251,14 @@ TypeSymbol* Semantic::FindLeastUpperBound(TypeSymbol* type1, TypeSymbol* type2)
             }
         }
 
-        if (most_specific_common_interfaces.Length() == 1) {
-            return most_specific_common_interfaces[0]; // Exactly one most specific common interface
+        if (most_specific_common_interfaces.Length() >= 1) {
+            // Return the first most specific common interface.
+            // When there are multiple (e.g., A implements I, J and B implements I, J),
+            // the JLS says the LUB is the intersection type I & J. For type erasure,
+            // we just return the first one. This allows assignment to that interface type.
+            return most_specific_common_interfaces[0];
         } else {
-            // Multiple or zero most specific common interfaces (other than Object already handled if common_super_class is null)
+            // No common interface found other than Object
             return control.Object(); // Fallback to Object
         }
     }
@@ -3233,6 +3310,39 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
     }
 
     TypeSymbol* left_type = left_hand_side -> Type();
+
+    // Target type inference: If the right side is a method call with an
+    // uninferred type parameter return type, use the target type (left_type).
+    AstExpression* right_expr = assignment_expression -> expression;
+    AstMethodInvocation* method_call = right_expr -> MethodInvocationCast();
+    if (method_call && method_call -> needs_target_type_inference &&
+        left_type && left_type != control.no_type && left_type != control.Object())
+    {
+        // Get the method to verify it's a generic method
+        MethodSymbol* method = method_call -> symbol ? method_call -> symbol -> MethodCast() : NULL;
+        if (method && method -> method_return_type_param_index >= 0)
+        {
+            // The method's return type is a type parameter - use target type
+            TypeSymbol* method_return_type = method -> Type();
+            unsigned return_dims = method_return_type ? method_return_type -> num_dimensions : 0;
+            if (return_dims > 0)
+            {
+                // Return type is T[] - target must be an array with matching dimensions
+                if (left_type -> num_dimensions >= return_dims)
+                {
+                    method_call -> resolved_type = left_type;
+                    method_call -> needs_target_type_inference = false;
+                }
+            }
+            else
+            {
+                // Simple return type T - use target type directly
+                method_call -> resolved_type = left_type;
+                method_call -> needs_target_type_inference = false;
+            }
+        }
+    }
+
     TypeSymbol* right_type = assignment_expression -> expression -> Type();
 
     if (left_type == control.no_type ||
@@ -3389,90 +3499,116 @@ void Semantic::ProcessAssignmentExpression(Ast* expr)
         case AstAssignmentExpression::LEFT_SHIFT_EQUAL:
         case AstAssignmentExpression::RIGHT_SHIFT_EQUAL:
         case AstAssignmentExpression::UNSIGNED_RIGHT_SHIFT_EQUAL:
-            assignment_expression -> left_hand_side
-                = PromoteUnaryNumericExpression(left_hand_side);
-            if (! control.IsIntegral(left_type))
             {
-                if (assignment_expression -> left_hand_side -> symbol !=
-                    control.no_type)
+                assignment_expression -> left_hand_side
+                    = PromoteUnaryNumericExpression(left_hand_side);
+                // Java 5: Check if type is integral or can be unboxed to an integral type
+                TypeSymbol* unboxed_left = left_type -> UnboxedType(control);
+                bool left_is_integral = control.IsIntegral(left_type) ||
+                                        (unboxed_left != left_type && control.IsIntegral(unboxed_left));
+                if (! left_is_integral)
+                {
+                    if (assignment_expression -> left_hand_side -> symbol !=
+                        control.no_type)
+                    {
+                        ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
+                                       assignment_expression -> left_hand_side,
+                                       left_type -> ContainingPackageName(),
+                                       left_type -> ExternalName());
+                    }
+                    assignment_expression -> symbol = control.no_type;
+                }
+                //
+                // This call captures both unary numeric conversion (widening) of
+                // byte, char, or short, and narrowing of long, since the bytecode
+                // requires an int shift amount.
+                //
+                // Java 5: Check if type is integral or can be unboxed to an integral type
+                TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
+                bool right_is_integral = control.IsIntegral(right_type) ||
+                                         (unboxed_right != right_type && control.IsIntegral(unboxed_right));
+                if (! right_is_integral)
                 {
                     ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
-                                   assignment_expression -> left_hand_side,
-                                   left_type -> ContainingPackageName(),
-                                   left_type -> ExternalName());
+                                   assignment_expression -> expression,
+                                   right_type -> ContainingPackageName(),
+                                   right_type -> ExternalName());
+                    assignment_expression -> symbol = control.no_type;
                 }
-                assignment_expression -> symbol = control.no_type;
+                assignment_expression -> expression =
+                    ConvertToType(assignment_expression -> expression,
+                                  control.int_type);
+                ProcessShiftCount(left_type, assignment_expression -> expression);
             }
-            //
-            // This call captures both unary numeric conversion (widening) of
-            // byte, char, or short, and narrowing of long, since the bytecode
-            // requires an int shift amount.
-            //
-            if (! control.IsIntegral(right_type))
-            {
-                ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
-                               assignment_expression -> expression,
-                               right_type -> ContainingPackageName(),
-                               right_type -> ExternalName());
-                assignment_expression -> symbol = control.no_type;
-            }
-            assignment_expression -> expression =
-                ConvertToType(assignment_expression -> expression,
-                              control.int_type);
-            ProcessShiftCount(left_type, assignment_expression -> expression);
             break;
         case AstAssignmentExpression::AND_EQUAL:
         case AstAssignmentExpression::XOR_EQUAL:
         case AstAssignmentExpression::IOR_EQUAL:
-            // Java 5: Unbox Boolean to boolean for RHS
-            if (right_type == control.Boolean())
             {
-                assignment_expression -> expression =
-                    ConvertToType(assignment_expression -> expression, control.boolean_type);
-                right_type = control.boolean_type;
-            }
-            if (left_type == control.boolean_type)
-            {
-                if (right_type != control.boolean_type)
+                // Java 5: Unbox Boolean to boolean for RHS
+                if (right_type == control.Boolean())
                 {
-                    ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
-                                   assignment_expression -> expression,
-                                   right_type -> ContainingPackageName(),
-                                   right_type -> ExternalName());
-                    assignment_expression -> symbol = control.no_type;
+                    assignment_expression -> expression =
+                        ConvertToType(assignment_expression -> expression, control.boolean_type);
+                    right_type = control.boolean_type;
                 }
-            }
-            else
-            {
-                // Java 5: Unbox numeric wrapper types before checking
-                if (control.option.source >= JopaOption::SDK1_5)
+                // Java 5: Also handle Boolean wrapper on LHS
+                bool left_is_boolean = (left_type == control.boolean_type) ||
+                                       (left_type == control.Boolean());
+                if (left_is_boolean)
                 {
-                    TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
-                    if (unboxed_right && unboxed_right != right_type &&
-                        control.IsIntegral(unboxed_right))
+                    // Unbox RHS if it's Boolean
+                    if (right_type == control.Boolean())
                     {
                         assignment_expression -> expression =
-                            ConvertToType(assignment_expression -> expression, unboxed_right);
-                        right_type = unboxed_right;
+                            ConvertToType(assignment_expression -> expression, control.boolean_type);
+                        right_type = control.boolean_type;
+                    }
+                    if (right_type != control.boolean_type)
+                    {
+                        ReportSemError(SemanticError::TYPE_NOT_BOOLEAN,
+                                       assignment_expression -> expression,
+                                       right_type -> ContainingPackageName(),
+                                       right_type -> ExternalName());
+                        assignment_expression -> symbol = control.no_type;
                     }
                 }
-                if (! control.IsIntegral(left_type))
+                else
                 {
-                    ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
-                                   left_hand_side,
-                                   left_type -> ContainingPackageName(),
-                                   left_type -> ExternalName());
-                    assignment_expression -> symbol = control.no_type;
+                    // Java 5: Unbox numeric wrapper types before checking
+                    if (control.option.source >= JopaOption::SDK1_5)
+                    {
+                        TypeSymbol* unboxed_right = right_type -> UnboxedType(control);
+                        if (unboxed_right && unboxed_right != right_type &&
+                            control.IsIntegral(unboxed_right))
+                        {
+                            assignment_expression -> expression =
+                                ConvertToType(assignment_expression -> expression, unboxed_right);
+                            right_type = unboxed_right;
+                        }
+                    }
+                    // Java 5: Check if type is integral or can be unboxed to an integral type
+                    TypeSymbol* unboxed_left = left_type -> UnboxedType(control);
+                    bool left_is_integral = control.IsIntegral(left_type) ||
+                                            (unboxed_left != left_type && control.IsIntegral(unboxed_left));
+                    if (! left_is_integral)
+                    {
+                        ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
+                                       left_hand_side,
+                                       left_type -> ContainingPackageName(),
+                                       left_type -> ExternalName());
+                        assignment_expression -> symbol = control.no_type;
+                    }
+                    if (! control.IsIntegral(right_type))
+                    {
+                        ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
+                                       assignment_expression -> expression,
+                                       right_type -> ContainingPackageName(),
+                                       right_type -> ExternalName());
+                        assignment_expression -> symbol = control.no_type;
+                    }
+                    BinaryNumericPromotion(assignment_expression);
                 }
-                if (! control.IsIntegral(right_type))
-                {
-                    ReportSemError(SemanticError::TYPE_NOT_INTEGRAL,
-                                   assignment_expression -> expression,
-                                   right_type -> ContainingPackageName(),
-                                   right_type -> ExternalName());
-                    assignment_expression -> symbol = control.no_type;
-                }
-                BinaryNumericPromotion(assignment_expression);
             }
             break;
         default:

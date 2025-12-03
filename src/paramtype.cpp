@@ -23,36 +23,114 @@ ParameterizedType::~ParameterizedType()
 }
 
 
+ParameterizedType* ParameterizedType::Clone() const
+{
+    // Clone type arguments
+    Tuple<Type*>* cloned_args = NULL;
+    if (type_arguments)
+    {
+        cloned_args = new Tuple<Type*>(type_arguments -> Length());
+        for (unsigned i = 0; i < type_arguments -> Length(); i++)
+        {
+            cloned_args -> Next() = (*type_arguments)[i] -> Clone();
+        }
+    }
+
+    // Clone enclosing type
+    ParameterizedType* cloned_enclosing = NULL;
+    if (enclosing_type)
+    {
+        cloned_enclosing = enclosing_type -> Clone();
+    }
+
+    return new ParameterizedType(generic_type, cloned_args, cloned_enclosing);
+}
+
+
 void ParameterizedType::GenerateSignature(char* buffer, unsigned& length)
 {
     // Format: L<classname><TypeArguments>;
     // Example: Ljava/util/List<Ljava/lang/String;>;
+    //
+    // For inner classes with parameterized enclosing types:
+    // Format: L<OuterClass><TypeArgs>.<InnerClass>;
+    // Example: LA<LB;>.C;  for class C extends A<B>.C
 
-    // Get the fully qualified signature (e.g., "Ljava/util/List;")
-    const char* full_sig = generic_type -> SignatureString();
-    unsigned sig_len = strlen(full_sig);
-
-    // Copy everything except the trailing ';'
-    for (unsigned i = 0; i < sig_len - 1; i++)
+    if (enclosing_type)
     {
-        buffer[length++] = full_sig[i];
-    }
+        // Generate enclosing type signature without trailing ';'
+        // First get the enclosing type's full signature
+        const char* enclosing_sig = enclosing_type -> generic_type -> SignatureString();
+        unsigned enclosing_len = strlen(enclosing_sig);
 
-    // Add type arguments if present
-    if (type_arguments && type_arguments -> Length() > 0)
-    {
-        buffer[length++] = '<';
+        // Copy "L<OuterClassName>"
+        for (unsigned i = 0; i < enclosing_len - 1; i++)
+            buffer[length++] = enclosing_sig[i];
 
-        for (unsigned i = 0; i < type_arguments -> Length(); i++)
+        // Add enclosing type's type arguments
+        if (enclosing_type -> type_arguments && enclosing_type -> type_arguments -> Length() > 0)
         {
-            Type* arg = (*type_arguments)[i];
-            arg -> GenerateSignature(buffer, length);
+            buffer[length++] = '<';
+            for (unsigned i = 0; i < enclosing_type -> type_arguments -> Length(); i++)
+            {
+                Type* arg = (*enclosing_type -> type_arguments)[i];
+                arg -> GenerateSignature(buffer, length);
+            }
+            buffer[length++] = '>';
         }
 
-        buffer[length++] = '>';
-    }
+        // Add '.' separator and inner class simple name
+        buffer[length++] = '.';
 
-    buffer[length++] = ';';
+        // Get the inner class's simple name (without package/outer class prefix)
+        const char* inner_name = generic_type -> Utf8Name();
+        unsigned inner_len = strlen(inner_name);
+        for (unsigned i = 0; i < inner_len; i++)
+            buffer[length++] = inner_name[i];
+
+        // Add type arguments for the inner class if present
+        if (type_arguments && type_arguments -> Length() > 0)
+        {
+            buffer[length++] = '<';
+            for (unsigned i = 0; i < type_arguments -> Length(); i++)
+            {
+                Type* arg = (*type_arguments)[i];
+                arg -> GenerateSignature(buffer, length);
+            }
+            buffer[length++] = '>';
+        }
+
+        buffer[length++] = ';';
+    }
+    else
+    {
+        // Simple case: no enclosing parameterized type
+        // Get the fully qualified signature (e.g., "Ljava/util/List;")
+        const char* full_sig = generic_type -> SignatureString();
+        unsigned sig_len = strlen(full_sig);
+
+        // Copy everything except the trailing ';'
+        for (unsigned i = 0; i < sig_len - 1; i++)
+        {
+            buffer[length++] = full_sig[i];
+        }
+
+        // Add type arguments if present
+        if (type_arguments && type_arguments -> Length() > 0)
+        {
+            buffer[length++] = '<';
+
+            for (unsigned i = 0; i < type_arguments -> Length(); i++)
+            {
+                Type* arg = (*type_arguments)[i];
+                arg -> GenerateSignature(buffer, length);
+            }
+
+            buffer[length++] = '>';
+        }
+
+        buffer[length++] = ';';
+    }
 }
 
 //
@@ -270,6 +348,57 @@ void Type::GenerateSignature(char* buffer, unsigned& length)
         case ARRAY_TYPE:
             array_type -> GenerateSignature(buffer, length);
             break;
+    }
+}
+
+bool Type::IsSubtype(TypeSymbol* type)
+{
+    if (!type) return false;
+
+    switch (kind)
+    {
+        case SIMPLE_TYPE:
+            return simple_type && simple_type -> IsSubtype(type);
+
+        case PARAMETERIZED_TYPE:
+            return parameterized_type -> Erasure() -> IsSubtype(type);
+
+        case TYPE_PARAMETER:
+        {
+            // For type variable T, T <: type if any bound <: type
+            // If no bounds, T <: Object
+            if (type_parameter -> NumBounds() == 0)
+            {
+                return type == NULL; // Should check against Object, but we don't have Control here easily.
+                // Assuming type is not null, and unbounded T only extends Object.
+                // We need Control to get Object.
+                // However, Erasure() returns Object (or NULL).
+                // If Erasure() is NULL, we can't check properly without Control.
+                // But TypeParameterSymbol::ErasedType() handles this if we trust it.
+                // Wait, ErasedType returns NULL if unbounded and no Control.
+                
+                // If we assume type is valid, we can check if type is Object by name?
+                // Or just rely on Erasure logic if possible.
+                
+                // Better: check bounds.
+            }
+            
+            for (unsigned i = 0; i < type_parameter -> NumBounds(); i++)
+            {
+                if (type_parameter -> Bound(i) -> IsSubtype(type))
+                    return true;
+            }
+            return false;
+        }
+
+        case WILDCARD_TYPE:
+            return wildcard_type -> UpperBound() && wildcard_type -> UpperBound() -> IsSubtype(type);
+
+        case ARRAY_TYPE:
+            return array_type -> Erasure() && array_type -> Erasure() -> IsSubtype(type);
+
+        default:
+            return false;
     }
 }
 

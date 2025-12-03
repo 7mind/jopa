@@ -633,6 +633,32 @@ void Semantic::ProcessTypeHeader(AstClassDeclaration* declaration)
                 if (param_super)
                     type -> SetParameterizedSuper(param_super);
             }
+            // Handle parameterized inner class supertypes: D extends A<B>.C
+            // The type arguments are on the base (A<B>), not on the outer name (C)
+            else if (super_type_name && super_type_name -> base_opt)
+            {
+                AstTypeName* base_type_name = super_type_name -> base_opt -> TypeNameCast();
+                if (base_type_name && base_type_name -> type_arguments_opt)
+                {
+                    // Get the enclosing class type (A in A<B>.C)
+                    TypeSymbol* enclosing_type = super_type -> ContainingType();
+                    if (enclosing_type)
+                    {
+                        // Create ParameterizedType for the enclosing class (A<B>)
+                        ParameterizedType* param_enclosing = ProcessTypeArguments(
+                            enclosing_type, base_type_name -> type_arguments_opt);
+                        if (param_enclosing)
+                        {
+                            // Create a ParameterizedType for the inner class
+                            // that references the parameterized enclosing class
+                            ParameterizedType* param_super =
+                                new ParameterizedType(super_type, NULL);
+                            param_super -> enclosing_type = param_enclosing;
+                            type -> SetParameterizedSuper(param_super);
+                        }
+                    }
+                }
+            }
 
             while (super_type)
             {
@@ -928,6 +954,96 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 bound_type = type;
             }
 
+            // Check sibling nested types and ancestors for nested classes
+            // This handles cases like: class Outer { class A<X extends B> {} class B {} }
+            if (!bound_type)
+            {
+                TypeSymbol* containing = type -> ContainingType();
+                while (containing && !bound_type)
+                {
+                    // Check if the bound is the containing type itself
+                    if (bound_name == containing -> Identity())
+                    {
+                        bound_type = containing;
+                    }
+                    else
+                    {
+                        // Check sibling nested types in symbol table
+                        bound_type = containing -> FindTypeSymbol(bound_name);
+
+                        // If not found in symbol table, check AST for not-yet-processed sibling types
+                        // This handles forward references to sibling types during header processing
+                        if (!bound_type && containing -> declaration)
+                        {
+                            AstClassBody* body = containing -> declaration;
+
+                            // Check nested classes
+                            for (unsigned k = 0; k < body -> NumNestedClasses() && !bound_type; k++)
+                            {
+                                AstClassDeclaration* nested = body -> NestedClass(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+
+                            // Check nested enums
+                            for (unsigned k = 0; k < body -> NumNestedEnums() && !bound_type; k++)
+                            {
+                                AstEnumDeclaration* nested = body -> NestedEnum(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+
+                            // Check nested interfaces
+                            for (unsigned k = 0; k < body -> NumNestedInterfaces() && !bound_type; k++)
+                            {
+                                AstInterfaceDeclaration* nested = body -> NestedInterface(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    containing = containing -> ContainingType();
+                }
+            }
+
+            // Check single-type imports (e.g., import java.util.List;)
+            if (!bound_type)
+            {
+                for (unsigned k = 0; k < single_type_imports.Length(); k++)
+                {
+                    TypeSymbol* import_type = single_type_imports[k];
+                    if (bound_name == import_type -> Identity())
+                    {
+                        bound_type = import_type;
+                        break;
+                    }
+                }
+            }
+
+            // Try import-on-demand (e.g., import java.util.*;)
+            if (!bound_type)
+            {
+                bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
+            }
+
             // Try to find in the current package
             if (!bound_type)
             {
@@ -964,6 +1080,14 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 // TODO: Add proper validation for final classes in bounds
                 // TODO: Validate that only first bound can be a class
                 type_param -> AddBound(bound_type);
+
+                // NOTE: We intentionally don't process parameterized bounds here
+                // during class type parameter processing, because for recursive generics
+                // like class A<T extends B<T, U>, U extends A<T, U>>, the other type
+                // parameters haven't been added yet. Parameterized bounds for class
+                // type parameters will be processed later if needed.
+                // For method type parameters, we can safely process parameterized bounds
+                // since methods can't have recursive type parameter references.
             }
             // If bound_type is still NULL, we'll report an error later
         }
@@ -1029,7 +1153,66 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
 
             // Try to find in the containing type's package
             TypeSymbol* containing_type = method -> containing_type;
-            if (containing_type)
+
+            // First, check if the bound is a previously defined method type parameter
+            // (e.g., for <X extends A, Y extends X>, Y's bound X is a type parameter)
+            for (unsigned k = 0; k < i; k++)
+            {
+                TypeParameterSymbol* prev_tp = method -> TypeParameter(k);
+                if (prev_tp && prev_tp -> name_symbol == bound_name)
+                {
+                    // The bound is another type parameter - use its erasure
+                    bound_type = prev_tp -> ErasedType();
+                    if (! bound_type)
+                        bound_type = control.Object();
+                    break;
+                }
+            }
+
+            // Check if the bound refers to the containing type itself (T7022054pos1)
+            if (! bound_type && containing_type && containing_type->Identity() == bound_name)
+            {
+                bound_type = containing_type;
+            }
+
+            // Check nested classes within the containing type (e.g., E extends B where B is a nested class)
+            if (!bound_type && containing_type)
+            {
+                bound_type = containing_type -> FindTypeSymbol(bound_name);
+            }
+
+            // Check enclosing types for nested classes (for deeply nested types)
+            if (!bound_type && containing_type)
+            {
+                for (TypeSymbol* enclosing = containing_type -> ContainingType();
+                     enclosing && !bound_type;
+                     enclosing = enclosing -> ContainingType())
+                {
+                    bound_type = enclosing -> FindTypeSymbol(bound_name);
+                }
+            }
+
+            // Check single-type imports (e.g., import java.util.List;)
+            if (!bound_type)
+            {
+                for (unsigned k = 0; k < single_type_imports.Length(); k++)
+                {
+                    TypeSymbol* import_type = single_type_imports[k];
+                    if (bound_name == import_type -> Identity())
+                    {
+                        bound_type = import_type;
+                        break;
+                    }
+                }
+            }
+
+            // Try import-on-demand (e.g., import java.util.*;)
+            if (!bound_type)
+            {
+                bound_type = ImportType(bound_ast->name->identifier_token, bound_name);
+            }
+
+            if (!bound_type && containing_type)
             {
                 PackageSymbol* package = containing_type -> ContainingPackage();
                 if (package)
@@ -1062,6 +1245,61 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
             if (bound_type)
             {
                 type_param -> AddBound(bound_type);
+
+                // Also store parameterized bound if there are type arguments
+                // (e.g., for T extends List<? extends Number>, store List<? extends Number>)
+                // However, skip if the bound references forward type parameters (e.g., T extends List<U>
+                // where U is defined after T) to avoid errors during ProcessTypeArguments
+                if (bound_ast -> type_arguments_opt)
+                {
+                    // Check for forward references to not-yet-defined type parameters
+                    bool has_forward_reference = false;
+                    for (unsigned k = 0; k < bound_ast -> type_arguments_opt -> NumTypeArguments() && !has_forward_reference; k++)
+                    {
+                        AstType* type_arg = bound_ast -> type_arguments_opt -> TypeArgument(k);
+                        AstTypeName* arg_name = type_arg -> TypeNameCast();
+                        if (arg_name && !arg_name -> base_opt && !arg_name -> type_arguments_opt)
+                        {
+                            // Simple type name - might be a type parameter reference
+                            NameSymbol* name_sym = lex_stream -> NameSymbol(arg_name -> name -> identifier_token);
+                            // Check if it's a type parameter not yet defined
+                            bool found = false;
+                            for (unsigned m = 0; m <= i && !found; m++)
+                            {
+                                AstTypeParameter* prev_param = parameters -> TypeParameter(m);
+                                if (prev_param -> symbol &&
+                                    prev_param -> symbol -> name_symbol == name_sym)
+                                {
+                                    found = true;
+                                }
+                            }
+                            // If not found in defined params, check if it's a type param from later
+                            if (!found)
+                            {
+                                for (unsigned m = i + 1; m < parameters -> NumTypeParameters() && !has_forward_reference; m++)
+                                {
+                                    AstTypeParameter* later_param = parameters -> TypeParameter(m);
+                                    const NameSymbol* later_name =
+                                        lex_stream -> NameSymbol(later_param -> identifier_token);
+                                    if (name_sym == later_name)
+                                    {
+                                        has_forward_reference = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!has_forward_reference)
+                    {
+                        ParameterizedType* param_bound = ProcessTypeArguments(bound_type, bound_ast -> type_arguments_opt);
+                        if (param_bound)
+                        {
+                            // Clone the parameterized type to avoid double-free (AST owns the original)
+                            type_param -> AddParameterizedBound(new Type(param_bound -> Clone()));
+                        }
+                    }
+                }
             }
         }
     }
@@ -1178,7 +1416,20 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
             TypeSymbol* bound = type_param -> Bound(j);
 
             // Check if arg_type is a subtype of the bound
-            if (! arg_type -> IsSubtype(bound))
+            bool satisfies_bound = false;
+            
+            if (type_arg_ast->generic_type)
+            {
+                // Use generic type info if available (handles type variables)
+                satisfies_bound = type_arg_ast->generic_type->IsSubtype(bound);
+            }
+            else
+            {
+                // Fallback to erasure (TypeSymbol)
+                satisfies_bound = arg_type -> IsSubtype(bound);
+            }
+
+            if (! satisfies_bound)
             {
                 // Type argument doesn't satisfy bound
                 ReportSemError(SemanticError::TYPE_ARGUMENT_FAILS_BOUNDS,
@@ -1203,71 +1454,122 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     {
         AstType* type_arg_ast = type_arguments -> TypeArgument(i);
 
-        // Check if the type argument is itself a parameterized type
-        AstTypeName* type_name = type_arg_ast -> TypeNameCast();
-        if (type_name && type_name -> parameterized_type)
+        // Check if the type argument is a wildcard
+        AstWildcard* wildcard_ast = type_arg_ast -> WildcardCast();
+        if (wildcard_ast)
         {
-            // Clone the nested parameterized type (to avoid double-free)
-            // The original is owned by ast_pool, so we need our own copy
-            Type temp_wrapper(type_name -> parameterized_type);
-            // Prevent temp_wrapper's destructor from deleting the original
-            // by resetting it - we'll use the clone instead
-            Type* cloned = temp_wrapper.Clone();
-            // Reset temp_wrapper to avoid double-free
-            temp_wrapper.kind = Type::SIMPLE_TYPE;
-            temp_wrapper.simple_type = NULL;
-            type_arg_tuple -> Next() = cloned;
-        }
-        else
-        {
-            // Check if the type argument is a type parameter reference
-            // Type parameters are stored as their erased type in symbol, but we need
-            // to track them as TYPE_PARAMETER kind for proper type substitution.
-            TypeParameterSymbol* type_param_sym = NULL;
-            if (type_name && ! type_name -> type_arguments_opt)
+            // Create WildcardType from AST
+            WildcardType::BoundKind bound_kind = WildcardType::UNBOUNDED;
+            Type* bound = NULL;
+
+            if (wildcard_ast -> extends_token_opt)
             {
-                const NameSymbol* arg_name = lex_stream -> NameSymbol(
-                    type_name -> name -> identifier_token);
-                // Check processing_type's type parameters
-                if (processing_type)
+                // ? extends X
+                bound_kind = WildcardType::EXTENDS;
+                if (wildcard_ast -> bounds_opt)
                 {
-                    for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
-                    {
-                        TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
-                        if (tp -> name_symbol == arg_name)
-                        {
-                            type_param_sym = tp;
-                            break;
-                        }
-                    }
+                    ProcessType(wildcard_ast -> bounds_opt);
+                    TypeSymbol* bound_sym = wildcard_ast -> bounds_opt -> symbol;
+                    if (bound_sym && ! bound_sym -> Bad())
+                        bound = new Type(bound_sym);
                 }
-                // Also check enclosing method's type parameters
-                if (! type_param_sym && ThisMethod())
+            }
+            else if (wildcard_ast -> super_token_opt)
+            {
+                // ? super X
+                bound_kind = WildcardType::SUPER;
+                if (wildcard_ast -> bounds_opt)
                 {
-                    for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
-                    {
-                        TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
-                        if (tp -> name_symbol == arg_name)
-                        {
-                            type_param_sym = tp;
-                            break;
-                        }
-                    }
+                    ProcessType(wildcard_ast -> bounds_opt);
+                    TypeSymbol* bound_sym = wildcard_ast -> bounds_opt -> symbol;
+                    if (bound_sym && ! bound_sym -> Bad())
+                        bound = new Type(bound_sym);
                 }
             }
 
-            if (type_param_sym)
+            WildcardType* wildcard = new WildcardType(bound_kind, bound);
+            type_arg_tuple -> Next() = new Type(wildcard);
+        }
+        // Check if the type argument is itself a parameterized type
+        else
+        {
+            AstTypeName* type_name = type_arg_ast -> TypeNameCast();
+            if (type_name && type_name -> parameterized_type)
             {
-                // Type argument is a type parameter - store as TYPE_PARAMETER
-                type_arg_tuple -> Next() = new Type(type_param_sym);
+                // Clone the nested parameterized type (to avoid double-free)
+                // The original is owned by ast_pool, so we need our own copy
+                Type temp_wrapper(type_name -> parameterized_type);
+                // Prevent temp_wrapper's destructor from deleting the original
+                // by resetting it - we'll use the clone instead
+                Type* cloned = temp_wrapper.Clone();
+                // Reset temp_wrapper to avoid double-free
+                temp_wrapper.kind = Type::SIMPLE_TYPE;
+                temp_wrapper.simple_type = NULL;
+                type_arg_tuple -> Next() = cloned;
             }
             else
             {
-                // Simple type - use the TypeSymbol
-                TypeSymbol* arg_sym = type_arg_ast -> symbol;
-                if (! arg_sym || arg_sym -> Bad())
-                    arg_sym = control.no_type; // Use placeholder for bad types
-                type_arg_tuple -> Next() = new Type(arg_sym);
+                // Check if the type argument is a type parameter reference
+                // Type parameters are stored as their erased type in symbol, but we need
+                // to track them as TYPE_PARAMETER kind for proper type substitution.
+                TypeParameterSymbol* type_param_sym = NULL;
+                if (type_name && ! type_name -> type_arguments_opt)
+                {
+                    const NameSymbol* arg_name = lex_stream -> NameSymbol(
+                        type_name -> name -> identifier_token);
+
+                    // Check method type parameters FIRST - they shadow class type params
+                    // This is important for generic methods like <S> ServiceLoader<S> load(...)
+                    // inside a generic class like class ServiceLoader<S>
+                    if (ThisMethod())
+                    {
+                        for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
+                        {
+                            TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
+                            if (tp -> name_symbol == arg_name)
+                            {
+                                type_param_sym = tp;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Then check class type parameters from:
+                    // 1. processing_type (used during header processing)
+                    // 2. ThisType() (used during member processing when processing_type is NULL)
+                    if (! type_param_sym)
+                    {
+                        TypeSymbol* type_param_source = processing_type;
+                        if (! type_param_source)
+                            type_param_source = ThisType();
+                        if (type_param_source)
+                        {
+                            for (unsigned j = 0; j < type_param_source -> NumTypeParameters(); j++)
+                            {
+                                TypeParameterSymbol* tp = type_param_source -> TypeParameter(j);
+                                if (tp -> name_symbol == arg_name)
+                                {
+                                    type_param_sym = tp;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (type_param_sym)
+                {
+                    // Type argument is a type parameter - store as TYPE_PARAMETER
+                    type_arg_tuple -> Next() = new Type(type_param_sym);
+                }
+                else
+                {
+                    // Simple type - use the TypeSymbol
+                    TypeSymbol* arg_sym = type_arg_ast -> symbol;
+                    if (! arg_sym || arg_sym -> Bad())
+                        arg_sym = control.no_type; // Use placeholder for bad types
+                    type_arg_tuple -> Next() = new Type(arg_sym);
+                }
             }
         }
     }
@@ -1425,16 +1727,23 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
     TokenIndex tok = type -> declaration ? type -> declaration -> identifier_token : 0;
 
-    // Iterate through all methods declared in this type
-    for (unsigned i = 0; i < type -> NumMethodSymbols(); i++)
+    // Iterate through all methods in the expanded method table (declared AND inherited)
+    // This ensures we generate bridges even for inherited methods that implement
+    // interfaces (e.g., D extends C<Integer> implements A<Integer>, D inherits f(Integer))
+    ExpandedMethodTable* table = type -> expanded_method_table;
+
+    for (unsigned i = 0; i < table -> symbol_pool.Length(); i++)
     {
-        MethodSymbol* method = type -> MethodSym(i);
+        MethodShadowSymbol* current_shadow = table -> symbol_pool[i];
+        MethodSymbol* method = current_shadow -> method_symbol;
 
         // Skip constructors, static methods, private methods, and already-bridge methods
+        // Also skip abstract methods - bridges are only for concrete implementations
         if (method -> Identity() == control.init_name_symbol ||
             method -> ACC_STATIC() ||
             method -> ACC_PRIVATE() ||
-            method -> IsBridge())
+            method -> IsBridge() ||
+            method -> ACC_ABSTRACT())
         {
             continue;
         }
@@ -1444,7 +1753,7 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
         // Check against methods in THIS type's expanded_method_table
         // This catches methods already added from superclasses/interfaces
-        MethodShadowSymbol* shadow = type -> expanded_method_table ->
+        MethodShadowSymbol* shadow = table ->
             FindMethodShadowSymbol(method -> name_symbol);
 
         while (shadow)
@@ -1460,52 +1769,72 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
             shadow = shadow -> next_method;
         }
 
-        // ALSO check superclass methods directly, because they might not be in
-        // expanded_method_table if there was a same-name method in the current type
-        // (FindOverloadMethodShadow finds by param types, so methods with same
-        // params but different return types are considered same overload and
-        // the superclass method isn't added separately)
-        for (TypeSymbol* super = type -> super; super; super = super -> super)
+        // Also explicitly check interface methods - they may not be in expanded_method_table
+        // as conflicts when the current type declares an overriding method with covariant return.
+        // This is needed for bridge generation when implementing generic interfaces with
+        // concrete type arguments (e.g., PrivilegedAction<String> with String run()).
+        for (unsigned k = 0; k < type -> NumInterfaces(); k++)
         {
-            if (! super -> expanded_method_table)
-                continue;
-
-            MethodShadowSymbol* super_shadow = super -> expanded_method_table ->
-                FindMethodShadowSymbol(method -> name_symbol);
-
-            while (super_shadow)
-            {
-                CheckAndCreateBridge(method, super_shadow -> method_symbol, type, control, this, tok);
-
-                for (unsigned c = 0; c < super_shadow -> NumConflicts(); c++)
-                {
-                    CheckAndCreateBridge(method, super_shadow -> Conflict(c), type, control, this, tok);
-                }
-
-                super_shadow = super_shadow -> next_method;
-            }
-        }
-
-        // Also check interfaces
-        for (unsigned j = 0; j < type -> NumInterfaces(); j++)
-        {
-            TypeSymbol* interf = type -> Interface(j);
+            TypeSymbol* interf = type -> Interface(k);
             if (! interf -> expanded_method_table)
                 continue;
 
-            MethodShadowSymbol* interf_shadow = interf -> expanded_method_table ->
+            MethodShadowSymbol* iface_shadow = interf -> expanded_method_table ->
                 FindMethodShadowSymbol(method -> name_symbol);
 
-            while (interf_shadow)
+            while (iface_shadow)
             {
-                CheckAndCreateBridge(method, interf_shadow -> method_symbol, type, control, this, tok);
-
-                for (unsigned c = 0; c < interf_shadow -> NumConflicts(); c++)
+                MethodSymbol* iface_method = iface_shadow -> method_symbol;
+                // Only check interface methods (not inherited Object methods)
+                if (iface_method -> containing_type -> ACC_INTERFACE())
                 {
-                    CheckAndCreateBridge(method, interf_shadow -> Conflict(c), type, control, this, tok);
+                    if (! iface_method -> IsTyped())
+                        iface_method -> ProcessMethodSignature(this, tok);
+                    CheckAndCreateBridge(method, iface_method, type, control, this, tok);
                 }
 
-                interf_shadow = interf_shadow -> next_method;
+                for (unsigned c = 0; c < iface_shadow -> NumConflicts(); c++)
+                {
+                    MethodSymbol* conflict = iface_shadow -> Conflict(c);
+                    if (conflict -> containing_type -> ACC_INTERFACE())
+                    {
+                        if (! conflict -> IsTyped())
+                            conflict -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                    }
+                }
+
+                iface_shadow = iface_shadow -> next_method;
+            }
+        }
+
+        // Also check superclass methods - needed for bridge generation when extending
+        // generic abstract classes with concrete type arguments (e.g., TypedContainer<String>)
+        if (type -> super && type -> super != control.Object())
+        {
+            TypeSymbol* super_type = type -> super;
+            if (super_type -> expanded_method_table)
+            {
+                MethodShadowSymbol* super_shadow = super_type -> expanded_method_table ->
+                    FindMethodShadowSymbol(method -> name_symbol);
+
+                while (super_shadow)
+                {
+                    MethodSymbol* super_method = super_shadow -> method_symbol;
+                    if (! super_method -> IsTyped())
+                        super_method -> ProcessMethodSignature(this, tok);
+                    CheckAndCreateBridge(method, super_method, type, control, this, tok);
+
+                    for (unsigned c = 0; c < super_shadow -> NumConflicts(); c++)
+                    {
+                        MethodSymbol* conflict = super_shadow -> Conflict(c);
+                        if (! conflict -> IsTyped())
+                            conflict -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                    }
+
+                    super_shadow = super_shadow -> next_method;
+                }
             }
         }
     }
@@ -2650,31 +2979,44 @@ void Semantic::ProcessImportQualifiedName(AstName* name)
         // import statement. Class names in import statements must be the
         // canonical version.
         //
-        TypeSymbol* type = FindSimpleNameType(control.UnnamedPackage(),
-                                              name -> identifier_token);
+        // First, check if there's a valid package with that name that has
+        // actual directories/files. If so, prefer the package over any type
+        // in the unnamed package (JLS 6.5.3: Package names are resolved
+        // before type names in qualified names of imports).
+        //
+        NameSymbol* name_symbol =
+            lex_stream -> NameSymbol(name -> identifier_token);
+        PackageSymbol* package =
+            control.external_table.FindPackageSymbol(name_symbol);
+        if (! package)
+            package = control.external_table.
+                InsertPackageSymbol(name_symbol, NULL);
+        control.FindPathsToDirectory(package);
 
         //
-        // If the name is a type, detect the error. Otherwise, assume
-        // it is a package, and legal.
+        // If the package has actual directories, use it. Otherwise, check
+        // for a type in the unnamed package which would be an error.
         //
-        if (type)
+        if (package -> directory.Length() > 0)
         {
-            ReportSemError(SemanticError::IMPORT_FROM_UNNAMED_PACKAGE,
-                           name -> identifier_token,
-                           lex_stream -> NameString(name -> identifier_token));
-            name -> symbol = control.no_type;
+            name -> symbol = package;
         }
         else
         {
-            NameSymbol* name_symbol =
-                lex_stream -> NameSymbol(name -> identifier_token);
-            PackageSymbol* package =
-                control.external_table.FindPackageSymbol(name_symbol);
-            if (! package)
-                package = control.external_table.
-                    InsertPackageSymbol(name_symbol, NULL);
-            control.FindPathsToDirectory(package);
-            name -> symbol = package;
+            TypeSymbol* type = FindSimpleNameType(control.UnnamedPackage(),
+                                                  name -> identifier_token);
+            if (type)
+            {
+                ReportSemError(SemanticError::IMPORT_FROM_UNNAMED_PACKAGE,
+                               name -> identifier_token,
+                               lex_stream -> NameString(name -> identifier_token));
+                name -> symbol = control.no_type;
+            }
+            else
+            {
+                // Assume it's a package (possibly empty/non-existent)
+                name -> symbol = package;
+            }
         }
     }
 }
@@ -2804,14 +3146,6 @@ void Semantic::ProcessTypeImportOnDemandDeclaration(AstImportDeclaration* import
     ProcessImportQualifiedName(import_declaration -> name);
     Symbol* symbol = import_declaration -> name -> symbol;
 
-    PackageSymbol* package = symbol -> PackageCast();
-    if (package && package -> directory.Length() == 0)
-    {
-        ReportSemError(SemanticError::PACKAGE_NOT_FOUND,
-                       import_declaration -> name,
-                       package -> PackageName());
-    }
-
     //
     // Two or more type-import-on-demand may name the same package; the effect
     // is as if there were only one such declaration. Likewise, importing the
@@ -2821,6 +3155,14 @@ void Semantic::ProcessTypeImportOnDemandDeclaration(AstImportDeclaration* import
     //
     if (symbol == this_package)
         return;
+
+    PackageSymbol* package = symbol -> PackageCast();
+    if (package && package -> directory.Length() == 0)
+    {
+        ReportSemError(SemanticError::PACKAGE_NOT_FOUND,
+                       import_declaration -> name,
+                       package -> PackageName());
+    }
     for (unsigned i = 0; i < import_on_demand_packages.Length(); i++)
     {
         if (symbol == import_on_demand_packages[i])
@@ -3200,6 +3542,35 @@ void Semantic::ProcessFieldDeclaration(AstFieldDeclaration* field_declaration)
             if (type_name && type_name -> parameterized_type)
             {
                 variable -> parameterized_type = type_name -> parameterized_type;
+            }
+            // If the field's type is a type parameter, set the generic signature
+            // This is needed for proper type substitution when the field is inherited
+            if (type_name && type_name -> name && ! type_name -> base_opt &&
+                ! type_name -> type_arguments_opt &&
+                this_type -> NumTypeParameters() > 0)
+            {
+                const NameSymbol* type_name_sym = lex_stream -> NameSymbol(
+                    type_name -> name -> identifier_token);
+                for (unsigned j = 0; j < this_type -> NumTypeParameters(); j++)
+                {
+                    TypeParameterSymbol* type_param = this_type -> TypeParameter(j);
+                    if (type_param -> name_symbol == type_name_sym)
+                    {
+                        // Build generic signature: T<name>;
+                        const char* tp_name = type_param -> Utf8Name();
+                        unsigned tp_name_len = strlen(tp_name);
+                        char* sig_str = new char[tp_name_len + 3];
+                        sig_str[0] = 'T';
+                        memcpy(sig_str + 1, tp_name, tp_name_len);
+                        sig_str[tp_name_len + 1] = ';';
+                        sig_str[tp_name_len + 2] = '\0';
+                        Utf8LiteralValue* sig_literal = control.Utf8_pool.
+                            FindOrInsert(sig_str, tp_name_len + 2);
+                        variable -> SetGenericSignature(sig_literal);
+                        delete [] sig_str;
+                        break;
+                    }
+                }
             }
             if (must_be_constant &&
                 (dims || ! variable_declarator -> variable_initializer_opt ||
@@ -3836,6 +4207,18 @@ void Semantic::CheckMethodOverride(MethodSymbol* method,
         }
         else
         {
+            if (method -> containing_type != base_type &&
+                hidden_method -> containing_type != base_type)
+            {
+                //
+                // Both methods are inherited. We suppress the error here because
+                // a subsequent inherited method might override both (covariance).
+                // If not, the ambiguity remains in the conflict list and will be
+                // checked when a concrete class implements this interface.
+                //
+                return;
+            }
+
             ReportSemError(SemanticError::MISMATCHED_INHERITED_METHOD_EXTERNALLY,
                            left_tok, right_tok, base_type -> ExternalName(),
                            method -> Header(),
@@ -4284,7 +4667,25 @@ void Semantic::AddInheritedMethods(TypeSymbol* base_type,
             {
                 if (! shadow)
                     shadow = base_expanded_table -> Overload(method);
-                else shadow -> AddConflict(method);
+                else
+                {
+                    MethodSymbol* current = shadow -> method_symbol;
+                    //
+                    // If the new method has a narrower return type than the current
+                    // representative, it is a better candidate for the primary symbol.
+                    //
+                    if (method -> Type() != current -> Type() &&
+                        method -> Type() -> IsSubtype(current -> Type()))
+                    {
+                        shadow -> symbol = method;
+                        shadow -> method_symbol = method;
+                        shadow -> AddConflict(current);
+                    }
+                    else
+                    {
+                        shadow -> AddConflict(method);
+                    }
+                }
 
                 assert(method -> containing_type != super_type ||
                        method_shadow_symbol -> NumConflicts() == 0);
@@ -4625,6 +5026,24 @@ void Semantic::ProcessFormalParameters(BlockSymbol* block,
         {
             symbol -> parameterized_type = type_name -> parameterized_type;
         }
+        // If the declared type is a type parameter with a parameterized bound,
+        // propagate that bound to the variable (for method return type substitution)
+        // e.g., for <T extends List<? extends Number>> void m(T t), t should have
+        // parameterized_type = List<? extends Number>
+        else if (type_name && type_name -> generic_type &&
+                 type_name -> generic_type -> IsTypeParameter())
+        {
+            TypeParameterSymbol* type_param = type_name -> generic_type -> GetTypeParameter();
+            if (type_param && type_param -> parameterized_bounds &&
+                type_param -> parameterized_bounds -> Length() > 0)
+            {
+                Type* param_bound = (*(type_param -> parameterized_bounds))[0];
+                if (param_bound && param_bound -> IsParameterized())
+                {
+                    symbol -> parameterized_type = param_bound -> GetParameterizedType();
+                }
+            }
+        }
 
         parameter -> formal_declarator -> symbol = symbol;
     }
@@ -4777,13 +5196,34 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         // It's a simple name - check if it matches a class type parameter
         const NameSymbol* type_name = lex_stream -> NameSymbol(
             return_type_name -> name -> identifier_token);
-        for (unsigned i = 0; i < this_type -> NumTypeParameters(); i++)
+        bool found = false;
+        // First check the immediate containing class
+        for (unsigned i = 0; i < this_type -> NumTypeParameters() && ! found; i++)
         {
             TypeParameterSymbol* type_param = this_type -> TypeParameter(i);
             if (type_param -> name_symbol == type_name)
             {
                 method -> return_type_param_index = (int) i;
-                break;
+                found = true;
+            }
+        }
+        // If not found, check enclosing classes (for inner classes)
+        if (! found)
+        {
+            for (TypeSymbol* enclosing = this_type -> ContainingType();
+                 enclosing && ! found;
+                 enclosing = enclosing -> ContainingType())
+            {
+                for (unsigned i = 0; i < enclosing -> NumTypeParameters() && ! found; i++)
+                {
+                    TypeParameterSymbol* type_param = enclosing -> TypeParameter(i);
+                    if (type_param -> name_symbol == type_name)
+                    {
+                        // Found in enclosing class - set flag for signature generation
+                        method -> return_type_is_enclosing_type_param = true;
+                        found = true;
+                    }
+                }
             }
         }
     }
@@ -4948,6 +5388,80 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         AstTypeName* throw_expr = method_declaration -> Throw(k);
         ProcessType(throw_expr);
         method -> AddThrows(throw_expr -> symbol);
+    }
+
+    // Track which throws clause entries use method type parameters and
+    // which parameter provides the type argument for inference
+    if (method -> NumTypeParameters() > 0 && method_declaration -> NumThrows() > 0)
+    {
+        unsigned num_throws = method_declaration -> NumThrows();
+        method -> throws_type_param_indices = new Tuple<int>(num_throws);
+        method -> throws_param_source_indices = new Tuple<int>(num_throws);
+        method -> throws_param_type_arg_indices = new Tuple<int>(num_throws);
+
+        for (unsigned t = 0; t < num_throws; t++)
+        {
+            int throws_type_param = -1;
+            int param_source = -1;
+            int type_arg_idx = -1;
+
+            AstTypeName* throw_expr = method_declaration -> Throw(t);
+            if (throw_expr && throw_expr -> name && ! throw_expr -> base_opt &&
+                ! throw_expr -> type_arguments_opt)
+            {
+                // Check if throws type is a type parameter (e.g., throws E)
+                const NameSymbol* throw_name = lex_stream -> NameSymbol(
+                    throw_expr -> name -> identifier_token);
+                for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+                {
+                    TypeParameterSymbol* type_param = method -> TypeParameter(i);
+                    if (type_param -> name_symbol == throw_name)
+                    {
+                        throws_type_param = (int) i;
+                        break;
+                    }
+                }
+
+                // If it's a type parameter, find which parameter can provide its value
+                if (throws_type_param >= 0)
+                {
+                    unsigned num_params = method_declarator -> NumFormalParameters();
+                    for (unsigned p = 0; p < num_params && param_source < 0; p++)
+                    {
+                        AstFormalParameter* formal = method_declarator -> FormalParameter(p);
+                        AstType* formal_type = formal -> type;
+                        AstTypeName* param_type_name = formal_type -> TypeNameCast();
+
+                        if (param_type_name && param_type_name -> type_arguments_opt)
+                        {
+                            unsigned num_type_args =
+                                param_type_name -> type_arguments_opt -> NumTypeArguments();
+                            for (unsigned a = 0; a < num_type_args; a++)
+                            {
+                                AstType* arg = param_type_name -> type_arguments_opt -> TypeArgument(a);
+                                AstTypeName* arg_name = arg -> TypeNameCast();
+                                if (arg_name && arg_name -> name && ! arg_name -> base_opt &&
+                                    ! arg_name -> type_arguments_opt)
+                                {
+                                    const NameSymbol* arg_sym = lex_stream -> NameSymbol(
+                                        arg_name -> name -> identifier_token);
+                                    if (arg_sym == throw_name)
+                                    {
+                                        param_source = (int) p;
+                                        type_arg_idx = (int) a;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            method -> throws_type_param_indices -> Next() = throws_type_param;
+            method -> throws_param_source_indices -> Next() = param_source;
+            method -> throws_param_type_arg_indices -> Next() = type_arg_idx;
+        }
     }
 
     ThisMethod() = method_saved_context;
@@ -5326,7 +5840,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             TypeParameterSymbol* type_param = processing_type -> TypeParameter(i);
             if (type_param -> name_symbol == name_symbol)
             {
-                // Found a type parameter - return its erased type
+                // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
@@ -5361,9 +5875,7 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             TypeParameterSymbol* type_param = enclosing_type -> TypeParameter(i);
             if (type_param -> name_symbol == name_symbol)
             {
-                // Found a type parameter - return its erased type
-                // TODO: We should return a Type wrapper with TYPE_PARAMETER kind
-                // For now, just return the erased type to keep things working
+                // Found a method type parameter - return its erased type
                 TypeSymbol* erased = type_param -> ErasedType();
                 // If unbounded, default to Object
                 return erased ? erased : control.Object();
@@ -5433,14 +5945,28 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
         if (this_type -> ACC_STATIC() && ! type -> ACC_STATIC() &&
             ! this_type -> IsSubclass(type -> ContainingType()))
         {
-            ReportSemError(SemanticError::STATIC_TYPE_ACCESSING_MEMBER_TYPE,
-                           identifier_token,
-                           this_type -> ContainingPackageName(),
-                           this_type -> ExternalName(),
-                           type -> ContainingPackageName(),
-                           type -> ExternalName(),
-                           env -> Type() -> ContainingPackageName(),
-                           env -> Type() -> ExternalName());
+            //
+            // JLS 8.5.1 says a static class cannot access non-static members of
+            // an enclosing class. However, javac allows access to inherited
+            // non-static member types (see tools/javac/generics/rare/Rare8.java).
+            // We relax the check here to match javac behavior.
+            //
+            // Additionally, sibling member types (both directly contained in the
+            // same enclosing class) should be accessible. A static nested class
+            // can refer to a sibling inner class by simple name (Rare10.java).
+            //
+            if (type -> owner == env -> Type() &&
+                this_type -> ContainingType() != type -> ContainingType())
+            {
+                ReportSemError(SemanticError::STATIC_TYPE_ACCESSING_MEMBER_TYPE,
+                               identifier_token,
+                               this_type -> ContainingPackageName(),
+                               this_type -> ExternalName(),
+                               type -> ContainingPackageName(),
+                               type -> ExternalName(),
+                               env -> Type() -> ContainingPackageName(),
+                               env -> Type() -> ExternalName());
+            }
         }
         //
         // If the type was inherited, give a warning if it shadowed another
@@ -5690,6 +6216,71 @@ TypeSymbol* Semantic::MustFindType(AstName* name)
 }
 
 
+TypeParameterSymbol* Semantic::FindTypeParameter(TokenIndex identifier_token)
+{
+    NameSymbol* name_symbol = lex_stream -> NameSymbol(identifier_token);
+
+    SemanticEnvironment* env = NULL;
+    if (state_stack.Size())
+        env = state_stack.Top();
+
+    MethodSymbol* current_method = ThisMethod();
+    if (current_method)
+    {
+        for (unsigned i = 0; i < current_method -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = current_method -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+    }
+
+    if (processing_type)
+    {
+        for (unsigned i = 0; i < processing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = processing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+        
+        MethodSymbol* enclosing_method = processing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                    return type_param;
+            }
+        }
+    }
+
+    for ( ; env; env = env -> previous)
+    {
+        TypeSymbol* enclosing_type = env -> Type();
+        for (unsigned i = 0; i < enclosing_type -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = enclosing_type -> TypeParameter(i);
+            if (type_param -> name_symbol == name_symbol)
+                return type_param;
+        }
+        
+        MethodSymbol* enclosing_method = enclosing_type -> owner -> MethodCast();
+        if (enclosing_method)
+        {
+            for (unsigned i = 0; i < enclosing_method -> NumTypeParameters(); i++)
+            {
+                TypeParameterSymbol* type_param = enclosing_method -> TypeParameter(i);
+                if (type_param -> name_symbol == name_symbol)
+                    return type_param;
+            }
+        }
+    }
+    return NULL;
+}
+
+
 void Semantic::ProcessType(AstType* type_expr)
 {
     if (type_expr -> symbol)
@@ -5781,6 +6372,20 @@ void Semantic::ProcessType(AstType* type_expr)
                                                     IdentifierToken()));
         }
     }
+    else
+    {
+        // If type is valid, check if it's a type variable and populate generic_type
+        // This is needed for correct bounds checking (Intersection Types) where erasure is insufficient.
+        if (name && !name->base_opt && !name->type_arguments_opt)
+        {
+            TypeParameterSymbol* tparam = FindTypeParameter(name->name->identifier_token);
+            if (tparam)
+            {
+                type_expr->generic_type = new Type(tparam);
+            }
+        }
+    }
+    
     if (array_type)
         type = type -> GetArrayType(this, array_type -> NumBrackets());
     type_expr -> symbol = type;

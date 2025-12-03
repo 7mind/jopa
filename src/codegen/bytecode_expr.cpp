@@ -1065,6 +1065,14 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
                                    ? casted_left_hand_side -> Type()
                                    : assignment_expression -> Type());
 
+            // Java 5: Handle wrapper types by unboxing
+            TypeSymbol* unboxed_op_type = op_type -> UnboxedType(control);
+            if (unboxed_op_type != op_type && (control.IsNumeric(unboxed_op_type) ||
+                                               unboxed_op_type == control.boolean_type))
+            {
+                op_type = unboxed_op_type;
+            }
+
             if (control.IsSimpleIntegerValueType(op_type) ||
                 op_type == control.boolean_type)
             {

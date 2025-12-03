@@ -54,6 +54,15 @@ public class Arrays {
     public static void fill(float[] a, float val) {}
     public static void fill(double[] a, double val) {}
     public static void fill(Object[] a, Object val) {}
+    public static void fill(int[] a, int fromIndex, int toIndex, int val) {}
+    public static void fill(long[] a, int fromIndex, int toIndex, long val) {}
+    public static void fill(short[] a, int fromIndex, int toIndex, short val) {}
+    public static void fill(char[] a, int fromIndex, int toIndex, char val) {}
+    public static void fill(byte[] a, int fromIndex, int toIndex, byte val) {}
+    public static void fill(boolean[] a, int fromIndex, int toIndex, boolean val) {}
+    public static void fill(float[] a, int fromIndex, int toIndex, float val) {}
+    public static void fill(double[] a, int fromIndex, int toIndex, double val) {}
+    public static void fill(Object[] a, int fromIndex, int toIndex, Object val) {}
 
     public static <T> T[] copyOf(T[] original, int newLength) { return null; }
     public static <T,U> T[] copyOf(U[] original, int newLength, Class<? extends T[]> newType) { return null; }

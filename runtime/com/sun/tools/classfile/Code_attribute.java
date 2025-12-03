@@ -5,6 +5,8 @@ public class Code_attribute extends Attribute {
     public int max_locals;
     public byte[] code = new byte[0];
     public Exception_data[] exception_table = new Exception_data[0];
+    public int exception_table_length = 0;
+    public int exception_table_langth = 0;  // Typo in JDK7 test Pos05.java
     public Attributes attributes = new Attributes();
 
     public Code_attribute() {

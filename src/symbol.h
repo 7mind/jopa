@@ -464,7 +464,11 @@ public:
         , bridges_generated(NULL)
         , return_type_param_index(-1)
         , method_return_type_param_index(-1)
+        , return_type_is_enclosing_type_param(false)
         , param_type_param_indices(NULL)
+        , throws_type_param_indices(NULL)
+        , throws_param_source_indices(NULL)
+        , throws_param_type_arg_indices(NULL)
         , return_parameterized_type(NULL)
     {
         Symbol::_kind = METHOD;
@@ -642,11 +646,31 @@ public:
     // This is different from return_type_param_index which is for class type parameters.
     int method_return_type_param_index;
 
+    // True if the return type is a type parameter from an ENCLOSING class (not the
+    // immediate containing class). For example, in A<T> { class C { T getT(); } },
+    // getT()'s return_type_is_enclosing_type_param is true.
+    // This flag triggers signature generation even when return_type_param_index is -1.
+    bool return_type_is_enclosing_type_param;
+
     // For each formal parameter, stores the index of the method type parameter it uses.
     // -1 means the parameter doesn't use a method type parameter.
     // For example, in <T> T identity(T arg), param_type_param_indices[0] = 0.
     // This enables type inference from actual arguments.
     Tuple<int>* param_type_param_indices;
+
+    // For each throws clause entry, stores the index of the method type parameter it uses.
+    // -1 means the exception doesn't use a method type parameter.
+    // For example, in <E extends Throwable> void m() throws E, throws_type_param_indices[0] = 0.
+    // This enables exception type inference from actual arguments.
+    Tuple<int>* throws_type_param_indices;
+
+    // For each throws clause, stores which parameter index provides the type argument.
+    // -1 means no parameter provides the type. For example, in
+    // <T, E extends Throwable> void accept(Visitor<T, E> v) throws E,
+    // throws_param_source_indices[0] = 0, throws_param_type_arg_indices[0] = 1
+    // (E is inferred from param 0's type argument at index 1)
+    Tuple<int>* throws_param_source_indices;
+    Tuple<int>* throws_param_type_arg_indices;
 
     // If the return type is a parameterized type (like Map<String, Integer>),
     // this stores that parameterized type. This enables proper type propagation
@@ -1557,6 +1581,19 @@ public:
     // Check if superclass is parameterized (for Signature attribute)
     bool HasParameterizedSuper() const { return parameterized_super != NULL; }
 
+    // Check if any interface is parameterized (for Signature attribute)
+    bool HasParameterizedInterface() const
+    {
+        if (! parameterized_interfaces)
+            return false;
+        for (unsigned i = 0; i < parameterized_interfaces -> Length(); i++)
+        {
+            if ((*parameterized_interfaces)[i])
+                return true;
+        }
+        return false;
+    }
+
     // Set parameterized superclass (for anonymous classes)
     void SetParameterizedSuper(ParameterizedType* ptype) { parameterized_super = ptype; }
 
@@ -1604,6 +1641,7 @@ public:
     Symbol* owner;
     LiteralValue* initial_value;
     Utf8LiteralValue* signature;
+    Utf8LiteralValue* generic_signature; // Generic signature (TV; format) from class file
     ParameterizedType* parameterized_type; // For tracking generic type arguments
 
     // Index of element in symbol_pool (in the relevant symbol table) that
@@ -1676,6 +1714,7 @@ public:
         , owner(NULL)
         , initial_value(NULL)
         , signature(NULL)
+        , generic_signature(NULL)
         , parameterized_type(NULL)
         , enum_ordinal(-1)
         , accessed_local(NULL)
@@ -1733,6 +1772,12 @@ public:
     {
         type_ = _type;
         signature = type_ -> signature;
+    }
+
+    void SetGenericSignature(Utf8LiteralValue* sig) { generic_signature = sig; }
+    const char* GenericSignatureString() const
+    {
+        return generic_signature ? generic_signature -> value : NULL;
     }
 
     void ProcessVariableSignature(Semantic*, TokenIndex);

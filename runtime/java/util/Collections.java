@@ -51,6 +51,14 @@ public class Collections {
 
     public static <T> void sort(List<T> list, Comparator<? super T> c) {}
 
+    public static <T> Comparator<T> reverseOrder() {
+        return null;
+    }
+
+    public static <T> Comparator<T> reverseOrder(Comparator<T> cmp) {
+        return null;
+    }
+
     public static void reverse(List<?> list) {}
 
     public static void shuffle(List<?> list) {}

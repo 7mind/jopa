@@ -28,6 +28,10 @@ public class Throwable {
         return detailMessage;
     }
 
+    public String getLocalizedMessage() {
+        return getMessage();
+    }
+
     public Throwable getCause() {
         return (cause == this) ? null : cause;
     }

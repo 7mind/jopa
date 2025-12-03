@@ -75,6 +75,7 @@ public final class Class<T> implements java.lang.reflect.Type {
     // Type hierarchy
     public native boolean isAssignableFrom(Class cls);
     public native boolean isInstance(Object obj);
+    public native T cast(Object obj);
     public native Class[] getDeclaredClasses();
     public native Class[] getClasses();
 

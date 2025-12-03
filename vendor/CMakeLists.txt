@@ -265,4 +265,46 @@ ulimit -s unlimited
         
         BUILD_BYPRODUCTS "${ANT_INSTALL_DIR}/bin/ant"
     )
+
+    # ============================================================================
+    # Eclipse Compiler for Java (ECJ) 4.2.1 - Built with JOPA
+    # ============================================================================
+    # ECJ is the Eclipse Java Compiler. Building it with JOPA proves our compiler
+    # can compile a real-world Java compiler.
+    set(ECJ_VERSION "4.2.1")
+    set(ECJ_ARCHIVE "${CMAKE_CURRENT_SOURCE_DIR}/ecjsrc-${ECJ_VERSION}.jar")
+    set(ECJ_SOURCE_DIR "${CMAKE_CURRENT_BINARY_DIR}/ecj-${ECJ_VERSION}")
+    set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
+
+    ExternalProject_Add(ecj
+        URL "${ECJ_ARCHIVE}"
+        SOURCE_DIR "${ECJ_SOURCE_DIR}"
+        INSTALL_DIR "${ECJ_INSTALL_DIR}"
+
+        DEPENDS gnu_classpath
+
+        # Configure is a no-op - just extract sources
+        CONFIGURE_COMMAND ""
+
+        # Compile all Java sources with JOPA
+        # ECJ 4.2.1 targets Java 1.6 and requires javax.annotation.processing APIs
+        # Exclude optional integration classes that require external dependencies:
+        # - antadapter, JDTCompilerAdapter: require Apache Ant
+        # - tool/*: JSR 199 Java Compiler API (javax.tools.*)
+        # - apt/*: JSR 269 Annotation Processing (javax.annotation.processing.*)
+        BUILD_COMMAND sh -c "mkdir -p bin && find org -name '*.java' ! -path '*/antadapter/*' ! -path '*/tool/*' ! -path '*/apt/*' ! -name 'JDTCompilerAdapter.java' > sources.list && echo 'Compiling ECJ...' && wc -l sources.list" &&
+                      "${CMAKE_CURRENT_BINARY_DIR}/ant-javac.sh" -d bin @sources.list &&
+                      sh -c "find org \\( -name '*.properties' -o -name '*.rsc' -o -name '*.props' \\) ! -path '*/antadapter/*' | cpio -pdm bin 2>/dev/null" &&
+                      sh -c "cd bin && \"${CMAKE_COMMAND}\" -E tar cf ../ecj.jar --format=zip ."
+
+        # Install ECJ jar
+        INSTALL_COMMAND ${CMAKE_COMMAND} -E make_directory "${ECJ_INSTALL_DIR}/lib" &&
+                        ${CMAKE_COMMAND} -E copy ecj.jar "${ECJ_INSTALL_DIR}/lib/ecj.jar"
+
+        BUILD_BYPRODUCTS "${ECJ_INSTALL_DIR}/lib/ecj.jar"
+        BUILD_IN_SOURCE 1
+    )
+
+    # Ensure JOPA is built before ECJ tries to use it
+    add_dependencies(ecj jopa)
 endif()

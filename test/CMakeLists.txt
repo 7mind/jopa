@@ -137,6 +137,7 @@ add_jopa_run_test(VarargsImplicitTest "${TEST_DIR}/varargs/VarargsImplicitTest.j
 add_jopa_run_test(ForEachTest "${TEST_DIR}/foreach/ForEachTest.java" "ForEachTest")
 add_jopa_run_test(ForEachArrayTest "${TEST_DIR}/foreach/ForEachArrayTest.java" "ForEachArrayTest")
 add_jopa_run_test(ForEachIterableTest "${TEST_DIR}/foreach/ForEachIterableTest.java" "ForEachIterableTest")
+add_jopa_run_test(BoxedForeachTest "${TEST_DIR}/foreach/BoxedForeachTest.java" "BoxedForeachTest")
 
 # Generics Tests
 add_jopa_run_test(GenericBox "${TEST_DIR}/generics/GenericBox.java" "GenericBox")

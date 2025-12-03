@@ -17,6 +17,7 @@ class MethodSymbol;
 class TypeSymbol;
 class TypeParameterSymbol;
 class ParameterizedType;
+class Type; // Added forward declaration
 class StoragePool;
 struct CaseElement;
 
@@ -803,11 +804,13 @@ class AstExpression : public AstMemberValue
 public:
     LiteralValue* value; // The compile-time constant value of the expression.
     TypeSymbol* resolved_type; // For type substitution in generics (overrides symbol's type)
+    TypeSymbol* secondary_resolved_type; // For intersection types (wildcard capture with extends)
     ParameterizedType* resolved_parameterized_type; // For tracking nested parameterized types
 
     inline AstExpression(AstKind k)
         : AstMemberValue(k, EXPRESSION)
         , resolved_type(NULL)
+        , secondary_resolved_type(NULL)
         , resolved_parameterized_type(NULL)
     {}
     ~AstExpression() {}
@@ -824,9 +827,12 @@ class AstType : public Ast
 {
 public:
     TypeSymbol* symbol;
+    Type* generic_type; // For type variables (T) to allow bounds checking
 
     inline AstType(AstKind k, AstTag t = NO_TAG)
         : Ast(k, t)
+        , symbol(NULL)
+        , generic_type(NULL)
     {}
     ~AstType() {}
 
@@ -3112,9 +3118,11 @@ public:
     AstFormalParameter* formal_parameter;
     AstExpression* expression;
     AstBlock* statement;
+    TypeSymbol* iterator_element_type; // Actual element type from iterator (for bytecode generation)
 
     inline AstForeachStatement()
         : AstStatement(FOREACH)
+        , iterator_element_type(NULL)
     {}
     ~AstForeachStatement() {}
 
@@ -3984,9 +3992,17 @@ public:
     //
     AstExpression* resolution_opt;
 
+    //
+    // For target type inference: set to true when the method's return type
+    // is a type parameter that couldn't be inferred from arguments.
+    // In this case, the return type can be inferred from the assignment context.
+    //
+    bool needs_target_type_inference;
+
     inline AstMethodInvocation(TokenIndex t)
         : AstExpression(CALL)
         , identifier_token(t)
+        , needs_target_type_inference(false)
     {}
     ~AstMethodInvocation() {}
 

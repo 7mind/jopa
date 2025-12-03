@@ -13,7 +13,9 @@ public class JavacTaskImpl extends JavacTask {
     public Iterable<? extends javax.lang.model.element.Element> analyze() { return null; }
     public Iterable<? extends JavaFileObject> generate() { return null; }
     public Iterable<? extends javax.lang.model.element.TypeElement> enter() { return null; }
+    public Iterable<? extends javax.lang.model.element.TypeElement> enter(Iterable<? extends com.sun.source.tree.CompilationUnitTree> trees) { return null; }
     public Iterable<? extends com.sun.source.tree.CompilationUnitTree> parse() { return null; }
+    public javax.lang.model.type.TypeMirror parseType(String expr, javax.lang.model.element.TypeElement scope) { return null; }
     public javax.lang.model.util.Types getTypes() { return null; }
     public javax.lang.model.util.Elements getElements() { return null; }
     public Context getContext() { return null; }

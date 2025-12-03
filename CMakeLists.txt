@@ -45,6 +45,7 @@ option(JOPA_ENABLE_ENCODING "Enable -encoding support via iconv or ICU" ON)
 option(JOPA_ENABLE_CPPTRACE "Enable cpptrace for better stack traces on crashes" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_SANITIZERS "Enable Clang sanitizers (ASan, UBSan)" ${_IS_DEBUG_BUILD})
 option(JOPA_ENABLE_LEAK_SANITIZER "Enable memory leak detection (requires JOPA_ENABLE_SANITIZERS)" OFF)
+option(JOPA_BUILD_BOOTSTRAP "Build GNU Classpath and JamVM bootstrap targets" OFF)
 
 set(JOPA_VERSION_STRING "${JOPA_VERSION}")
 set(PACKAGE_NAME "jopa")
@@ -64,6 +65,11 @@ add_subdirectory(runtime)
 
 if(BUILD_TESTING)
     add_subdirectory(test)
+endif()
+
+# Bootstrap build: GNU Classpath and JamVM
+if(JOPA_BUILD_BOOTSTRAP)
+    add_subdirectory(vendor)
 endif()
 
 install(FILES doc/jikes.1 DESTINATION "${CMAKE_INSTALL_MANDIR}/man1")

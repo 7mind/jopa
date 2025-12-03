@@ -10,6 +10,7 @@
 #include "symbol.h"
 #include "table.h"
 #include "option.h"
+#include "typeparam.h"
 
 namespace Jopa {
 
@@ -483,6 +484,53 @@ void ByteCode::DeclareField(VariableSymbol* symbol)
 
     if (symbol -> IsDeprecated())
         fields[field_index] -> AddAttribute(CreateDeprecatedAttribute());
+
+    //
+    // Add Signature attribute for fields whose type is a type parameter (Java 5+)
+    //
+    if (control.option.target >= JopaOption::SDK1_5 &&
+        unit_type -> NumTypeParameters() > 0 &&
+        symbol -> field_declaration)
+    {
+        AstFieldDeclaration* field_decl = symbol -> field_declaration -> FieldDeclarationCast();
+        if (field_decl && field_decl -> type)
+        {
+            AstTypeName* type_name = field_decl -> type -> TypeNameCast();
+            // Check if it's a simple type name (not qualified, no type arguments)
+            if (type_name && type_name -> name && ! type_name -> base_opt &&
+                ! type_name -> type_arguments_opt)
+            {
+                LexStream* lex = unit_type -> file_symbol -> lex_stream;
+                const NameSymbol* name_sym = lex -> NameSymbol(type_name -> name -> identifier_token);
+                // Check if this name matches a type parameter
+                for (unsigned i = 0; i < unit_type -> NumTypeParameters(); i++)
+                {
+                    TypeParameterSymbol* type_param = unit_type -> TypeParameter(i);
+                    if (type_param -> name_symbol == name_sym)
+                    {
+                        // Field type is a type parameter, emit Signature attribute
+                        // Format: T<name>;
+                        const char* tp_name = type_param -> Utf8Name();
+                        unsigned tp_name_len = strlen(tp_name);
+                        char* sig_str = new char[tp_name_len + 3]; // T + name + ; + null
+                        sig_str[0] = 'T';
+                        memcpy(sig_str + 1, tp_name, tp_name_len);
+                        sig_str[tp_name_len + 1] = ';';
+                        sig_str[tp_name_len + 2] = '\0';
+
+                        Utf8LiteralValue* sig_literal = control.Utf8_pool.
+                            FindOrInsert(sig_str, tp_name_len + 2);
+                        SignatureAttribute* sig_attr =
+                            new SignatureAttribute(RegisterUtf8(control.Signature_literal),
+                                                   RegisterUtf8(sig_literal));
+                        fields[field_index] -> AddAttribute(sig_attr);
+                        delete [] sig_str;
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 
@@ -539,10 +587,13 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     // Add Signature attribute for generic methods (Java 5+)
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
-    // 2. Return type is a class type parameter (return_type_param_index >= 0)
+    // 2. Return type is a class type parameter (return_type_param_index >= 0), OR
+    // 3. Return type is a parameterized type (return_parameterized_type != NULL), OR
+    // 4. Return type is an enclosing class's type parameter (return_type_is_enclosing_type_param)
     //
     if (control.option.target >= JopaOption::SDK1_5 &&
-        (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0))
+        (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0 ||
+         msym -> return_parameterized_type || msym -> return_type_is_enclosing_type_param))
     {
         msym -> SetGenericSignature(control);
         if (msym -> GenericSignature())

@@ -1070,7 +1070,8 @@ MethodSymbol* Semantic::FindMisspelledMethodName(TypeSymbol* type,
 //
 MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
                                                AstMethodInvocation* method_call,
-                                               NameSymbol* name_symbol)
+                                               NameSymbol* name_symbol,
+                                               bool suppress_error)
 {
     Tuple<MethodShadowSymbol*> method_set(2); // Stores method overloads.
     AstExpression* base = method_call -> base_opt;
@@ -1269,7 +1270,8 @@ MethodShadowSymbol* Semantic::FindMethodInType(TypeSymbol* type,
 
     if (method_set.Length() == 0)
     {
-        ReportMethodNotFound(method_call, type);
+        if (! suppress_error)
+            ReportMethodNotFound(method_call, type);
         return NULL;
     }
     else if (method_set.Length() > 1)
