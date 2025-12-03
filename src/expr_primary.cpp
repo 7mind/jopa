@@ -1947,8 +1947,42 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                             {
                                 arg_type = unwrapped_arg -> Type();
                             }
+
+                            // For varargs methods, if this is the varargs parameter and
+                            // the argument is an array matching the varargs array type,
+                            // extract the component type for inference.
+                            // E.g., Arrays.asList(new String[]{"a"}) should infer T=String not T=String[]
+                            if (method -> ACC_VARARGS() &&
+                                i == method -> NumFormalParameters() - 1 &&
+                                arg_type -> IsArray())
+                            {
+                                VariableSymbol* varargs_param = method -> FormalParameter(i);
+                                if (varargs_param && varargs_param -> Type() &&
+                                    varargs_param -> Type() -> IsArray())
+                                {
+                                    // Strip array dimensions matching the parameter
+                                    unsigned param_dims = varargs_param -> Type() -> num_dimensions;
+                                    unsigned arg_dims = arg_type -> num_dimensions;
+                                    if (arg_dims >= param_dims)
+                                    {
+                                        unsigned remaining = arg_dims - param_dims;
+                                        if (remaining > 0)
+                                            arg_type = arg_type -> base_type -> GetArrayType(
+                                                (Semantic*) this, remaining);
+                                        else
+                                            arg_type = arg_type -> base_type;
+                                    }
+                                }
+                            }
+
+                            // Don't infer from raw generic types.
+                            // E.g., raw Class passed to Class<P> should not infer P=Class
+                            // because the argument is being used in raw mode.
+                            bool is_raw_generic = arg_type -> NumTypeParameters() > 0 &&
+                                ! arg_param_type;
+
                             // Only infer if we haven't already inferred this parameter
-                            if (! (*inferred_types)[param_type_param])
+                            if (! (*inferred_types)[param_type_param] && ! is_raw_generic)
                             {
                                 (*inferred_types)[param_type_param] = new Type(arg_type);
                             }
@@ -2094,7 +2128,41 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     else if (arg -> Type() && ! arg -> Type() -> Primitive())
                     {
                         TypeSymbol* arg_type = arg -> Type();
-                        if (! (*inferred_types)[param_type_param])
+
+                        // For varargs methods, if this is the varargs parameter and
+                        // the argument is an array matching the varargs array type,
+                        // extract the component type for inference.
+                        // E.g., Arrays.asList(new String[]{"a"}) should infer T=String not T=String[]
+                        if (method -> ACC_VARARGS() &&
+                            i == method -> NumFormalParameters() - 1 &&
+                            arg_type -> IsArray())
+                        {
+                            VariableSymbol* varargs_param = method -> FormalParameter(i);
+                            if (varargs_param && varargs_param -> Type() &&
+                                varargs_param -> Type() -> IsArray())
+                            {
+                                // Strip array dimensions matching the parameter
+                                unsigned param_dims = varargs_param -> Type() -> num_dimensions;
+                                unsigned arg_dims = arg_type -> num_dimensions;
+                                if (arg_dims >= param_dims)
+                                {
+                                    unsigned remaining = arg_dims - param_dims;
+                                    if (remaining > 0)
+                                        arg_type = arg_type -> base_type -> GetArrayType(
+                                            (Semantic*) this, remaining);
+                                    else
+                                        arg_type = arg_type -> base_type;
+                                }
+                            }
+                        }
+
+                        // Don't infer from raw generic types.
+                        // E.g., raw Class passed to Class<P> should not infer P=Class
+                        // because the argument is being used in raw mode.
+                        bool is_raw_generic = arg_type -> NumTypeParameters() > 0 &&
+                            ! arg_param_type;
+
+                        if (! (*inferred_types)[param_type_param] && ! is_raw_generic)
                         {
                             (*inferred_types)[param_type_param] = new Type(arg_type);
                         }
