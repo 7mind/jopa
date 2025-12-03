@@ -2,6 +2,7 @@ package com.sun.tools.classfile;
 
 public class LocalVariableTypeTable_attribute extends Attribute {
     public Entry[] local_variable_table = new Entry[0];
+    public int local_variable_table_length = 0;
 
     public LocalVariableTypeTable_attribute() {
         super(Attribute.LocalVariableTypeTable);
