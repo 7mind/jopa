@@ -2707,18 +2707,55 @@ void Semantic::GetAnonymousConstructor(AstClassCreationExpression* class_creatio
         super_call -> base_opt = name;
     }
     else resolution_args -> AllocateArguments(num_args);
-    super_args -> AllocateArguments(super_constructor ->
-                                    NumFormalParameters());
-
     //
     // Next, simply pass all parameters through to the superclass.
+    // For varargs constructors, num_args may be less than num_formals.
     //
-    for (unsigned j = 0; j < super_constructor -> NumFormalParameters(); j++)
+    bool is_varargs = super_constructor -> ACC_VARARGS();
+    unsigned num_formals = super_constructor -> NumFormalParameters();
+
+    // For varargs, we pass actual arguments through; the varargs handling
+    // (packing into array) is done by MethodInvocationConversion later.
+    // The super call will get the actual arguments, and for empty varargs,
+    // an empty array will be created during conversion.
+    super_args -> AllocateArguments(is_varargs ? num_args : num_formals);
+
+    // For varargs, get the component type of the varargs array
+    TypeSymbol* varargs_component_type = NULL;
+    if (is_varargs && num_formals > 0)
     {
-        VariableSymbol* param = super_constructor -> FormalParameter(j);
+        TypeSymbol* varargs_type = super_constructor -> FormalParameter(num_formals - 1) -> Type();
+        if (varargs_type -> IsArray())
+            varargs_component_type = varargs_type -> ArraySubtype();
+    }
+
+    for (unsigned j = 0; j < num_args; j++)
+    {
+        // For varargs, use actual argument type; for non-varargs, use formal parameter type
+        TypeSymbol* param_type;
+        if (is_varargs && j >= num_formals - 1)
+        {
+            // This is a varargs argument
+            TypeSymbol* arg_type = class_creation -> arguments -> Argument(j) -> Type();
+            // If the argument is null or doesn't have a signature, use the varargs component type
+            if (arg_type == control.null_type || !arg_type -> signature)
+            {
+                param_type = varargs_component_type ? varargs_component_type : control.Object();
+            }
+            else
+            {
+                param_type = arg_type;
+            }
+        }
+        else
+        {
+            VariableSymbol* param = super_constructor -> FormalParameter(j);
+            param_type = param -> Type();
+        }
+
         VariableSymbol* symbol =
-            block_symbol -> InsertVariableSymbol(param -> Identity());
-        symbol -> SetType(param -> Type());
+            block_symbol -> InsertVariableSymbol(control.MakeParameter(j));
+        symbol -> SetType(param_type);
         symbol -> SetOwner(constructor);
         symbol -> SetLocalVariableIndex(block_symbol -> max_variable_index++);
         symbol -> MarkComplete();
