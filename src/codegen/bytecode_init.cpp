@@ -587,10 +587,12 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     // Add Signature attribute for generic methods (Java 5+)
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
-    // 2. Return type is a class type parameter (return_type_param_index >= 0)
+    // 2. Return type is a class type parameter (return_type_param_index >= 0), OR
+    // 3. Return type is a parameterized type (return_parameterized_type != NULL)
     //
     if (control.option.target >= JopaOption::SDK1_5 &&
-        (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0))
+        (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0 ||
+         msym -> return_parameterized_type))
     {
         msym -> SetGenericSignature(control);
         if (msym -> GenericSignature())

@@ -1376,6 +1376,29 @@ static int FindMethodTypeParameter(AstName* name, MethodSymbol* method, LexStrea
 }
 
 //
+// Helper function to check if a name matches a class type parameter.
+// Returns the TypeParameterSymbol if found, NULL otherwise.
+//
+static TypeParameterSymbol* FindClassTypeParameter(AstName* name, MethodSymbol* method, LexStream* lex_stream)
+{
+    if (! name || ! method || ! lex_stream || ! method -> containing_type)
+        return NULL;
+
+    const NameSymbol* name_sym = lex_stream -> NameSymbol(name -> identifier_token);
+    if (! name_sym)
+        return NULL;
+
+    TypeSymbol* containing = method -> containing_type;
+    for (unsigned i = 0; i < containing -> NumTypeParameters(); i++)
+    {
+        TypeParameterSymbol* type_param = containing -> TypeParameter(i);
+        if (type_param -> name_symbol == name_sym)
+            return type_param;
+    }
+    return NULL;
+}
+
+//
 // Helper function to generate the generic type signature from an AST type node.
 // This handles type parameters, parameterized types, arrays, and wildcards.
 //
@@ -1415,6 +1438,20 @@ static void GenerateTypeSignatureFromAst(AstType* type, MethodSymbol* method,
                 buffer[length++] = 'T';
                 const char* name = type_param -> Utf8Name();
                 unsigned name_len = type_param -> Utf8NameLength();
+                for (unsigned j = 0; j < name_len; j++)
+                    buffer[length++] = name[j];
+                buffer[length++] = ';';
+                return;
+            }
+
+            // Check if this name matches one of the class's type parameters
+            TypeParameterSymbol* class_type_param = FindClassTypeParameter(type_name -> name, method, lex_stream);
+            if (class_type_param)
+            {
+                // This is a reference to a class type parameter
+                buffer[length++] = 'T';
+                const char* name = class_type_param -> Utf8Name();
+                unsigned name_len = class_type_param -> Utf8NameLength();
                 for (unsigned j = 0; j < name_len; j++)
                     buffer[length++] = name[j];
                 buffer[length++] = ';';
@@ -1499,8 +1536,9 @@ void MethodSymbol::SetGenericSignature(Control& control)
 {
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
-    // 2. Return type is a class type parameter (return_type_param_index >= 0)
-    if (NumTypeParameters() == 0 && return_type_param_index < 0)
+    // 2. Return type is a class type parameter (return_type_param_index >= 0), OR
+    // 3. Return type is a parameterized type (return_parameterized_type != NULL)
+    if (NumTypeParameters() == 0 && return_type_param_index < 0 && ! return_parameterized_type)
         return;
 
     // Estimate size: type parameters + parameters + return type
