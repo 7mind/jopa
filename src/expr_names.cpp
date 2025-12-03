@@ -13,6 +13,7 @@
 #include "stream.h"
 #include "typeparam.h"
 #include "paramtype.h"
+#include <cstring>
 
 namespace Jopa {
 
@@ -1922,46 +1923,97 @@ void Semantic::ProcessFieldAccess(Ast* expr)
             // Most field access goes through ProcessAmbiguousName instead.
             //
             VariableSymbol* field = field_access -> symbol -> VariableCast();
-            if (field && field_access -> base && field -> field_declaration)
+            if (field && field_access -> base)
             {
                 // Get the receiver's parameterized type (if any)
                 ParameterizedType* receiver_param_type = NULL;
+
+                // Case 1: Base is a variable with parameterized_type
                 VariableSymbol* var = field_access -> base -> symbol -> VariableCast();
                 if (var && var -> parameterized_type)
                 {
                     receiver_param_type = var -> parameterized_type;
                 }
+                // Case 2: Base is an expression with resolved_parameterized_type (e.g., method call)
+                else if (field_access -> base -> resolved_parameterized_type)
+                {
+                    receiver_param_type = field_access -> base -> resolved_parameterized_type;
+                }
 
                 if (receiver_param_type)
                 {
                     TypeSymbol* declaring_class = (TypeSymbol*) field -> owner;
-                    // Only check type parameter substitution if the field is declared
-                    // in a file we can read tokens from (same compilation unit)
-                    if (declaring_class && declaring_class -> file_symbol == source_file_symbol)
+                    if (declaring_class)
                     {
-                        AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
-                        if (field_decl && field_decl -> type)
-                        {
-                            AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
-                            if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
-                            {
-                                // It's a simple name (not qualified), could be a type parameter
-                                // Match by name from the source code
-                                const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
+                        bool substituted = false;
 
-                                // Compare with class type parameter names
-                                for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
+                        // First try: Use generic_signature to identify type parameter fields
+                        // This works for fields from class files (different compilation units)
+                        const char* field_sig = field -> GenericSignatureString();
+                        if (field_sig && field_sig[0] == 'T')
+                        {
+                            // Field signature is in format "T<name>;" - extract the type parameter name
+                            int sig_len = strlen(field_sig);
+                            if (sig_len > 2 && field_sig[sig_len - 1] == ';')
+                            {
+                                // Extract the type parameter name (between 'T' and ';')
+                                char type_param_name[256];
+                                int name_len = sig_len - 2;
+                                if (name_len < 256)
                                 {
-                                    TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
-                                    if (wcscmp(field_type_text, type_param -> Name()) == 0)
+                                    strncpy(type_param_name, field_sig + 1, name_len);
+                                    type_param_name[name_len] = '\0';
+
+                                    // Match with the declaring class's type parameters
+                                    for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
                                     {
-                                        // Match! Substitute with the corresponding type argument
-                                        if (i < receiver_param_type -> NumTypeArguments())
+                                        TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
+                                        // Compare UTF-8 name
+                                        if (strcmp(type_param_name, type_param -> Utf8Name()) == 0)
                                         {
-                                            Type* type_arg = receiver_param_type -> TypeArgument(i);
-                                            field_access -> resolved_type = type_arg -> Erasure();
+                                            // Match! Substitute with the corresponding type argument
+                                            if (i < receiver_param_type -> NumTypeArguments())
+                                            {
+                                                Type* type_arg = receiver_param_type -> TypeArgument(i);
+                                                field_access -> resolved_type = type_arg -> Erasure();
+                                                substituted = true;
+                                            }
+                                            break;
                                         }
-                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Second try: Check source tokens if same compilation unit
+                        // and not already substituted
+                        if (! substituted && field -> field_declaration &&
+                            declaring_class -> file_symbol == source_file_symbol)
+                        {
+                            AstFieldDeclaration* field_decl = field -> field_declaration -> FieldDeclarationCast();
+                            if (field_decl && field_decl -> type)
+                            {
+                                AstTypeName* field_type_name = field_decl -> type -> TypeNameCast();
+                                if (field_type_name && field_type_name -> name && ! field_type_name -> base_opt)
+                                {
+                                    // It's a simple name (not qualified), could be a type parameter
+                                    // Match by name from the source code
+                                    const wchar_t* field_type_text = lex_stream -> NameString(field_type_name -> name -> identifier_token);
+
+                                    // Compare with class type parameter names
+                                    for (unsigned i = 0; i < declaring_class -> NumTypeParameters(); i++)
+                                    {
+                                        TypeParameterSymbol* type_param = declaring_class -> TypeParameter(i);
+                                        if (wcscmp(field_type_text, type_param -> Name()) == 0)
+                                        {
+                                            // Match! Substitute with the corresponding type argument
+                                            if (i < receiver_param_type -> NumTypeArguments())
+                                            {
+                                                Type* type_arg = receiver_param_type -> TypeArgument(i);
+                                                field_access -> resolved_type = type_arg -> Erasure();
+                                            }
+                                            break;
+                                        }
                                     }
                                 }
                             }

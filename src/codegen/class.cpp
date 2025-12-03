@@ -2780,7 +2780,27 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                 else if (*args_p == 'L')
                                 {
                                     // Class type - may be parameterized
-                                    // Skip to end of this type argument
+                                    // Parse the class name (between 'L' and '<' or ';')
+                                    const char* class_start = args_p + 1; // skip 'L'
+                                    const char* class_end = class_start;
+                                    while (*class_end && *class_end != '<' && *class_end != ';')
+                                        class_end++;
+                                    int class_name_len = class_end - class_start;
+
+                                    // Read the actual type
+                                    TypeSymbol* arg_type = ReadTypeFromSignature(
+                                        type, class_start, class_name_len, tok);
+
+                                    if (arg_type)
+                                    {
+                                        type_arg = new Type(arg_type);
+                                    }
+                                    else
+                                    {
+                                        type_arg = new Type(control.Object());
+                                    }
+
+                                    // Skip to end of this type argument (handling nested parameterization)
                                     int depth = 0;
                                     while (*args_p)
                                     {
@@ -2789,9 +2809,6 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                         else if (*args_p == ';' && depth == 0) { args_p++; break; }
                                         args_p++;
                                     }
-                                    // For now, use Object as placeholder for nested parameterized types
-                                    // A full implementation would recursively parse these
-                                    type_arg = new Type(control.Object());
                                 }
                                 else if (*args_p == '*')
                                 {
