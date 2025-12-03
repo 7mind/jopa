@@ -1742,9 +1742,75 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
             shadow = shadow -> next_method;
         }
-        
-        // We can skip the explicit superclass/interface loops because expanded_method_table
-        // contains all visible methods.
+
+        // Also explicitly check interface methods - they may not be in expanded_method_table
+        // as conflicts when the current type declares an overriding method with covariant return.
+        // This is needed for bridge generation when implementing generic interfaces with
+        // concrete type arguments (e.g., PrivilegedAction<String> with String run()).
+        for (unsigned k = 0; k < type -> NumInterfaces(); k++)
+        {
+            TypeSymbol* interf = type -> Interface(k);
+            if (! interf -> expanded_method_table)
+                continue;
+
+            MethodShadowSymbol* iface_shadow = interf -> expanded_method_table ->
+                FindMethodShadowSymbol(method -> name_symbol);
+
+            while (iface_shadow)
+            {
+                MethodSymbol* iface_method = iface_shadow -> method_symbol;
+                // Only check interface methods (not inherited Object methods)
+                if (iface_method -> containing_type -> ACC_INTERFACE())
+                {
+                    if (! iface_method -> IsTyped())
+                        iface_method -> ProcessMethodSignature(this, tok);
+                    CheckAndCreateBridge(method, iface_method, type, control, this, tok);
+                }
+
+                for (unsigned c = 0; c < iface_shadow -> NumConflicts(); c++)
+                {
+                    MethodSymbol* conflict = iface_shadow -> Conflict(c);
+                    if (conflict -> containing_type -> ACC_INTERFACE())
+                    {
+                        if (! conflict -> IsTyped())
+                            conflict -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                    }
+                }
+
+                iface_shadow = iface_shadow -> next_method;
+            }
+        }
+
+        // Also check superclass methods - needed for bridge generation when extending
+        // generic abstract classes with concrete type arguments (e.g., TypedContainer<String>)
+        if (type -> super && type -> super != control.Object())
+        {
+            TypeSymbol* super_type = type -> super;
+            if (super_type -> expanded_method_table)
+            {
+                MethodShadowSymbol* super_shadow = super_type -> expanded_method_table ->
+                    FindMethodShadowSymbol(method -> name_symbol);
+
+                while (super_shadow)
+                {
+                    MethodSymbol* super_method = super_shadow -> method_symbol;
+                    if (! super_method -> IsTyped())
+                        super_method -> ProcessMethodSignature(this, tok);
+                    CheckAndCreateBridge(method, super_method, type, control, this, tok);
+
+                    for (unsigned c = 0; c < super_shadow -> NumConflicts(); c++)
+                    {
+                        MethodSymbol* conflict = super_shadow -> Conflict(c);
+                        if (! conflict -> IsTyped())
+                            conflict -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                    }
+
+                    super_shadow = super_shadow -> next_method;
+                }
+            }
+        }
     }
 }
 
@@ -4557,37 +4623,8 @@ void Semantic::AddInheritedMethods(TypeSymbol* base_type,
                 }
             }
 
-            // Process method signature if needed for return type comparison
-            if (! method -> IsTyped())
-                method -> ProcessMethodSignature(this, tok);
-
-            // Check if we need to add the inherited method:
-            // - No existing shadow: always add
-            // - Existing shadow from non-base_type: add as conflict
-            // - Existing shadow from base_type with SAME return type: skip (base type implements it)
-            // - Existing shadow from base_type with DIFFERENT return type: add as conflict (for bridge generation)
-            bool need_add = false;
-            if (! shadow)
-            {
-                need_add = true;
-            }
-            else if (shadow -> method_symbol -> containing_type != base_type)
-            {
-                need_add = true;
-            }
-            else
-            {
-                // Shadow is from base_type - check if return types differ
-                MethodSymbol* base_method = shadow -> method_symbol;
-                if (! base_method -> IsTyped())
-                    base_method -> ProcessMethodSignature(this, tok);
-                // If return types differ, we need to add the inherited method as a conflict
-                // for bridge method generation
-                if (base_method -> Type() != method -> Type())
-                    need_add = true;
-            }
-
-            if (need_add)
+            if (! shadow ||
+                shadow -> method_symbol -> containing_type != base_type)
             {
                 if (! shadow)
                     shadow = base_expanded_table -> Overload(method);
