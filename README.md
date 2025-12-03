@@ -18,6 +18,7 @@ Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 - **How many bugs are there in JOPA?** Plenty, probably. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot). Also it can build GNU Classpath, Apache ANT and Eclipse ECJ. But the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
+- **What does JOPA mean?** Javac One Patch Away (from completeness).
 
 ## Achievement Unlocked: Bootstrapping ECJ and Ant
 
