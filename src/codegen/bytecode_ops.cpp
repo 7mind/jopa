@@ -92,34 +92,80 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
     else EmitFieldAccessLhs(expression -> expression);
 
     TypeSymbol* expression_type = expression -> Type();
-    if (need_value)
-        PutOp(control.IsDoubleWordType(expression_type)
-              ? OP_DUP2_X1 : OP_DUP_X1);
 
-    if (control.IsSimpleIntegerValueType(expression_type))
+    // Java 5: Check if this is a wrapper type that needs unboxing
+    TypeSymbol* unboxed_type = expression_type -> UnboxedType(control);
+    bool is_wrapper = (unboxed_type != expression_type && control.IsNumeric(unboxed_type));
+
+    if (is_wrapper)
     {
-        PutOp(OP_ICONST_1);
-        PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
-              ? OP_IADD : OP_ISUB);
-        EmitCast(expression_type, control.int_type);
+        // For post-increment, we need to save the original value
+        // Stack: [obj_ref, wrapper_val]
+        if (need_value)
+            PutOp(OP_DUP_X1); // duplicate wrapper value under obj ref
+
+        // Unbox, increment, rebox
+        EmitUnboxingConversion(expression_type, unboxed_type);
+
+        if (control.IsSimpleIntegerValueType(unboxed_type))
+        {
+            PutOp(OP_ICONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_IADD : OP_ISUB);
+            EmitCast(unboxed_type, control.int_type);
+        }
+        else if (unboxed_type == control.long_type)
+        {
+            PutOp(OP_LCONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_LADD : OP_LSUB);
+        }
+        else if (unboxed_type == control.float_type)
+        {
+            PutOp(OP_FCONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_FADD : OP_FSUB);
+        }
+        else if (unboxed_type == control.double_type)
+        {
+            PutOp(OP_DCONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_DADD : OP_DSUB);
+        }
+
+        EmitBoxingConversion(unboxed_type, expression_type);
     }
-    else if (expression_type == control.long_type)
+    else
     {
-        PutOp(OP_LCONST_1);
-        PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
-              ? OP_LADD : OP_LSUB);
-    }
-    else if (expression_type == control.float_type)
-    {
-        PutOp(OP_FCONST_1);
-        PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
-              ? OP_FADD : OP_FSUB);
-    }
-    else if (expression_type == control.double_type)
-    {
-        PutOp(OP_DCONST_1); // load 1.0
-        PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
-              ? OP_DADD : OP_DSUB);
+        if (need_value)
+            PutOp(control.IsDoubleWordType(expression_type)
+                  ? OP_DUP2_X1 : OP_DUP_X1);
+
+        if (control.IsSimpleIntegerValueType(expression_type))
+        {
+            PutOp(OP_ICONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_IADD : OP_ISUB);
+            EmitCast(expression_type, control.int_type);
+        }
+        else if (expression_type == control.long_type)
+        {
+            PutOp(OP_LCONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_LADD : OP_LSUB);
+        }
+        else if (expression_type == control.float_type)
+        {
+            PutOp(OP_FCONST_1);
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_FADD : OP_FSUB);
+        }
+        else if (expression_type == control.double_type)
+        {
+            PutOp(OP_DCONST_1); // load 1.0
+            PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
+                  ? OP_DADD : OP_DSUB);
+        }
     }
 
     if (kind == ACCESSED_VAR)
@@ -565,7 +611,50 @@ void ByteCode::EmitPreUnaryIncrementExpressionField(VariableCategory kind,
         EmitFieldAccessLhs(expression -> expression);
 
     TypeSymbol* expression_type = expression -> Type();
-    if (control.IsSimpleIntegerValueType(expression_type))
+
+    // Java 5: Check if this is a wrapper type that needs unboxing
+    TypeSymbol* unboxed_type = expression_type -> UnboxedType(control);
+    bool is_wrapper = (unboxed_type != expression_type && control.IsNumeric(unboxed_type));
+
+    if (is_wrapper)
+    {
+        // Unbox the wrapper to primitive
+        EmitUnboxingConversion(expression_type, unboxed_type);
+
+        // Perform the increment/decrement on the primitive
+        if (control.IsSimpleIntegerValueType(unboxed_type))
+        {
+            PutOp(OP_ICONST_1);
+            PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
+                  ? OP_IADD : OP_ISUB);
+            EmitCast(unboxed_type, control.int_type);
+        }
+        else if (unboxed_type == control.long_type)
+        {
+            PutOp(OP_LCONST_1);
+            PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
+                  ? OP_LADD : OP_LSUB);
+        }
+        else if (unboxed_type == control.float_type)
+        {
+            PutOp(OP_FCONST_1);
+            PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
+                  ? OP_FADD : OP_FSUB);
+        }
+        else if (unboxed_type == control.double_type)
+        {
+            PutOp(OP_DCONST_1);
+            PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
+                  ? OP_DADD : OP_DSUB);
+        }
+
+        // Rebox the result back to wrapper
+        EmitBoxingConversion(unboxed_type, expression_type);
+
+        if (need_value)
+            PutOp(OP_DUP_X1);
+    }
+    else if (control.IsSimpleIntegerValueType(expression_type))
     {
         PutOp(OP_ICONST_1);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
