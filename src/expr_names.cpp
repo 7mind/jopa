@@ -1238,6 +1238,63 @@ void Semantic::ProcessAmbiguousName(AstName* name)
             name -> value = variable_symbol -> initial_value;
             name -> symbol = variable_symbol;
 
+            //
+            // Type substitution for fields inherited from generic superclasses:
+            // If a field's declared type is a type parameter (e.g., T value in class Value<T>),
+            // and we're accessing it from a subclass with concrete type arguments
+            // (e.g., IntegerValue extends Value<Integer>), substitute the type parameter
+            // with the actual type argument.
+            //
+            TypeSymbol* field_containing_type = variable_symbol -> ContainingType();
+            if (field_containing_type && field_containing_type != this_type &&
+                field_containing_type -> NumTypeParameters() > 0)
+            {
+                // Field is from a generic superclass - check if its type is a type parameter
+                TypeSymbol* field_type = variable_symbol -> Type();
+
+                // Walk superclass chain to find the parameterized version of field_containing_type
+                ParameterizedType* param_super = NULL;
+                for (TypeSymbol* search = this_type; search && !param_super; search = search -> super)
+                {
+                    if (search -> super == field_containing_type)
+                    {
+                        param_super = search -> GetParameterizedSuper();
+                        break;
+                    }
+                }
+
+                // If we found the parameterized superclass, try to substitute
+                if (param_super && param_super -> NumTypeArguments() > 0)
+                {
+                    for (unsigned i = 0; i < field_containing_type -> NumTypeParameters(); i++)
+                    {
+                        TypeParameterSymbol* type_param = field_containing_type -> TypeParameter(i);
+                        // ErasedType() returns NULL for unbounded type parameters, meaning Object
+                        TypeSymbol* erased = type_param ? type_param -> ErasedType() : NULL;
+                        if (!erased)
+                            erased = control.Object();  // Unbounded T erases to Object
+                        if (type_param && erased == field_type)
+                        {
+                            // The field's type is this type parameter's erasure
+                            // Substitute with the actual type argument
+                            if (i < param_super -> NumTypeArguments())
+                            {
+                                Type* type_arg = param_super -> TypeArgument(i);
+                                if (type_arg)
+                                {
+                                    TypeSymbol* substituted = type_arg -> Erasure();
+                                    if (substituted && substituted != control.no_type)
+                                    {
+                                        name -> resolved_type = substituted;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
             CheckSimpleName(name, where_found);
 
             //

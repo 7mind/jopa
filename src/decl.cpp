@@ -1343,71 +1343,110 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     {
         AstType* type_arg_ast = type_arguments -> TypeArgument(i);
 
-        // Check if the type argument is itself a parameterized type
-        AstTypeName* type_name = type_arg_ast -> TypeNameCast();
-        if (type_name && type_name -> parameterized_type)
+        // Check if the type argument is a wildcard
+        AstWildcard* wildcard_ast = type_arg_ast -> WildcardCast();
+        if (wildcard_ast)
         {
-            // Clone the nested parameterized type (to avoid double-free)
-            // The original is owned by ast_pool, so we need our own copy
-            Type temp_wrapper(type_name -> parameterized_type);
-            // Prevent temp_wrapper's destructor from deleting the original
-            // by resetting it - we'll use the clone instead
-            Type* cloned = temp_wrapper.Clone();
-            // Reset temp_wrapper to avoid double-free
-            temp_wrapper.kind = Type::SIMPLE_TYPE;
-            temp_wrapper.simple_type = NULL;
-            type_arg_tuple -> Next() = cloned;
-        }
-        else
-        {
-            // Check if the type argument is a type parameter reference
-            // Type parameters are stored as their erased type in symbol, but we need
-            // to track them as TYPE_PARAMETER kind for proper type substitution.
-            TypeParameterSymbol* type_param_sym = NULL;
-            if (type_name && ! type_name -> type_arguments_opt)
+            // Create WildcardType from AST
+            WildcardType::BoundKind bound_kind = WildcardType::UNBOUNDED;
+            Type* bound = NULL;
+
+            if (wildcard_ast -> extends_token_opt)
             {
-                const NameSymbol* arg_name = lex_stream -> NameSymbol(
-                    type_name -> name -> identifier_token);
-                // Check processing_type's type parameters
-                if (processing_type)
+                // ? extends X
+                bound_kind = WildcardType::EXTENDS;
+                if (wildcard_ast -> bounds_opt)
                 {
-                    for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
-                    {
-                        TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
-                        if (tp -> name_symbol == arg_name)
-                        {
-                            type_param_sym = tp;
-                            break;
-                        }
-                    }
+                    ProcessType(wildcard_ast -> bounds_opt);
+                    TypeSymbol* bound_sym = wildcard_ast -> bounds_opt -> symbol;
+                    if (bound_sym && ! bound_sym -> Bad())
+                        bound = new Type(bound_sym);
                 }
-                // Also check enclosing method's type parameters
-                if (! type_param_sym && ThisMethod())
+            }
+            else if (wildcard_ast -> super_token_opt)
+            {
+                // ? super X
+                bound_kind = WildcardType::SUPER;
+                if (wildcard_ast -> bounds_opt)
                 {
-                    for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
-                    {
-                        TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
-                        if (tp -> name_symbol == arg_name)
-                        {
-                            type_param_sym = tp;
-                            break;
-                        }
-                    }
+                    ProcessType(wildcard_ast -> bounds_opt);
+                    TypeSymbol* bound_sym = wildcard_ast -> bounds_opt -> symbol;
+                    if (bound_sym && ! bound_sym -> Bad())
+                        bound = new Type(bound_sym);
                 }
             }
 
-            if (type_param_sym)
+            WildcardType* wildcard = new WildcardType(bound_kind, bound);
+            type_arg_tuple -> Next() = new Type(wildcard);
+        }
+        // Check if the type argument is itself a parameterized type
+        else
+        {
+            AstTypeName* type_name = type_arg_ast -> TypeNameCast();
+            if (type_name && type_name -> parameterized_type)
             {
-                // Type argument is a type parameter - store as TYPE_PARAMETER
-                type_arg_tuple -> Next() = new Type(type_param_sym);
+                // Clone the nested parameterized type (to avoid double-free)
+                // The original is owned by ast_pool, so we need our own copy
+                Type temp_wrapper(type_name -> parameterized_type);
+                // Prevent temp_wrapper's destructor from deleting the original
+                // by resetting it - we'll use the clone instead
+                Type* cloned = temp_wrapper.Clone();
+                // Reset temp_wrapper to avoid double-free
+                temp_wrapper.kind = Type::SIMPLE_TYPE;
+                temp_wrapper.simple_type = NULL;
+                type_arg_tuple -> Next() = cloned;
             }
             else
             {
-                // Simple type - use the TypeSymbol
-                TypeSymbol* arg_sym = type_arg_ast -> symbol;
-                if (! arg_sym || arg_sym -> Bad())
-                    arg_sym = control.no_type; // Use placeholder for bad types
-                type_arg_tuple -> Next() = new Type(arg_sym);
+                // Check if the type argument is a type parameter reference
+                // Type parameters are stored as their erased type in symbol, but we need
+                // to track them as TYPE_PARAMETER kind for proper type substitution.
+                TypeParameterSymbol* type_param_sym = NULL;
+                if (type_name && ! type_name -> type_arguments_opt)
+                {
+                    const NameSymbol* arg_name = lex_stream -> NameSymbol(
+                        type_name -> name -> identifier_token);
+                    // Check processing_type's type parameters
+                    if (processing_type)
+                    {
+                        for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
+                        {
+                            TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
+                            if (tp -> name_symbol == arg_name)
+                            {
+                                type_param_sym = tp;
+                                break;
+                            }
+                        }
+                    }
+                    // Also check enclosing method's type parameters
+                    if (! type_param_sym && ThisMethod())
+                    {
+                        for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
+                        {
+                            TypeParameterSymbol* tp = ThisMethod() -> TypeParameter(j);
+                            if (tp -> name_symbol == arg_name)
+                            {
+                                type_param_sym = tp;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (type_param_sym)
+                {
+                    // Type argument is a type parameter - store as TYPE_PARAMETER
+                    type_arg_tuple -> Next() = new Type(type_param_sym);
+                }
+                else
+                {
+                    // Simple type - use the TypeSymbol
+                    TypeSymbol* arg_sym = type_arg_ast -> symbol;
+                    if (! arg_sym || arg_sym -> Bad())
+                        arg_sym = control.no_type; // Use placeholder for bad types
+                    type_arg_tuple -> Next() = new Type(arg_sym);
+                }
             }
         }
     }

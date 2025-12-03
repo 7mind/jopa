@@ -584,6 +584,36 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 base_param_type = base -> ExpressionCast() -> resolved_parameterized_type;
             }
 
+            //
+            // Case 1b: Check if the base type is a method type parameter with a parameterized bound.
+            // For <T extends FooList<? super Bar>> void m(T t), when calling t.get(0),
+            // the variable t has type T, which erases to FooList. We need to find the
+            // parameterized bound FooList<? super Bar> from the type parameter.
+            //
+            if (! base_param_type && base_type && ThisMethod())
+            {
+                MethodSymbol* this_method = ThisMethod();
+                for (unsigned i = 0; i < this_method -> NumTypeParameters() && ! base_param_type; i++)
+                {
+                    TypeParameterSymbol* type_param = this_method -> TypeParameter(i);
+                    if (type_param && type_param -> parameterized_bounds &&
+                        type_param -> parameterized_bounds -> Length() > 0)
+                    {
+                        // Check if base_type matches this type parameter's erasure
+                        TypeSymbol* erased_bound = type_param -> ErasedType();
+                        if (erased_bound && erased_bound == base_type)
+                        {
+                            // Found a matching type parameter - use its parameterized bound
+                            Type* param_bound = type_param -> ParameterizedBound(0);
+                            if (param_bound && param_bound -> IsParameterized())
+                            {
+                                base_param_type = param_bound -> GetParameterizedType();
+                            }
+                        }
+                    }
+                }
+            }
+
             if (base_param_type)
             {
                 if (base_param_type -> generic_type == method -> containing_type)
@@ -636,6 +666,30 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                         if (substituted_arg)
                                                         {
                                                             TypeSymbol* result = substituted_arg -> Erasure();
+
+                                                            // Wildcard capture: For ? super X or unbounded ?,
+                                                            // use the type parameter's bound instead of Object
+                                                            if (substituted_arg -> IsWildcard())
+                                                            {
+                                                                WildcardType* wildcard = substituted_arg -> GetWildcard();
+                                                                if (wildcard -> IsSuper() || wildcard -> IsUnbounded())
+                                                                {
+                                                                    // Get the bound from current_generic's type parameter
+                                                                    if (k < current_generic -> NumTypeParameters())
+                                                                    {
+                                                                        TypeParameterSymbol* tp = current_generic -> TypeParameter(k);
+                                                                        if (tp)
+                                                                        {
+                                                                            TypeSymbol* bound = tp -> ErasedType();
+                                                                            if (bound)
+                                                                                result = bound;
+                                                                            else
+                                                                                result = control.Object();
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
                                                             if (result && result -> fully_qualified_name &&
                                                                 ! result -> Primitive())
                                                             {
@@ -697,6 +751,29 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                                             if (substituted_arg)
                                                             {
                                                                 TypeSymbol* result = substituted_arg -> Erasure();
+
+                                                                // Wildcard capture: For ? super X or unbounded ?,
+                                                                // use the type parameter's bound instead of Object
+                                                                if (substituted_arg -> IsWildcard())
+                                                                {
+                                                                    WildcardType* wildcard = substituted_arg -> GetWildcard();
+                                                                    if (wildcard -> IsSuper() || wildcard -> IsUnbounded())
+                                                                    {
+                                                                        if (k < current_generic -> NumTypeParameters())
+                                                                        {
+                                                                            TypeParameterSymbol* tp = current_generic -> TypeParameter(k);
+                                                                            if (tp)
+                                                                            {
+                                                                                TypeSymbol* bound = tp -> ErasedType();
+                                                                                if (bound)
+                                                                                    result = bound;
+                                                                                else
+                                                                                    result = control.Object();
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+
                                                                 if (result && result -> fully_qualified_name &&
                                                                     ! result -> Primitive())
                                                                 {
@@ -861,6 +938,37 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             if (type_arg)
             {
                 TypeSymbol* substituted = type_arg -> Erasure();
+
+                //
+                // Wildcard capture: For wildcards with ? super X or unbounded ?,
+                // the erasure returns Object. But the correct upper bound should
+                // come from the corresponding type parameter's bound.
+                //
+                // Example: FooList<T extends Foo> and FooList<? super Bar>
+                // The wildcard ? super Bar has upper bound Foo (from T's bound).
+                //
+                if (type_arg -> IsWildcard())
+                {
+                    WildcardType* wildcard = type_arg -> GetWildcard();
+                    if (wildcard -> IsSuper() || wildcard -> IsUnbounded())
+                    {
+                        // Get the corresponding type parameter's bound
+                        TypeSymbol* generic_type = param_type -> generic_type;
+                        if (generic_type && param_index < generic_type -> NumTypeParameters())
+                        {
+                            TypeParameterSymbol* type_param = generic_type -> TypeParameter(param_index);
+                            if (type_param)
+                            {
+                                TypeSymbol* bound = type_param -> ErasedType();
+                                if (bound)
+                                    substituted = bound;
+                                else
+                                    substituted = control.Object();  // Unbounded type param
+                            }
+                        }
+                    }
+                }
+
                 // Make sure we have a valid reference type (not primitive)
                 // Primitives don't have fully_qualified_name and can't be type arguments
                 if (substituted &&
