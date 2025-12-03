@@ -5,7 +5,7 @@ import com.sun.tools.javac.util.Context;
 public class ClassReader {
     public static ClassReader instance(Context context) { return null; }
 
-    public static class BadClassFile extends Exception {
+    public static class BadClassFile extends RuntimeException {
         public BadClassFile(String msg) { super(msg); }
     }
 

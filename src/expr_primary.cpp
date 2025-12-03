@@ -1927,6 +1927,32 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                                 (*inferred_types)[param_type_param] = first_type_arg;
                             }
                         }
+                        // Handle non-parameterized arguments: if argument type directly
+                        // matches/is assignable to the type parameter bound, use it.
+                        // E.g., EnumSet.of(ClassName.A) where <E extends Enum<E>>
+                        // should infer E = ClassName from the argument type.
+                        else if (arg -> Type() && ! arg -> Type() -> Primitive())
+                        {
+                            TypeSymbol* arg_type = arg -> Type();
+                            // Look through cast expressions to find the original type
+                            AstExpression* unwrapped_arg = arg;
+                            AstCastExpression* cast = arg -> CastExpressionCast();
+                            while (cast && cast -> expression)
+                            {
+                                unwrapped_arg = cast -> expression;
+                                cast = unwrapped_arg -> CastExpressionCast();
+                            }
+                            // Use the unwrapped expression's type if available
+                            if (unwrapped_arg -> Type())
+                            {
+                                arg_type = unwrapped_arg -> Type();
+                            }
+                            // Only infer if we haven't already inferred this parameter
+                            if (! (*inferred_types)[param_type_param])
+                            {
+                                (*inferred_types)[param_type_param] = new Type(arg_type);
+                            }
+                        }
                     }
                 }
 
@@ -1960,8 +1986,149 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
             else
             {
-                method_call -> resolved_parameterized_type = ret_ptype;
+                // Don't just copy ret_ptype if the method has its own type parameters
+                // that need inference from arguments. We'll handle that in the next block.
+                bool has_method_type_params_needing_inference =
+                    method -> NumTypeParameters() > 0 &&
+                    method -> param_type_param_indices;
+
+                // Check if return type uses method type parameters
+                bool return_uses_method_type_params = false;
+                if (has_method_type_params_needing_inference)
+                {
+                    for (unsigned i = 0; i < ret_ptype -> NumTypeArguments(); i++)
+                    {
+                        Type* type_arg = ret_ptype -> TypeArgument(i);
+                        if (type_arg && type_arg -> IsTypeParameter())
+                        {
+                            TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                            for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                            {
+                                if (method -> TypeParameter(k) == tparam)
+                                {
+                                    return_uses_method_type_params = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (return_uses_method_type_params) break;
+                    }
+                }
+
+                if (! return_uses_method_type_params)
+                {
+                    method_call -> resolved_parameterized_type = ret_ptype;
+                }
             }
+        }
+    }
+
+    //
+    // Handle static generic method calls: infer type parameters from arguments
+    // when there's no receiver expression (e.g., EnumSet.of(ClassName.A, ClassName.B))
+    //
+    if (method && method -> return_parameterized_type &&
+        ! method_call -> resolved_parameterized_type &&
+        method -> NumTypeParameters() > 0 &&
+        method -> param_type_param_indices)
+    {
+        ParameterizedType* ret_ptype = method -> return_parameterized_type;
+
+        // Check if the return type references method type parameters
+        bool has_method_type_params = false;
+        for (unsigned i = 0; i < ret_ptype -> NumTypeArguments() && !has_method_type_params; i++)
+        {
+            Type* type_arg = ret_ptype -> TypeArgument(i);
+            if (type_arg && type_arg -> IsTypeParameter())
+            {
+                TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                {
+                    if (method -> TypeParameter(k) == tparam)
+                    {
+                        has_method_type_params = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (has_method_type_params)
+        {
+            // Infer method type parameters from arguments
+            Tuple<Type*>* inferred_types = new Tuple<Type*>(method -> NumTypeParameters());
+            for (unsigned tp = 0; tp < method -> NumTypeParameters(); tp++)
+                inferred_types -> Next() = NULL;
+
+            unsigned num_args = method_call -> arguments -> NumArguments();
+            unsigned num_params = method -> param_type_param_indices -> Length();
+            unsigned limit = (num_args < num_params) ? num_args : num_params;
+
+            for (unsigned i = 0; i < limit; i++)
+            {
+                int param_type_param = (*(method -> param_type_param_indices))[i];
+                if (param_type_param >= 0 && (unsigned)param_type_param < method -> NumTypeParameters())
+                {
+                    AstExpression* arg = method_call -> arguments -> Argument(i);
+
+                    // Get type from argument
+                    ParameterizedType* arg_param_type = NULL;
+                    if (arg -> symbol)
+                    {
+                        VariableSymbol* var = arg -> symbol -> VariableCast();
+                        if (var && var -> parameterized_type)
+                            arg_param_type = var -> parameterized_type;
+                    }
+                    if (! arg_param_type && arg -> resolved_parameterized_type)
+                        arg_param_type = arg -> resolved_parameterized_type;
+
+                    if (arg_param_type && arg_param_type -> NumTypeArguments() > 0)
+                    {
+                        Type* first_type_arg = arg_param_type -> TypeArgument(0);
+                        if (first_type_arg && ! first_type_arg -> IsWildcard())
+                        {
+                            (*inferred_types)[param_type_param] = first_type_arg;
+                        }
+                    }
+                    // Handle non-parameterized arguments (e.g., enum constants)
+                    else if (arg -> Type() && ! arg -> Type() -> Primitive())
+                    {
+                        TypeSymbol* arg_type = arg -> Type();
+                        if (! (*inferred_types)[param_type_param])
+                        {
+                            (*inferred_types)[param_type_param] = new Type(arg_type);
+                        }
+                    }
+                }
+            }
+
+            // Substitute method type parameters in return type
+            Tuple<Type*>* new_type_args = new Tuple<Type*>(ret_ptype -> NumTypeArguments());
+            for (unsigned j = 0; j < ret_ptype -> NumTypeArguments(); j++)
+            {
+                Type* type_arg = ret_ptype -> TypeArgument(j);
+                Type* new_arg = NULL;
+
+                if (type_arg && type_arg -> IsTypeParameter())
+                {
+                    TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                    for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                    {
+                        if (method -> TypeParameter(k) == tparam)
+                        {
+                            new_arg = (*inferred_types)[k];
+                            break;
+                        }
+                    }
+                }
+                if (!new_arg)
+                    new_arg = type_arg ? type_arg : new Type(control.Object());
+                new_type_args -> Next() = new_arg;
+            }
+
+            ParameterizedType* substituted = new ParameterizedType(ret_ptype -> generic_type, new_type_args);
+            method_call -> resolved_parameterized_type = substituted;
+            delete inferred_types;
         }
     }
 

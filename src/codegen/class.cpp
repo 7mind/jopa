@@ -2507,6 +2507,22 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                         else break;
                     }
                     if (*p == '>') p++; // skip '>'
+
+                    // Create TypeParameterSymbol objects for each method type parameter
+                    // so that NumTypeParameters() returns the correct count
+                    for (int i = 0; i < num_method_type_params; i++)
+                    {
+                        int name_len = method_type_param_lengths[i];
+                        wchar_t* param_name = new wchar_t[name_len + 1];
+                        Control::ConvertUtf8ToUnicode(param_name, method_type_param_names[i], name_len);
+                        param_name[name_len] = U_NULL;
+
+                        NameSymbol* name_sym = control.FindOrInsertName(param_name, name_len);
+                        TypeParameterSymbol* type_param = new TypeParameterSymbol(name_sym, type, i);
+                        symbol -> AddTypeParameter(type_param);
+
+                        delete[] param_name;
+                    }
                 }
 
                 // Now find the parameters section and return type
@@ -2754,10 +2770,10 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                     while (*tname_end && *tname_end != ';') tname_end++;
                                     int tname_len = tname_end - tname_start;
 
-                                    // Find the type parameter
-                                    for (unsigned k = 0; k < type -> NumTypeParameters(); k++)
+                                    // First check method type parameters (for generic methods)
+                                    for (unsigned k = 0; k < symbol -> NumTypeParameters(); k++)
                                     {
-                                        TypeParameterSymbol* tp = type -> TypeParameter(k);
+                                        TypeParameterSymbol* tp = symbol -> TypeParameter(k);
                                         const wchar_t* tp_name = tp -> name_symbol -> Name();
                                         bool match = true;
                                         int j = 0;
@@ -2773,6 +2789,31 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                         {
                                             type_arg = new Type(tp);
                                             break;
+                                        }
+                                    }
+
+                                    // Then check class type parameters
+                                    if (! type_arg)
+                                    {
+                                        for (unsigned k = 0; k < type -> NumTypeParameters(); k++)
+                                        {
+                                            TypeParameterSymbol* tp = type -> TypeParameter(k);
+                                            const wchar_t* tp_name = tp -> name_symbol -> Name();
+                                            bool match = true;
+                                            int j = 0;
+                                            for (; j < tname_len && tp_name[j]; j++)
+                                            {
+                                                if ((wchar_t)(unsigned char)tname_start[j] != tp_name[j])
+                                                {
+                                                    match = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (match && j == tname_len && tp_name[j] == L'\0')
+                                            {
+                                                type_arg = new Type(tp);
+                                                break;
+                                            }
                                         }
                                     }
                                     args_p = tname_end + 1; // skip past ';'
