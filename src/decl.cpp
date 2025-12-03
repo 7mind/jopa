@@ -928,6 +928,76 @@ void Semantic::ProcessTypeParameters(TypeSymbol* type,
                 bound_type = type;
             }
 
+            // Check sibling nested types and ancestors for nested classes
+            // This handles cases like: class Outer { class A<X extends B> {} class B {} }
+            if (!bound_type)
+            {
+                TypeSymbol* containing = type -> ContainingType();
+                while (containing && !bound_type)
+                {
+                    // Check if the bound is the containing type itself
+                    if (bound_name == containing -> Identity())
+                    {
+                        bound_type = containing;
+                    }
+                    else
+                    {
+                        // Check sibling nested types in symbol table
+                        bound_type = containing -> FindTypeSymbol(bound_name);
+
+                        // If not found in symbol table, check AST for not-yet-processed sibling types
+                        // This handles forward references to sibling types during header processing
+                        if (!bound_type && containing -> declaration)
+                        {
+                            AstClassBody* body = containing -> declaration;
+
+                            // Check nested classes
+                            for (unsigned k = 0; k < body -> NumNestedClasses() && !bound_type; k++)
+                            {
+                                AstClassDeclaration* nested = body -> NestedClass(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+
+                            // Check nested enums
+                            for (unsigned k = 0; k < body -> NumNestedEnums() && !bound_type; k++)
+                            {
+                                AstEnumDeclaration* nested = body -> NestedEnum(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+
+                            // Check nested interfaces
+                            for (unsigned k = 0; k < body -> NumNestedInterfaces() && !bound_type; k++)
+                            {
+                                AstInterfaceDeclaration* nested = body -> NestedInterface(k);
+                                if (nested -> class_body && nested -> class_body -> semantic_environment)
+                                {
+                                    TypeSymbol* nested_type = nested -> class_body -> semantic_environment -> Type();
+                                    if (nested_type && bound_name == nested_type -> Identity())
+                                    {
+                                        bound_type = nested_type;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    containing = containing -> ContainingType();
+                }
+            }
+
             // Check single-type imports (e.g., import java.util.List;)
             if (!bound_type)
             {

@@ -257,6 +257,50 @@ if (original_type && original_type != arg_type)
 - Primary test suite: 214/214 tests pass
 - JDK7 compliance: 674/761 (88.6%, +2)
 
+### Phase 3d: Inherited Generic Field Type Substitution ✅ COMPLETE (2025-12-03)
+
+**Problem:** When a field is inherited from a generic superclass (e.g., `Value<T>`), accessing it from a subclass with concrete type arguments (e.g., `IntegerValue extends Value<Integer>`) returned the erased type (`Object`) instead of the substituted type (`Integer`).
+
+**Example:**
+```java
+class Value<T> { public T value; }
+class IntegerValue extends Value<Integer> {
+    void increment() {
+        value = value + 1;  // Failed: value was Object, not Integer
+    }
+}
+```
+
+**Fix Applied:**
+In `expr_names.cpp` `ProcessAmbiguousName()`, added type substitution logic after field lookup. When a field is inherited from a generic superclass, the code now walks the superclass chain to find the parameterized superclass and substitutes the type parameter with the actual type argument.
+
+**Results:**
+- `T6369051.java`: Now passes
+- JDK7 compliance: 675/761 (88.7%, +1)
+
+### Phase 3e: Wildcard Capture for Type Arguments ✅ COMPLETE (2025-12-03)
+
+**Problem:** When calling methods on types with wildcard type arguments (e.g., `FooList<? super Bar>`), the return type was `Object` instead of the correct upper bound from the type parameter's declaration.
+
+**Example:**
+```java
+interface FooList<T extends Foo> extends List<T> {}
+<T extends FooList<? super Bar>> void m(T t) {
+    Foo f = t.get(0);  // Failed: get returned Object instead of Foo
+}
+```
+
+**Root Causes Fixed:**
+
+1. **Missing wildcard type storage in `ProcessTypeArguments`** (`decl.cpp:1346-1380`): When creating `ParameterizedType` for type arguments, wildcards were not being converted to `WildcardType` objects. Instead, their erasure (`Object`) was stored. Fixed by detecting `AstWildcard` and creating proper `WildcardType` objects with the correct `BoundKind` (EXTENDS, SUPER, or UNBOUNDED).
+
+2. **Wildcard capture in type substitution** (`expr_primary.cpp:755-799`): When substituting type arguments for method return types, wildcards with `? super X` or unbounded `?` were returning `Object`. Fixed by checking if the substituted type argument is a wildcard, and if so, using the corresponding type parameter's upper bound instead of the wildcard's erasure.
+
+**Results:**
+- `T6330931.java`: Now passes (wildcard with `? super` bounds)
+- `T5097548b.java`: Now passes (unbounded wildcard with F-bounded type parameter)
+- JDK7 compliance: 677/761 (89.0%, +2)
+
 ---
 
 ## 3. Bootstrap Build Verification ✅ COMPLETE (2025-12-02)
@@ -307,23 +351,24 @@ Key issues to address:
 
 ## 5. Summary
 
-**Current Status: 88.6% (674/761)**
+**Current Status: 89.0% (677/761)**
 
 | Category | Tests | Priority | Notes |
 |----------|-------|----------|-------|
-| Type Inference | 25 | HIGH | Real compiler bugs |
+| Type Inference | ~20 | HIGH | Real compiler bugs |
 | API Stubs | 34 | MEDIUM | Infrastructure only |
-| Boxing/Generics | 4 | MEDIUM | Related to type inference |
-| Misc | 24 | LOW | Edge cases |
+| Boxing/Generics | 3 | MEDIUM | Related to type inference |
+| Misc | ~27 | LOW | Edge cases |
 
 **Remaining Phase 3 Issues:**
-- Wildcard capture with `? super` bounds (`T6330931.java`, `T5097548b.java`)
 - F-bounded polymorphism with recursive bounds (`T6650759f.java`, `T6650759j.java`)
 - Complex generic type inference edge cases
 
-**Recently Fixed (Phase 3b & 3c):**
+**Recently Fixed (Phase 3b, 3c, 3d & 3e):**
 - ✅ Intersection types in ternary operator (`Conditional.java`)
 - ✅ Nested generic method call inference (`T6650759a.java`, `T6650759l.java`)
+- ✅ Inherited generic field type substitution (`T6369051.java`)
+- ✅ Wildcard capture for `? super` and unbounded `?` (`T6330931.java`, `T5097548b.java`)
 
 **Recommendation:** Continue Phase 3 (Advanced Type Inference) to improve real-world compilation. The API stub tests (Phase 4) are infrastructure-only and don't affect JOPA's ability to compile real Java code.
 
