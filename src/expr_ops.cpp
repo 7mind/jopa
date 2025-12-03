@@ -572,6 +572,38 @@ bool Semantic::CanAssignmentConvert(const TypeSymbol* target_type,
     if (CanMethodInvocationConvert(target_type, source_type))
         return true;
 
+    // Intersection type support for conditional expressions:
+    // If the expression is a conditional (ternary) expression and both
+    // branches are assignable to the target type, then the conditional
+    // expression as a whole is assignable to the target type.
+    // This handles cases like: I i = cond ? a : b; where A and B both
+    // implement I and J, but the computed LUB is only one of them.
+    AstConditionalExpression* conditional = expr -> ConditionalExpressionCast();
+    if (conditional)
+    {
+        // Get the original branch types before any LUB conversion was applied.
+        // After ProcessConditionalExpression, branches may be wrapped in casts.
+        AstExpression* true_expr = conditional -> true_expression;
+        AstExpression* false_expr = conditional -> false_expression;
+
+        // Unwrap casts to get the original expression types
+        AstCastExpression* true_cast = true_expr -> CastExpressionCast();
+        if (true_cast)
+            true_expr = true_cast -> expression;
+        AstCastExpression* false_cast = false_expr -> CastExpressionCast();
+        if (false_cast)
+            false_expr = false_cast -> expression;
+
+        TypeSymbol* true_type = true_expr -> Type();
+        TypeSymbol* false_type = false_expr -> Type();
+        if (true_type && false_type &&
+            CanMethodInvocationConvert(target_type, true_type) &&
+            CanMethodInvocationConvert(target_type, false_type))
+        {
+            return true;
+        }
+    }
+
     // Allow constant narrowing into wrapper types by checking representability
     if (control.option.source >= JopaOption::SDK1_5 &&
         ! target_type -> Primitive() &&

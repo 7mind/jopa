@@ -1137,6 +1137,21 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 if (! arg_type || ! formal_type)
                     continue;
 
+                // Unwrap cast expressions to get the original expression's type
+                // This is needed because method argument type coercion wraps the expression
+                AstExpression* original_arg = arg;
+                while (original_arg -> kind == Ast::CAST)
+                {
+                    AstCastExpression* cast = (AstCastExpression*) original_arg;
+                    original_arg = cast -> expression;
+                }
+                // Use the original expression's type for inference, not the cast target type
+                TypeSymbol* original_type = original_arg -> Type();
+                if (original_type && original_type != arg_type)
+                {
+                    arg_type = original_type;
+                }
+
                 // Walk the argument's supertype chain to find a matching interface/class
                 for (TypeSymbol* search = arg_type; search && ! inferred_type; search = search -> super)
                 {

@@ -1,8 +1,8 @@
 # JDK 7 Compliance Failure Analysis & Roadmap
 
 **Date:** 2025-12-02
-**Status:** 87.9% Pass Rate (669/761)
-**Remaining Failures:** 92
+**Status:** 88.6% Pass Rate (674/761)
+**Remaining Failures:** 87
 
 ## 1. Failure Categories (Detailed Analysis)
 
@@ -193,6 +193,70 @@ else if (strcmp(method_name, "entrySet") == 0)
 - Primary test suite: 214/214 tests pass
 - JDK7 compliance: 671/761 (88.2%, +2 from baseline)
 
+### Phase 3b: Intersection Type Support for Ternary ✅ COMPLETE (2025-12-02)
+
+**Problem:** When a ternary expression's branches implement multiple common interfaces, assignment to any of those interfaces failed because the LUB was a single interface, not an intersection type.
+
+**Example:**
+```java
+interface I {}
+interface J {}
+class A implements I, J {}
+class B implements I, J {}
+// J j = cond ? new A() : new B();  // Failed: LUB was I, not assignable to J
+```
+
+**Fix Applied:**
+In `expr_ops.cpp` `CanAssignmentConvert()`, added intersection type support that checks if both branches of a conditional expression are individually assignable to the target type:
+```cpp
+AstConditionalExpression* conditional = expr -> ConditionalExpressionCast();
+if (conditional)
+{
+    // Unwrap casts to get the original expression types
+    // ... check if both branches are assignable to target_type
+}
+```
+
+**Results:**
+- `generics/Conditional.java`: Now passes
+- JDK7 compliance: 672/761 (88.3%, +1)
+
+### Phase 3c: Nested Method Call Type Inference ✅ COMPLETE (2025-12-02)
+
+**Problem:** When a generic method result was passed as an argument to another method, type inference from bounded type parameters failed because argument expressions were wrapped in cast nodes before inference could extract the original type.
+
+**Example:**
+```java
+<I extends Interface<T>, T> T getValue(I arg) { return null; }
+void useInt(Integer i) { }
+void test() {
+    useInt(getValue(new IntImpl()));  // Failed: returned Object instead of Integer
+}
+```
+
+**Root Cause:** Method argument type coercion wraps expressions in CAST nodes before secondary inference runs. The secondary inference code was calling `arg->Type()` which returned the cast target type (the formal parameter erasure) instead of the original expression type.
+
+**Fix Applied:**
+In `expr_primary.cpp` secondary inference block, added cast unwrapping to get the original expression's type:
+```cpp
+// Unwrap cast expressions to get the original expression's type
+AstExpression* original_arg = arg;
+while (original_arg -> kind == Ast::CAST)
+{
+    AstCastExpression* cast = (AstCastExpression*) original_arg;
+    original_arg = cast -> expression;
+}
+TypeSymbol* original_type = original_arg -> Type();
+if (original_type && original_type != arg_type)
+    arg_type = original_type;
+```
+
+**Results:**
+- `T6650759a.java`: Now passes (nested generic method calls)
+- `T6650759l.java`: Now passes
+- Primary test suite: 214/214 tests pass
+- JDK7 compliance: 674/761 (88.6%, +2)
+
 ---
 
 ## 3. Bootstrap Build Verification ✅ COMPLETE (2025-12-02)
@@ -243,19 +307,23 @@ Key issues to address:
 
 ## 5. Summary
 
-**Current Status: 88.2% (671/761)**
+**Current Status: 88.6% (674/761)**
 
 | Category | Tests | Priority | Notes |
 |----------|-------|----------|-------|
-| Type Inference | 28 | HIGH | Real compiler bugs |
+| Type Inference | 25 | HIGH | Real compiler bugs |
 | API Stubs | 34 | MEDIUM | Infrastructure only |
 | Boxing/Generics | 4 | MEDIUM | Related to type inference |
 | Misc | 24 | LOW | Edge cases |
 
 **Remaining Phase 3 Issues:**
-- Intersection types in ternary operator (when multiple common interfaces exist)
-- Nested generic method call inference (`testSet(getGenericValue(...))`)
-- Wildcard capture with `? super` bounds
+- Wildcard capture with `? super` bounds (`T6330931.java`, `T5097548b.java`)
+- F-bounded polymorphism with recursive bounds (`T6650759f.java`, `T6650759j.java`)
+- Complex generic type inference edge cases
+
+**Recently Fixed (Phase 3b & 3c):**
+- ✅ Intersection types in ternary operator (`Conditional.java`)
+- ✅ Nested generic method call inference (`T6650759a.java`, `T6650759l.java`)
 
 **Recommendation:** Continue Phase 3 (Advanced Type Inference) to improve real-world compilation. The API stub tests (Phase 4) are infrastructure-only and don't affect JOPA's ability to compile real Java code.
 
