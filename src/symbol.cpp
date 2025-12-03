@@ -1778,8 +1778,7 @@ void MethodSymbol::ProcessMethodSignature(Semantic* sem,
         // return type is a parameterized type (e.g., Collection<V> for Map.values()).
         // This enables proper type inference for foreach loops and method chaining.
         //
-        if (GenericSignatureString() && ! return_parameterized_type &&
-            containing_type && containing_type -> NumTypeParameters() > 0)
+        if (GenericSignatureString() && ! return_parameterized_type && containing_type)
         {
             const char* gen_sig = GenericSignatureString();
             const char* p = gen_sig;
@@ -1815,8 +1814,44 @@ void MethodSymbol::ProcessMethodSignature(Semantic* sem,
             // Skip array dimensions
             while (*p == '[') p++;
 
+            // Check if return type is just a type variable: TE; or TT;
+            // This sets return_type_param_index to allow proper type substitution
+            // at call sites when the type variable is from the containing class.
+            if (*p == 'T')
+            {
+                const char* name_start = p + 1;
+                const char* name_end = name_start;
+                while (*name_end && *name_end != ';') name_end++;
+
+                if (*name_end == ';')
+                {
+                    int name_len = name_end - name_start;
+
+                    // Find the type parameter in the containing type
+                    for (unsigned i = 0; i < containing_type -> NumTypeParameters(); i++)
+                    {
+                        TypeParameterSymbol* type_param = containing_type -> TypeParameter(i);
+                        const wchar_t* param_name = type_param -> name_symbol -> Name();
+                        bool match = true;
+                        int j = 0;
+                        for (; j < name_len && param_name[j]; j++)
+                        {
+                            if ((wchar_t)(unsigned char)name_start[j] != param_name[j])
+                            {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match && j == name_len && param_name[j] == U_NULL)
+                        {
+                            return_type_param_index = (int) i;
+                            break;
+                        }
+                    }
+                }
+            }
             // Check for parameterized return type: Ljava/util/Collection<TV;>;
-            if (*p == 'L')
+            else if (*p == 'L')
             {
                 const char* class_start = p + 1;
                 const char* class_end = class_start;

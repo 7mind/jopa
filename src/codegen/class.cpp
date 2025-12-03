@@ -2854,13 +2854,73 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                 else if (*args_p == '*')
                                 {
                                     // Unbounded wildcard
-                                    type_arg = new Type(control.Object());
+                                    WildcardType* wildcard = new WildcardType(WildcardType::UNBOUNDED, NULL);
+                                    type_arg = new Type(wildcard);
                                     args_p++;
                                 }
                                 else if (*args_p == '+' || *args_p == '-')
                                 {
-                                    // Bounded wildcard - skip past it
-                                    args_p++;
+                                    // Bounded wildcard: +Lclass; (extends) or -Lclass; (super)
+                                    bool is_extends = (*args_p == '+');
+                                    args_p++; // skip + or -
+
+                                    Type* bound_type = NULL;
+
+                                    if (*args_p == 'L')
+                                    {
+                                        // Parse the bound class type
+                                        const char* bound_class_start = args_p + 1;
+                                        const char* bound_class_end = bound_class_start;
+                                        while (*bound_class_end && *bound_class_end != '<' && *bound_class_end != ';')
+                                            bound_class_end++;
+                                        int bound_class_len = bound_class_end - bound_class_start;
+
+                                        TypeSymbol* bound_sym = ReadTypeFromSignature(
+                                            type, bound_class_start, bound_class_len, tok);
+                                        if (bound_sym)
+                                            bound_type = new Type(bound_sym);
+                                    }
+                                    else if (*args_p == 'T')
+                                    {
+                                        // Type parameter as bound: TName;
+                                        const char* tname_start = args_p + 1;
+                                        const char* tname_end = tname_start;
+                                        while (*tname_end && *tname_end != ';') tname_end++;
+                                        int tname_len = tname_end - tname_start;
+
+                                        // Check class type parameters
+                                        for (unsigned k = 0; k < type -> NumTypeParameters(); k++)
+                                        {
+                                            TypeParameterSymbol* tp = type -> TypeParameter(k);
+                                            const wchar_t* tp_name = tp -> name_symbol -> Name();
+                                            bool match = true;
+                                            int j = 0;
+                                            for (; j < tname_len && tp_name[j]; j++)
+                                            {
+                                                if ((wchar_t)(unsigned char)tname_start[j] != tp_name[j])
+                                                {
+                                                    match = false;
+                                                    break;
+                                                }
+                                            }
+                                            if (match && j == tname_len && tp_name[j] == L'\0')
+                                            {
+                                                bound_type = new Type(tp);
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    if (! bound_type)
+                                        bound_type = new Type(control.Object());
+
+                                    // Create the wildcard type
+                                    WildcardType::BoundKind wk = is_extends ?
+                                        WildcardType::EXTENDS : WildcardType::SUPER;
+                                    WildcardType* wildcard = new WildcardType(wk, bound_type);
+                                    type_arg = new Type(wildcard);
+
+                                    // Skip to end of this type argument
                                     int depth = 0;
                                     while (*args_p)
                                     {
@@ -2869,7 +2929,6 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
                                         else if (*args_p == ';' && depth == 0) { args_p++; break; }
                                         args_p++;
                                     }
-                                    type_arg = new Type(control.Object());
                                 }
                                 else
                                 {
