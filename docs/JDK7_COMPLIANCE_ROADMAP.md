@@ -1,8 +1,8 @@
 # JDK 7 Compliance Failure Analysis & Roadmap
 
 **Date:** 2025-12-03
-**Status:** 84.7% Pass Rate on tools/javac (516/609), 71.2% Overall (542/761)
-**Remaining Failures:** 93 (tools/javac), 219 (overall including javadoc stub failures)
+**Status:** 85.9% Pass Rate on tools/javac (523/609), 72.1% Overall (549/761)
+**Remaining Failures:** 86 (tools/javac), 212 (overall including javadoc stub failures)
 
 ## 1. Failure Categories (Detailed Analysis)
 
@@ -415,11 +415,13 @@ The ECJ build target has been added to `vendor/CMakeLists.txt`. ECJ 4.2.1 compil
 | Multi-file tests | 13 | LOW | Sourcepath setup |
 | Misc | ~20 | LOW | Edge cases |
 
-**Recently Fixed (Phase 3d, 3e, 3f):**
+**Recently Fixed (Phase 3d, 3e, 3f, 4a):**
 - ✅ Inherited generic field type substitution (`T6369051.java`)
 - ✅ Wildcard capture for `? super` and unbounded `?` (`T6330931.java`, `T5097548b.java`)
 - ✅ Parameterized return type parsing from class files (GNU Classpath bootstrap)
 - ✅ Generic signature storage for inherited fields with type parameters
+- ✅ Added `java.util.Queue`, `java.util.Deque`, `java.util.LinkedHashSet` stubs
+- ✅ Added `ToolTester` test infrastructure stub (+7 tests passing)
 
 **Next Steps (Recommended Order):**
 1. **Rare types** - Fix static nested class access in generic contexts (4 tests)

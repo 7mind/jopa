@@ -1,6 +1,6 @@
 package java.util;
 
-public class LinkedList<E> extends AbstractList<E> implements List<E>, java.io.Serializable {
+public class LinkedList<E> extends AbstractList<E> implements List<E>, Deque<E>, java.io.Serializable {
     public LinkedList() {}
     public LinkedList(Collection<? extends E> c) {}
 
@@ -26,6 +26,7 @@ public class LinkedList<E> extends AbstractList<E> implements List<E>, java.io.S
     public E peek() { return null; }
     public E element() { return null; }
     public E poll() { return null; }
+    public E remove() { return null; }
     public boolean offer(E e) { return false; }
     public boolean offerFirst(E e) { return false; }
     public boolean offerLast(E e) { return false; }

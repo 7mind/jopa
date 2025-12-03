@@ -300,7 +300,10 @@ void TypeSymbol::RemoveCompilationReferences()
         {
             unsigned i;
             for (i = 0; i < table -> NumVariableSymbols(); i++)
+            {
                 table -> VariableSym(i) -> declarator = NULL;
+                table -> VariableSym(i) -> field_declaration = NULL;
+            }
             for (i = 0; i < table -> NumMethodSymbols(); i++)
                 table -> MethodSym(i) -> declaration = NULL;
             for (i = 0; i < table -> NumTypeSymbols(); i++)
