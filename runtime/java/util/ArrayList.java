@@ -1,7 +1,7 @@
 // Minimal ArrayList for testing enhanced for-loop
 package java.util;
 
-public class ArrayList<E> implements List<E>, java.lang.Iterable<E> {
+public class ArrayList<E> extends AbstractList<E> implements List<E>, java.lang.Iterable<E> {
     private Object[] elements;
     private int size;
 
