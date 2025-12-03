@@ -1705,6 +1705,7 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
     // This ensures we generate bridges even for inherited methods that implement
     // interfaces (e.g., D extends C<Integer> implements A<Integer>, D inherits f(Integer))
     ExpandedMethodTable* table = type -> expanded_method_table;
+
     for (unsigned i = 0; i < table -> symbol_pool.Length(); i++)
     {
         MethodShadowSymbol* current_shadow = table -> symbol_pool[i];
@@ -4556,8 +4557,37 @@ void Semantic::AddInheritedMethods(TypeSymbol* base_type,
                 }
             }
 
-            if (! shadow ||
-                shadow -> method_symbol -> containing_type != base_type)
+            // Process method signature if needed for return type comparison
+            if (! method -> IsTyped())
+                method -> ProcessMethodSignature(this, tok);
+
+            // Check if we need to add the inherited method:
+            // - No existing shadow: always add
+            // - Existing shadow from non-base_type: add as conflict
+            // - Existing shadow from base_type with SAME return type: skip (base type implements it)
+            // - Existing shadow from base_type with DIFFERENT return type: add as conflict (for bridge generation)
+            bool need_add = false;
+            if (! shadow)
+            {
+                need_add = true;
+            }
+            else if (shadow -> method_symbol -> containing_type != base_type)
+            {
+                need_add = true;
+            }
+            else
+            {
+                // Shadow is from base_type - check if return types differ
+                MethodSymbol* base_method = shadow -> method_symbol;
+                if (! base_method -> IsTyped())
+                    base_method -> ProcessMethodSignature(this, tok);
+                // If return types differ, we need to add the inherited method as a conflict
+                // for bridge method generation
+                if (base_method -> Type() != method -> Type())
+                    need_add = true;
+            }
+
+            if (need_add)
             {
                 if (! shadow)
                     shadow = base_expanded_table -> Overload(method);
