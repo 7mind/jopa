@@ -46,6 +46,10 @@ public final class Long extends Number implements Comparable<Long>, java.io.Seri
         return String.valueOf(value);
     }
 
+    public static String toString(long l) {
+        return String.valueOf(l);
+    }
+
     @Override
     public int compareTo(Long anotherLong) {
         return this.value < anotherLong.value ? -1 : (this.value == anotherLong.value ? 0 : 1);

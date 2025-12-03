@@ -2953,31 +2953,44 @@ void Semantic::ProcessImportQualifiedName(AstName* name)
         // import statement. Class names in import statements must be the
         // canonical version.
         //
-        TypeSymbol* type = FindSimpleNameType(control.UnnamedPackage(),
-                                              name -> identifier_token);
+        // First, check if there's a valid package with that name that has
+        // actual directories/files. If so, prefer the package over any type
+        // in the unnamed package (JLS 6.5.3: Package names are resolved
+        // before type names in qualified names of imports).
+        //
+        NameSymbol* name_symbol =
+            lex_stream -> NameSymbol(name -> identifier_token);
+        PackageSymbol* package =
+            control.external_table.FindPackageSymbol(name_symbol);
+        if (! package)
+            package = control.external_table.
+                InsertPackageSymbol(name_symbol, NULL);
+        control.FindPathsToDirectory(package);
 
         //
-        // If the name is a type, detect the error. Otherwise, assume
-        // it is a package, and legal.
+        // If the package has actual directories, use it. Otherwise, check
+        // for a type in the unnamed package which would be an error.
         //
-        if (type)
+        if (package -> directory.Length() > 0)
         {
-            ReportSemError(SemanticError::IMPORT_FROM_UNNAMED_PACKAGE,
-                           name -> identifier_token,
-                           lex_stream -> NameString(name -> identifier_token));
-            name -> symbol = control.no_type;
+            name -> symbol = package;
         }
         else
         {
-            NameSymbol* name_symbol =
-                lex_stream -> NameSymbol(name -> identifier_token);
-            PackageSymbol* package =
-                control.external_table.FindPackageSymbol(name_symbol);
-            if (! package)
-                package = control.external_table.
-                    InsertPackageSymbol(name_symbol, NULL);
-            control.FindPathsToDirectory(package);
-            name -> symbol = package;
+            TypeSymbol* type = FindSimpleNameType(control.UnnamedPackage(),
+                                                  name -> identifier_token);
+            if (type)
+            {
+                ReportSemError(SemanticError::IMPORT_FROM_UNNAMED_PACKAGE,
+                               name -> identifier_token,
+                               lex_stream -> NameString(name -> identifier_token));
+                name -> symbol = control.no_type;
+            }
+            else
+            {
+                // Assume it's a package (possibly empty/non-existent)
+                name -> symbol = package;
+            }
         }
     }
 }

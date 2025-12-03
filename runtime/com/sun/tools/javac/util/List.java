@@ -8,6 +8,8 @@ public class List<A> implements Iterable<A> {
 
     public A first() { return head; }
 
+    public boolean isEmpty() { return head == null; }
+
     public static <A> List<A> nil() { return new List<A>(); }
 
     @SafeVarargs

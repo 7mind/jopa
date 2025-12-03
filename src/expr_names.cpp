@@ -1571,12 +1571,19 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                             {
                                 if (static_member)
                                 {
-                                    // Ambiguous static import
-                                    ReportSemError(SemanticError::AMBIGUOUS_FIELD,
-                                                 name -> identifier_token,
-                                                 name_symbol -> Name());
-                                    name -> symbol = control.no_type;
-                                    return;
+                                    // Check if it's the same field (inherited via different paths)
+                                    VariableSymbol* prev_var = static_member -> VariableCast();
+                                    if (prev_var != var)
+                                    {
+                                        // Ambiguous static import - different fields
+                                        ReportSemError(SemanticError::AMBIGUOUS_FIELD,
+                                                     name -> identifier_token,
+                                                     name_symbol -> Name());
+                                        name -> symbol = control.no_type;
+                                        return;
+                                    }
+                                    // Same field via different import, skip
+                                    continue;
                                 }
                                 if (!var -> IsTyped())
                                     var -> ProcessVariableSignature(this, name -> identifier_token);
@@ -1602,12 +1609,19 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                                 {
                                     if (static_member)
                                     {
-                                        // Ambiguous static import
-                                        ReportSemError(SemanticError::AMBIGUOUS_TYPE,
-                                                     name -> identifier_token,
-                                                     name_symbol -> Name());
-                                        name -> symbol = control.no_type;
-                                        return;
+                                        // Check if it's the same type (inherited via different paths)
+                                        TypeSymbol* prev_type = static_member -> TypeCast();
+                                        if (prev_type != nested)
+                                        {
+                                            // Ambiguous static import - different types
+                                            ReportSemError(SemanticError::AMBIGUOUS_TYPE,
+                                                         name -> identifier_token,
+                                                         name_symbol -> Name());
+                                            name -> symbol = control.no_type;
+                                            return;
+                                        }
+                                        // Same type via different import, skip
+                                        continue;
                                     }
                                     static_member = nested;
                                 }
