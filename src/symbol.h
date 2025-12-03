@@ -465,6 +465,9 @@ public:
         , return_type_param_index(-1)
         , method_return_type_param_index(-1)
         , param_type_param_indices(NULL)
+        , throws_type_param_indices(NULL)
+        , throws_param_source_indices(NULL)
+        , throws_param_type_arg_indices(NULL)
         , return_parameterized_type(NULL)
     {
         Symbol::_kind = METHOD;
@@ -647,6 +650,20 @@ public:
     // For example, in <T> T identity(T arg), param_type_param_indices[0] = 0.
     // This enables type inference from actual arguments.
     Tuple<int>* param_type_param_indices;
+
+    // For each throws clause entry, stores the index of the method type parameter it uses.
+    // -1 means the exception doesn't use a method type parameter.
+    // For example, in <E extends Throwable> void m() throws E, throws_type_param_indices[0] = 0.
+    // This enables exception type inference from actual arguments.
+    Tuple<int>* throws_type_param_indices;
+
+    // For each throws clause, stores which parameter index provides the type argument.
+    // -1 means no parameter provides the type. For example, in
+    // <T, E extends Throwable> void accept(Visitor<T, E> v) throws E,
+    // throws_param_source_indices[0] = 0, throws_param_type_arg_indices[0] = 1
+    // (E is inferred from param 0's type argument at index 1)
+    Tuple<int>* throws_param_source_indices;
+    Tuple<int>* throws_param_type_arg_indices;
 
     // If the return type is a parameterized type (like Map<String, Integer>),
     // this stores that parameterized type. This enables proper type propagation

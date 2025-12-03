@@ -505,9 +505,128 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
 
         SymbolSet exceptions(method -> NumThrows());
         int i, j;
-        // First, the base set
+        // First, the base set - with exception type parameter inference
         for (i = method -> NumThrows(); --i >= 0; )
-            exceptions.AddElement(method -> Throws(i));
+        {
+            TypeSymbol* ex_type = method -> Throws(i);
+
+            // Check if this exception type could be a type parameter's bound (erased type).
+            // For a method like <E extends Throwable> void m() throws E, the throws clause
+            // contains Throwable (the erasure). We need to check if the method has a type
+            // parameter with this bound and try to infer the actual type from arguments.
+
+            if (method -> NumTypeParameters() > 0 &&
+                ex_type && ex_type -> IsSubclass(control.Throwable()))
+            {
+                // Check each type parameter to find one that matches this exception type
+                for (unsigned tp = 0; tp < method -> NumTypeParameters(); tp++)
+                {
+                    TypeParameterSymbol* type_param = method -> TypeParameter(tp);
+                    if (! type_param)
+                        continue;
+
+                    // Check if this type parameter's bound matches the exception type
+                    // ErasedType() returns the first bound, or NULL for unbounded (Object)
+                    TypeSymbol* bound = type_param -> ErasedType();
+                    if (! bound)
+                        bound = control.Object();
+
+                    if (bound != ex_type)
+                        continue;
+
+                    // Found a matching type parameter. Try to infer actual type from arguments.
+                    // Scan arguments to find parameterized types containing this type parameter.
+                    if (method_call -> arguments)
+                    {
+                        unsigned num_args = method_call -> arguments -> NumArguments();
+                        for (unsigned arg_idx = 0; arg_idx < num_args && ex_type == method -> Throws(i); arg_idx++)
+                        {
+                            AstExpression* arg = method_call -> arguments -> Argument(arg_idx);
+                            if (! arg)
+                                continue;
+
+                            // Unwrap cast expressions to find the original expression
+                            // (MethodInvocationConversion wraps arguments in casts)
+                            AstExpression* unwrapped = arg;
+                            while (unwrapped -> CastExpressionCast())
+                            {
+                                unwrapped = unwrapped -> CastExpressionCast() -> expression;
+                            }
+
+                            TypeSymbol* arg_type = unwrapped -> Type();
+                            if (! arg_type || arg_type == control.no_type)
+                                continue;
+
+                            // Check parameterized super (for anonymous classes)
+                            ParameterizedType* param_type = arg_type -> GetParameterizedSuper();
+                            if (param_type)
+                            {
+                                // Search for the type parameter in this parameterized type
+                                TypeSymbol* generic = param_type -> generic_type;
+                                if (generic)
+                                {
+                                    for (unsigned k = 0; k < generic -> NumTypeParameters(); k++)
+                                    {
+                                        TypeParameterSymbol* gtp = generic -> TypeParameter(k);
+                                        // Match by name since type parameters are separate instances
+                                        if (gtp && type_param -> name_symbol == gtp -> name_symbol &&
+                                            k < param_type -> NumTypeArguments())
+                                        {
+                                            Type* inferred = param_type -> TypeArgument(k);
+                                            if (inferred)
+                                            {
+                                                TypeSymbol* inferred_type = inferred -> Erasure();
+                                                if (inferred_type && inferred_type -> IsSubclass(control.Throwable()))
+                                                    ex_type = inferred_type;
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Check parameterized interfaces
+                            if (ex_type == method -> Throws(i))
+                            {
+                                for (unsigned iface_idx = 0; iface_idx < arg_type -> NumInterfaces(); iface_idx++)
+                                {
+                                    ParameterizedType* iface_param = arg_type -> ParameterizedInterface(iface_idx);
+                                    if (! iface_param)
+                                        continue;
+
+                                    TypeSymbol* iface_generic = iface_param -> generic_type;
+                                    if (! iface_generic)
+                                        continue;
+
+                                    for (unsigned k = 0; k < iface_generic -> NumTypeParameters(); k++)
+                                    {
+                                        TypeParameterSymbol* gtp = iface_generic -> TypeParameter(k);
+                                        if (gtp && type_param -> name_symbol == gtp -> name_symbol &&
+                                            k < iface_param -> NumTypeArguments())
+                                        {
+                                            Type* inferred = iface_param -> TypeArgument(k);
+                                            if (inferred)
+                                            {
+                                                TypeSymbol* inferred_type = inferred -> Erasure();
+                                                if (inferred_type && inferred_type -> IsSubclass(control.Throwable()))
+                                                    ex_type = inferred_type;
+                                            }
+                                            break;
+                                        }
+                                    }
+
+                                    if (ex_type != method -> Throws(i))
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                    break; // Found the type parameter for this exception
+                }
+            }
+
+            exceptions.AddElement(ex_type);
+        }
         // Next, add all subclasses thrown in method conflicts
         for (i = method_shadow -> NumConflicts(); --i >= 0; )
         {

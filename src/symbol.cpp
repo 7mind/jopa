@@ -849,6 +849,9 @@ MethodSymbol::~MethodSymbol()
     }
     delete bridges_generated;
     delete param_type_param_indices;
+    delete throws_type_param_indices;
+    delete throws_param_source_indices;
+    delete throws_param_type_arg_indices;
 }
 
 

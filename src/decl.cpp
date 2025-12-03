@@ -5330,6 +5330,80 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         method -> AddThrows(throw_expr -> symbol);
     }
 
+    // Track which throws clause entries use method type parameters and
+    // which parameter provides the type argument for inference
+    if (method -> NumTypeParameters() > 0 && method_declaration -> NumThrows() > 0)
+    {
+        unsigned num_throws = method_declaration -> NumThrows();
+        method -> throws_type_param_indices = new Tuple<int>(num_throws);
+        method -> throws_param_source_indices = new Tuple<int>(num_throws);
+        method -> throws_param_type_arg_indices = new Tuple<int>(num_throws);
+
+        for (unsigned t = 0; t < num_throws; t++)
+        {
+            int throws_type_param = -1;
+            int param_source = -1;
+            int type_arg_idx = -1;
+
+            AstTypeName* throw_expr = method_declaration -> Throw(t);
+            if (throw_expr && throw_expr -> name && ! throw_expr -> base_opt &&
+                ! throw_expr -> type_arguments_opt)
+            {
+                // Check if throws type is a type parameter (e.g., throws E)
+                const NameSymbol* throw_name = lex_stream -> NameSymbol(
+                    throw_expr -> name -> identifier_token);
+                for (unsigned i = 0; i < method -> NumTypeParameters(); i++)
+                {
+                    TypeParameterSymbol* type_param = method -> TypeParameter(i);
+                    if (type_param -> name_symbol == throw_name)
+                    {
+                        throws_type_param = (int) i;
+                        break;
+                    }
+                }
+
+                // If it's a type parameter, find which parameter can provide its value
+                if (throws_type_param >= 0)
+                {
+                    unsigned num_params = method_declarator -> NumFormalParameters();
+                    for (unsigned p = 0; p < num_params && param_source < 0; p++)
+                    {
+                        AstFormalParameter* formal = method_declarator -> FormalParameter(p);
+                        AstType* formal_type = formal -> type;
+                        AstTypeName* param_type_name = formal_type -> TypeNameCast();
+
+                        if (param_type_name && param_type_name -> type_arguments_opt)
+                        {
+                            unsigned num_type_args =
+                                param_type_name -> type_arguments_opt -> NumTypeArguments();
+                            for (unsigned a = 0; a < num_type_args; a++)
+                            {
+                                AstType* arg = param_type_name -> type_arguments_opt -> TypeArgument(a);
+                                AstTypeName* arg_name = arg -> TypeNameCast();
+                                if (arg_name && arg_name -> name && ! arg_name -> base_opt &&
+                                    ! arg_name -> type_arguments_opt)
+                                {
+                                    const NameSymbol* arg_sym = lex_stream -> NameSymbol(
+                                        arg_name -> name -> identifier_token);
+                                    if (arg_sym == throw_name)
+                                    {
+                                        param_source = (int) p;
+                                        type_arg_idx = (int) a;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            method -> throws_type_param_indices -> Next() = throws_type_param;
+            method -> throws_param_source_indices -> Next() = param_source;
+            method -> throws_param_type_arg_indices -> Next() = type_arg_idx;
+        }
+    }
+
     ThisMethod() = method_saved_context;
 
     // save for processing bodies later.
