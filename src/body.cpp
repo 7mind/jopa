@@ -1890,6 +1890,28 @@ void Semantic::ProcessReturnStatement(Ast* stmt)
         AstExpression* expression = return_statement -> expression_opt;
         ProcessExpressionOrStringConstant(expression);
         TypeSymbol* method_type = this_method -> Type();
+
+        // Target type inference: If the expression is a method call with an
+        // uninferred type parameter return type, use the target type (method_type).
+        AstMethodInvocation* method_call = expression -> MethodInvocationCast();
+        if (method_call && method_call -> needs_target_type_inference &&
+            method_type && method_type != control.no_type)
+        {
+            MethodSymbol* called_method = method_call -> symbol -> MethodCast();
+            if (called_method && called_method -> method_return_type_param_index >= 0)
+            {
+                // The method's return type is a type parameter - use target type
+                TypeSymbol* return_erasure = called_method -> Type();
+                // Check if target type is compatible with the return type's erasure
+                if (method_type -> IsSubclass(return_erasure))
+                {
+                    // Simple return type T - use target type directly
+                    method_call -> resolved_type = method_type;
+                    method_call -> needs_target_type_inference = false;
+                }
+            }
+        }
+
         // Use resolved_type if available (for generic method type inference)
         // Otherwise fall back to the erased Type()
         TypeSymbol* expression_type = expression -> resolved_type

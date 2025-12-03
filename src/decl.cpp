@@ -1127,9 +1127,24 @@ void Semantic::ProcessMethodTypeParameters(MethodSymbol* method,
 
             // Try to find in the containing type's package
             TypeSymbol* containing_type = method -> containing_type;
-            
+
+            // First, check if the bound is a previously defined method type parameter
+            // (e.g., for <X extends A, Y extends X>, Y's bound X is a type parameter)
+            for (unsigned k = 0; k < i; k++)
+            {
+                TypeParameterSymbol* prev_tp = method -> TypeParameter(k);
+                if (prev_tp && prev_tp -> name_symbol == bound_name)
+                {
+                    // The bound is another type parameter - use its erasure
+                    bound_type = prev_tp -> ErasedType();
+                    if (! bound_type)
+                        bound_type = control.Object();
+                    break;
+                }
+            }
+
             // Check if the bound refers to the containing type itself (T7022054pos1)
-            if (containing_type && containing_type->Identity() == bound_name)
+            if (! bound_type && containing_type && containing_type->Identity() == bound_name)
             {
                 bound_type = containing_type;
             }

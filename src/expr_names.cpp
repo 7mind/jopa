@@ -1239,6 +1239,47 @@ void Semantic::ProcessAmbiguousName(AstName* name)
             name -> symbol = variable_symbol;
 
             //
+            // For type parameter types with multiple bounds (intersection types):
+            // If the field's type is T where T extends A & B, we need to track
+            // the secondary bounds for method lookup. Set secondary_resolved_type
+            // to the second bound (first interface bound) so that methods from
+            // both A and B are accessible.
+            //
+            const char* gen_sig = variable_symbol -> GenericSignatureString();
+            if (gen_sig && gen_sig[0] == 'T')
+            {
+                // Field type is a type parameter (TV; format)
+                // Extract type parameter name
+                TypeSymbol* containing = variable_symbol -> ContainingType();
+                if (containing)
+                {
+                    // Find the type parameter with matching name
+                    for (unsigned i = 0; i < containing -> NumTypeParameters(); i++)
+                    {
+                        TypeParameterSymbol* tp = containing -> TypeParameter(i);
+                        if (tp)
+                        {
+                            const char* tp_utf8 = tp -> Utf8Name();
+                            if (tp_utf8)
+                            {
+                                unsigned tp_len = strlen(tp_utf8);
+                                // gen_sig is "T<name>;" - compare name part
+                                if (strncmp(gen_sig + 1, tp_utf8, tp_len) == 0 &&
+                                    gen_sig[tp_len + 1] == ';')
+                                {
+                                    // Found the type parameter
+                                    // If it has multiple bounds, set secondary for intersection
+                                    if (tp -> NumBounds() > 1)
+                                        name -> secondary_resolved_type = tp -> Bound(1);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            //
             // Type substitution for fields inherited from generic superclasses:
             // If a field's declared type is a type parameter (e.g., T value in class Value<T>),
             // and we're accessing it from a subclass with concrete type arguments
