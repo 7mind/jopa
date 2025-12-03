@@ -1,8 +1,8 @@
 # JDK 7 Compliance Failure Analysis & Roadmap
 
-**Date:** 2025-12-02
-**Status:** 88.6% Pass Rate (674/761)
-**Remaining Failures:** 87
+**Date:** 2025-12-03
+**Status:** 84.7% Pass Rate on tools/javac (516/609), 71.2% Overall (542/761)
+**Remaining Failures:** 93 (tools/javac), 219 (overall including javadoc stub failures)
 
 ## 1. Failure Categories (Detailed Analysis)
 
@@ -299,7 +299,43 @@ interface FooList<T extends Foo> extends List<T> {}
 **Results:**
 - `T6330931.java`: Now passes (wildcard with `? super` bounds)
 - `T5097548b.java`: Now passes (unbounded wildcard with F-bounded type parameter)
-- JDK7 compliance: 677/761 (89.0%, +2)
+
+### Phase 3f: Generic Signature Parsing from Class Files ✅ COMPLETE (2025-12-03)
+
+**Problem:** When reading methods from class files that return parameterized types like `Set<Map.Entry<K,V>>`, the `return_parameterized_type` wasn't being constructed. This caused foreach loops to fail because the iterator element type couldn't be inferred.
+
+**Example:**
+```java
+// In JarVerifier.java:
+for (Entry<String, Attributes> me : entries.entrySet()) {
+    // Failed: element type was Object, not Map.Entry<String,Attributes>
+}
+```
+
+**Root Causes Fixed:**
+
+1. **Field generic signature storage** (`symbol.h`, `decl.cpp`, `class.cpp`): Added `generic_signature` field to `VariableSymbol` to store type parameter references (format: `TV;`) for fields inherited from generic superclasses. This allows type substitution during field access.
+
+2. **Signature attribute emission** (`bytecode_init.cpp`): Extended signature attribute emission to cover fields with type parameter types and methods with parameterized return types.
+
+3. **Parameterized return type parsing** (`class.cpp:2721-2837`): Added code to parse complex parameterized return types from generic signatures. For signatures like `()Ljava/util/Set<Ljava/util/Map$Entry<TK;TV;>;>;`, the code now:
+   - Extracts the base type name and resolves it via `ReadTypeFromSignature`
+   - Parses type arguments including type parameter references (`TK;`, `TV;`)
+   - Constructs `ParameterizedType` with proper type argument references
+
+**Fix Applied:**
+```cpp
+// Parse the base type from the signature (between 'L' and '<')
+const char* type_name_start = p + 1; // skip 'L'
+int type_name_len = search - type_name_start;
+TypeSymbol* base_type = ReadTypeFromSignature(
+    type, type_name_start, type_name_len, tok);
+```
+
+**Results:**
+- GNU Classpath bootstrap: COMPLETE (all files compile)
+- JarVerifier.java and similar Map.entrySet() patterns: Now work correctly
+- Primary test suite: 214/214 tests pass
 
 ---
 
@@ -318,58 +354,77 @@ The ECJ build target has been added to `vendor/CMakeLists.txt`. ECJ 4.2.1 compil
 
 ## 4. Roadmap to 95%+ Compliance
 
-### Phase 3: Advanced Type Inference (High Impact - ~25 tests)
-**Goal:** Fix remaining generic type inference issues
-**Status:** Not started
+### Phase 4: Remaining Type Inference Issues (High Impact - ~20 tests)
+**Goal:** Fix remaining generic type inference edge cases
+**Status:** In Progress
 **Priority:** HIGH
 
-Key issues to address:
-1. **Ternary operator type inference** (`Conditional.java`): When both branches implement a common interface, result should be that interface, not `Object`
-2. **Nested generic method calls** (`T6650759a.java`): Target type inference should propagate through nested calls like `testSet(getGenericValue(...))`
-3. **Wildcard capture** (`T6330931.java`, `T5097548b.java`): `List<? extends Foo>.get(0)` should return `Foo`, not `Object`
-4. **Recursive bounds** (`T6650759f.java`): `C<X extends D>` should properly validate bounds
+**Current Failure Breakdown (tools/javac only - 93 failures):**
 
-### Phase 4: Expand API Stubs (Medium Impact - ~34 tests)
-**Goal:** Make tool tests pass
+| Category | Count | Description |
+|----------|-------|-------------|
+| Multi-file tests | 13 | Need sourcepath compilation support |
+| Missing ToolTester stub | 12 | Test infrastructure stub |
+| Method overload resolution | 6 | Generic method signature matching |
+| Missing List import | 4 | Stub runtime needs java.util.List |
+| Internal javac API | 3 | com.sun.tools.javac.code.* stubs |
+| Rare types (static nested) | 4 | Static nested classes in generics |
+| Other edge cases | ~51 | Various specific issues |
+
+**Key issues to address:**
+1. **Rare types** (`Rare8.java`, `Rare9.java`, `Rare10.java`, `Rare11.java`): Static nested classes in generic contexts require qualified type names
+2. **Parametric exceptions** (`ParametricException.java`): Generic exception type inference
+3. **Recursive bounds** (`T6650759f.java`): Complex F-bounded polymorphism
+4. **Bridge methods** (`OverrideBridge.java`): Bridge method visibility issues
+
+### Phase 5: Expand API Stubs (Medium Impact - ~115 tests)
+**Goal:** Make javadoc and tool tests pass
 **Status:** Not started
 **Priority:** MEDIUM (infrastructure work, doesn't affect real compilation)
 
 **Approach:**
-1. **`runtime/com/sun/javadoc`**: Add `Tester`, `RootDoc`, `Doclet`, `ClassDoc`, etc.
+1. **`runtime/com/sun/javadoc`**: Add `Tester` class and javadoc API (~103 tests affected)
 2. **`runtime/com/sun/tools/javac/api`**: Add/Update `JavacTask`, `JavacTaskImpl` with correct signatures
-3. **`runtime/com/sun/tools/classfile`**: Add missing fields (`descriptor`, `exception_table_langth`, etc.)
+3. **`runtime/com/sun/tools/classfile`**: Add missing fields (`descriptor`, `exception_table_length`, etc.)
+4. **Test infrastructure**: Add `ToolTester`, `Example`, etc. for test harness
 
-### Phase 5: Bridge Methods (Low Impact)
-**Goal:** Bytecode correctness
+### Phase 6: Multi-file Compilation Tests (Low Impact - ~13 tests)
+**Goal:** Fix tests that require sourcepath compilation
 **Status:** Not started
 **Priority:** LOW
 
 **Approach:**
-1. Review `GenerateBridgeMethods`: Ensure bridges are generated for covariant return types in interfaces and abstract classes.
+1. Either add sourcepath support to test runner, or
+2. Manually verify these tests work with proper sourcepath setup
 
 ---
 
 ## 5. Summary
 
-**Current Status: 89.0% (677/761)**
+**Current Status:**
+- **tools/javac tests:** 516/609 (84.7%)
+- **Overall (including javadoc):** 542/761 (71.2%)
+- **Primary test suite:** 214/214 (100%)
+- **Bootstrap:** COMPLETE
 
 | Category | Tests | Priority | Notes |
 |----------|-------|----------|-------|
 | Type Inference | ~20 | HIGH | Real compiler bugs |
-| API Stubs | 34 | MEDIUM | Infrastructure only |
-| Boxing/Generics | 3 | MEDIUM | Related to type inference |
-| Misc | ~27 | LOW | Edge cases |
+| API Stubs (javadoc) | ~103 | MEDIUM | Infrastructure only |
+| API Stubs (other) | ~12 | MEDIUM | ToolTester, etc. |
+| Multi-file tests | 13 | LOW | Sourcepath setup |
+| Misc | ~20 | LOW | Edge cases |
 
-**Remaining Phase 3 Issues:**
-- F-bounded polymorphism with recursive bounds (`T6650759f.java`, `T6650759j.java`)
-- Complex generic type inference edge cases
-
-**Recently Fixed (Phase 3b, 3c, 3d & 3e):**
-- ✅ Intersection types in ternary operator (`Conditional.java`)
-- ✅ Nested generic method call inference (`T6650759a.java`, `T6650759l.java`)
+**Recently Fixed (Phase 3d, 3e, 3f):**
 - ✅ Inherited generic field type substitution (`T6369051.java`)
 - ✅ Wildcard capture for `? super` and unbounded `?` (`T6330931.java`, `T5097548b.java`)
+- ✅ Parameterized return type parsing from class files (GNU Classpath bootstrap)
+- ✅ Generic signature storage for inherited fields with type parameters
 
-**Recommendation:** Continue Phase 3 (Advanced Type Inference) to improve real-world compilation. The API stub tests (Phase 4) are infrastructure-only and don't affect JOPA's ability to compile real Java code.
+**Next Steps (Recommended Order):**
+1. **Rare types** - Fix static nested class access in generic contexts (4 tests)
+2. **Method overload** - Fix generic method signature matching (6 tests)
+3. **Stub expansion** - Add java.util.List, Queue, LinkedHashSet to stubs (4 tests)
+4. **ToolTester stub** - Add test harness classes (12 tests)
 
 **Bootstrap Status:** COMPLETE - JOPA can compile GNU Classpath, JamVM, Apache Ant, and ECJ from source, creating a fully self-contained Java development environment with no binary blobs.
