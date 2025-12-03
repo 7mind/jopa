@@ -11,11 +11,13 @@ Java 8 support is limited to default methods; other Java 8 features are intentio
 
 Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 
-How many bugs are here? Plenty. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
+## FAQ
+
+- **Christ, does this thing even work?** Yes, it can compile many complex Java projects of that era and the compiled code executes.
+- **How many bugs are there in JOPA?** Plenty. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot), but the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
-
-JOPA has a flaw: its memory consumption might be quiet high (tens of GiBs of RAM) due to the way the generics are implemented.
+- **How compliant it with Java specifications?** Only God knows. Usually JOPA spits out bytecode which looks like bytecode and runs like bytecode, but its typer is an abyss, don't stare into it. I think my dog is more compliant with Java specifications, but somehow JOPA works and builds complex projects.
 
 ## Achievement Unlocked: Bootstrapping ECJ and Ant
 
