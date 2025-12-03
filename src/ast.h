@@ -804,11 +804,13 @@ class AstExpression : public AstMemberValue
 public:
     LiteralValue* value; // The compile-time constant value of the expression.
     TypeSymbol* resolved_type; // For type substitution in generics (overrides symbol's type)
+    TypeSymbol* secondary_resolved_type; // For intersection types (wildcard capture with extends)
     ParameterizedType* resolved_parameterized_type; // For tracking nested parameterized types
 
     inline AstExpression(AstKind k)
         : AstMemberValue(k, EXPRESSION)
         , resolved_type(NULL)
+        , secondary_resolved_type(NULL)
         , resolved_parameterized_type(NULL)
     {}
     ~AstExpression() {}

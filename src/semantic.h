@@ -1227,7 +1227,8 @@ private:
     MethodShadowSymbol* FindMethodInEnvironment(SemanticEnvironment*&,
                                                 AstMethodInvocation*);
     MethodShadowSymbol* FindMethodInType(TypeSymbol*, AstMethodInvocation*,
-                                         NameSymbol* = NULL);
+                                         NameSymbol* = NULL,
+                                         bool suppress_error = false);
 
     void ReportVariableNotFound(AstExpression*, TypeSymbol*);
     void FindVariableInEnvironment(Tuple<VariableSymbol*>&,

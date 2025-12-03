@@ -250,7 +250,11 @@ MethodShadowSymbol* Semantic::FindMethodMember(TypeSymbol* type,
             return shadow;
         }
 
-        shadow = FindMethodInType(type, method_call);
+        // Check if base has a secondary type from intersection (wildcard capture).
+        // If so, suppress error on first lookup so we can try secondary type.
+        TypeSymbol* secondary_type = base -> secondary_resolved_type;
+        bool has_secondary = secondary_type && secondary_type != type;
+        shadow = FindMethodInType(type, method_call, NULL, has_secondary);
         MethodSymbol* method = (shadow ? shadow -> method_symbol
                                 : (MethodSymbol*) NULL);
         if (method)
@@ -347,6 +351,22 @@ MethodShadowSymbol* Semantic::FindMethodMember(TypeSymbol* type,
         }
         else
         {
+            // Method not found in primary type. Check secondary type from
+            // intersection type (wildcard capture). For G1<? extends I2> where
+            // G1<T extends I1>, the captured type has bound I1 & I2.
+            if (has_secondary)
+            {
+                shadow = FindMethodInType(secondary_type, method_call);
+                MethodSymbol* method = (shadow ? shadow -> method_symbol : NULL);
+                if (method)
+                {
+                    MethodInvocationConversion(method_call -> arguments, method);
+                    method_call -> symbol = method;
+                    return shadow;
+                }
+                // Not found in either type - report error now
+                ReportMethodNotFound(method_call, type);
+            }
             method_call -> symbol = control.no_type;
         }
     }
@@ -965,30 +985,47 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 TypeSymbol* substituted = type_arg -> Erasure();
 
                 //
-                // Wildcard capture: For wildcards with ? super X or unbounded ?,
-                // the erasure returns Object. But the correct upper bound should
-                // come from the corresponding type parameter's bound.
+                // Wildcard capture: For wildcards, the correct upper bound should
+                // come from the corresponding type parameter's bound (JLS 5.1.10).
                 //
-                // Example: FooList<T extends Foo> and FooList<? super Bar>
-                // The wildcard ? super Bar has upper bound Foo (from T's bound).
+                // For ? super X or unbounded ?, use the type parameter's bound.
+                // For ? extends X, use the intersection of X and the type parameter's
+                // bound. Since we can't represent intersections, we use the type
+                // parameter's bound to ensure its contract is honored.
+                //
+                // Example: G1<T extends I1> and G1<? extends I2>
+                // The captured type should have upper bound glb(I1, I2) = I1 & I2.
+                // We use I1 (type param bound) to make T's methods available.
                 //
                 if (type_arg -> IsWildcard())
                 {
                     WildcardType* wildcard = type_arg -> GetWildcard();
-                    if (wildcard -> IsSuper() || wildcard -> IsUnbounded())
+                    TypeSymbol* generic_type = param_type -> generic_type;
+                    if (generic_type && param_index < generic_type -> NumTypeParameters())
                     {
-                        // Get the corresponding type parameter's bound
-                        TypeSymbol* generic_type = param_type -> generic_type;
-                        if (generic_type && param_index < generic_type -> NumTypeParameters())
+                        TypeParameterSymbol* type_param = generic_type -> TypeParameter(param_index);
+                        if (type_param)
                         {
-                            TypeParameterSymbol* type_param = generic_type -> TypeParameter(param_index);
-                            if (type_param)
+                            TypeSymbol* type_param_bound = type_param -> ErasedType();
+                            if (wildcard -> IsSuper() || wildcard -> IsUnbounded())
                             {
-                                TypeSymbol* bound = type_param -> ErasedType();
-                                if (bound)
-                                    substituted = bound;
+                                // Use type parameter's bound directly
+                                if (type_param_bound)
+                                    substituted = type_param_bound;
                                 else
-                                    substituted = control.Object();  // Unbounded type param
+                                    substituted = control.Object();
+                            }
+                            else if (wildcard -> IsExtends() && type_param_bound)
+                            {
+                                // For ? extends X, captured type has bound glb(X, type_param_bound).
+                                // We use type_param_bound as primary to ensure type parameter's
+                                // contract methods are available. The wildcard's explicit bound X
+                                // is stored as secondary to enable intersection type method lookup.
+                                TypeSymbol* wildcard_bound = substituted; // Original erasure = wildcard bound
+                                substituted = type_param_bound;
+                                // Store the wildcard bound for secondary method lookup
+                                if (wildcard_bound && wildcard_bound != type_param_bound)
+                                    method_call -> secondary_resolved_type = wildcard_bound;
                             }
                         }
                     }

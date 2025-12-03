@@ -5735,7 +5735,12 @@ TypeSymbol* Semantic::FindType(TokenIndex identifier_token)
             // non-static member types (see tools/javac/generics/rare/Rare8.java).
             // We relax the check here to match javac behavior.
             //
-            if (type -> owner == env -> Type())
+            // Additionally, sibling member types (both directly contained in the
+            // same enclosing class) should be accessible. A static nested class
+            // can refer to a sibling inner class by simple name (Rare10.java).
+            //
+            if (type -> owner == env -> Type() &&
+                this_type -> ContainingType() != type -> ContainingType())
             {
                 ReportSemError(SemanticError::STATIC_TYPE_ACCESSING_MEMBER_TYPE,
                                identifier_token,
