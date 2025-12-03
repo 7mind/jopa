@@ -11,6 +11,7 @@ public final class Files {
     public static void delete(Path path) throws IOException {}
     public static boolean deleteIfExists(Path path) throws IOException { return false; }
     public static boolean exists(Path path, LinkOption... options) { return false; }
+    public static Path createDirectory(Path dir, java.nio.file.attribute.FileAttribute<?>... attrs) throws IOException { return null; }
     public static Path createDirectories(Path dir, java.nio.file.attribute.FileAttribute<?>... attrs) throws IOException { return null; }
     public static Path copy(Path source, Path target, CopyOption... options) throws IOException { return null; }
     public static Path move(Path source, Path target, CopyOption... options) throws IOException { return null; }
