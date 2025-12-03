@@ -68,12 +68,13 @@ if [[ "$BUILD_FLAG" == "--build" ]]; then
         -DJOPA_ENABLE_SANITIZERS=ON \
         -DJOPA_ENABLE_CPPTRACE=ON \
         -DJOPA_ENABLE_JDK_COMPLIANCE_TESTS=ON \
+        -DJOPA_BUILD_BOOTSTRAP=OFF \
         -DJOPA_COMPLIANCE_TESTS_JDK7=$([[ "$JDK_VERSION" == "jdk7" ]] && echo "ON" || echo "OFF") \
         -DJOPA_COMPLIANCE_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF")
 
     echo ""
     echo "=== Building ==="
-    cmake --build "${BUILD_DIR}" --parallel "${NPROC}"
+    cmake --build "${BUILD_DIR}" --target jopa jopa-stub-rt --parallel "${NPROC}"
 fi
 
 # Check build directory and jopa executable exist

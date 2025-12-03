@@ -49,12 +49,13 @@ if [[ "$BUILD_FLAG" == "--build" ]]; then
         -DJOPA_ENABLE_SANITIZERS=ON \
         -DJOPA_ENABLE_CPPTRACE=ON \
         -DJOPA_ENABLE_JDK_PARSER_TESTS=ON \
+        -DJOPA_BUILD_BOOTSTRAP=OFF \
         -DJOPA_PARSER_TESTS_JDK7=$([[ "$JDK_VERSION" == "jdk7" ]] && echo "ON" || echo "OFF") \
         -DJOPA_PARSER_TESTS_JDK8=$([[ "$JDK_VERSION" == "jdk8" ]] && echo "ON" || echo "OFF")
 
     echo ""
     echo "=== Building ==="
-    cmake --build "${BUILD_DIR}" --parallel "${NPROC}"
+    cmake --build "${BUILD_DIR}" --target jopa --parallel "${NPROC}"
 fi
 
 # Check build directory exists
