@@ -464,6 +464,7 @@ public:
         , bridges_generated(NULL)
         , return_type_param_index(-1)
         , method_return_type_param_index(-1)
+        , return_type_is_enclosing_type_param(false)
         , param_type_param_indices(NULL)
         , throws_type_param_indices(NULL)
         , throws_param_source_indices(NULL)
@@ -644,6 +645,12 @@ public:
     // For example, in <T> T identity(T arg), method_return_type_param_index is 0.
     // This is different from return_type_param_index which is for class type parameters.
     int method_return_type_param_index;
+
+    // True if the return type is a type parameter from an ENCLOSING class (not the
+    // immediate containing class). For example, in A<T> { class C { T getT(); } },
+    // getT()'s return_type_is_enclosing_type_param is true.
+    // This flag triggers signature generation even when return_type_param_index is -1.
+    bool return_type_is_enclosing_type_param;
 
     // For each formal parameter, stores the index of the method type parameter it uses.
     // -1 means the parameter doesn't use a method type parameter.

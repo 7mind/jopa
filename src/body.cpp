@@ -2651,7 +2651,10 @@ void Semantic::ProcessTryStatement(Ast* stmt)
     // environment of the enclosing block.
     //
     try_statement -> processing_try_block = false;
-    TryStatementStack().Pop();
+    // NOTE: Don't pop TryStatementStack yet - we need it on the stack while
+    // processing catch blocks so that UncaughtException can see the finally
+    // clause (if it can't complete normally, it suppresses exceptions from
+    // catch blocks). We'll pop it after processing all catch blocks.
     TryExceptionTableStack().Pop();
 
     Tuple<TypeSymbol*> catchable_exceptions;
@@ -2760,6 +2763,9 @@ void Semantic::ProcessTryStatement(Ast* stmt)
             }
         }
     }
+
+    // Now that all catch blocks are processed, pop the try statement from stack
+    TryStatementStack().Pop();
 
     if (TryExceptionTableStack().Top())
     {

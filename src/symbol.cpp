@@ -1384,6 +1384,8 @@ static int FindMethodTypeParameter(AstName* name, MethodSymbol* method, LexStrea
 //
 // Helper function to check if a name matches a class type parameter.
 // Returns the TypeParameterSymbol if found, NULL otherwise.
+// This checks both the immediate containing type and any enclosing types
+// (for inner classes that use type parameters from enclosing classes).
 //
 static TypeParameterSymbol* FindClassTypeParameter(AstName* name, MethodSymbol* method, LexStream* lex_stream)
 {
@@ -1394,12 +1396,17 @@ static TypeParameterSymbol* FindClassTypeParameter(AstName* name, MethodSymbol* 
     if (! name_sym)
         return NULL;
 
-    TypeSymbol* containing = method -> containing_type;
-    for (unsigned i = 0; i < containing -> NumTypeParameters(); i++)
+    // Walk up through containing types (for inner classes)
+    for (TypeSymbol* containing = method -> containing_type;
+         containing;
+         containing = containing -> ContainingType())
     {
-        TypeParameterSymbol* type_param = containing -> TypeParameter(i);
-        if (type_param -> name_symbol == name_sym)
-            return type_param;
+        for (unsigned i = 0; i < containing -> NumTypeParameters(); i++)
+        {
+            TypeParameterSymbol* type_param = containing -> TypeParameter(i);
+            if (type_param -> name_symbol == name_sym)
+                return type_param;
+        }
     }
     return NULL;
 }
@@ -1543,8 +1550,10 @@ void MethodSymbol::SetGenericSignature(Control& control)
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
     // 2. Return type is a class type parameter (return_type_param_index >= 0), OR
-    // 3. Return type is a parameterized type (return_parameterized_type != NULL)
-    if (NumTypeParameters() == 0 && return_type_param_index < 0 && ! return_parameterized_type)
+    // 3. Return type is a parameterized type (return_parameterized_type != NULL), OR
+    // 4. Return type is an enclosing class's type parameter (return_type_is_enclosing_type_param)
+    if (NumTypeParameters() == 0 && return_type_param_index < 0 &&
+        ! return_parameterized_type && ! return_type_is_enclosing_type_param)
         return;
 
     // Estimate size: type parameters + parameters + return type

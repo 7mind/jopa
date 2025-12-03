@@ -633,6 +633,32 @@ void Semantic::ProcessTypeHeader(AstClassDeclaration* declaration)
                 if (param_super)
                     type -> SetParameterizedSuper(param_super);
             }
+            // Handle parameterized inner class supertypes: D extends A<B>.C
+            // The type arguments are on the base (A<B>), not on the outer name (C)
+            else if (super_type_name && super_type_name -> base_opt)
+            {
+                AstTypeName* base_type_name = super_type_name -> base_opt -> TypeNameCast();
+                if (base_type_name && base_type_name -> type_arguments_opt)
+                {
+                    // Get the enclosing class type (A in A<B>.C)
+                    TypeSymbol* enclosing_type = super_type -> ContainingType();
+                    if (enclosing_type)
+                    {
+                        // Create ParameterizedType for the enclosing class (A<B>)
+                        ParameterizedType* param_enclosing = ProcessTypeArguments(
+                            enclosing_type, base_type_name -> type_arguments_opt);
+                        if (param_enclosing)
+                        {
+                            // Create a ParameterizedType for the inner class
+                            // that references the parameterized enclosing class
+                            ParameterizedType* param_super =
+                                new ParameterizedType(super_type, NULL);
+                            param_super -> enclosing_type = param_enclosing;
+                            type -> SetParameterizedSuper(param_super);
+                        }
+                    }
+                }
+            }
 
             while (super_type)
             {
@@ -3120,14 +3146,6 @@ void Semantic::ProcessTypeImportOnDemandDeclaration(AstImportDeclaration* import
     ProcessImportQualifiedName(import_declaration -> name);
     Symbol* symbol = import_declaration -> name -> symbol;
 
-    PackageSymbol* package = symbol -> PackageCast();
-    if (package && package -> directory.Length() == 0)
-    {
-        ReportSemError(SemanticError::PACKAGE_NOT_FOUND,
-                       import_declaration -> name,
-                       package -> PackageName());
-    }
-
     //
     // Two or more type-import-on-demand may name the same package; the effect
     // is as if there were only one such declaration. Likewise, importing the
@@ -3137,6 +3155,14 @@ void Semantic::ProcessTypeImportOnDemandDeclaration(AstImportDeclaration* import
     //
     if (symbol == this_package)
         return;
+
+    PackageSymbol* package = symbol -> PackageCast();
+    if (package && package -> directory.Length() == 0)
+    {
+        ReportSemError(SemanticError::PACKAGE_NOT_FOUND,
+                       import_declaration -> name,
+                       package -> PackageName());
+    }
     for (unsigned i = 0; i < import_on_demand_packages.Length(); i++)
     {
         if (symbol == import_on_demand_packages[i])
@@ -5170,13 +5196,34 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
         // It's a simple name - check if it matches a class type parameter
         const NameSymbol* type_name = lex_stream -> NameSymbol(
             return_type_name -> name -> identifier_token);
-        for (unsigned i = 0; i < this_type -> NumTypeParameters(); i++)
+        bool found = false;
+        // First check the immediate containing class
+        for (unsigned i = 0; i < this_type -> NumTypeParameters() && ! found; i++)
         {
             TypeParameterSymbol* type_param = this_type -> TypeParameter(i);
             if (type_param -> name_symbol == type_name)
             {
                 method -> return_type_param_index = (int) i;
-                break;
+                found = true;
+            }
+        }
+        // If not found, check enclosing classes (for inner classes)
+        if (! found)
+        {
+            for (TypeSymbol* enclosing = this_type -> ContainingType();
+                 enclosing && ! found;
+                 enclosing = enclosing -> ContainingType())
+            {
+                for (unsigned i = 0; i < enclosing -> NumTypeParameters() && ! found; i++)
+                {
+                    TypeParameterSymbol* type_param = enclosing -> TypeParameter(i);
+                    if (type_param -> name_symbol == type_name)
+                    {
+                        // Found in enclosing class - set flag for signature generation
+                        method -> return_type_is_enclosing_type_param = true;
+                        found = true;
+                    }
+                }
             }
         }
     }

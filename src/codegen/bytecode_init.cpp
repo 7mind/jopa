@@ -588,11 +588,12 @@ void ByteCode::BeginMethod(int method_index, MethodSymbol* msym)
     // Methods need signature if they have:
     // 1. Method type parameters (NumTypeParameters() > 0), OR
     // 2. Return type is a class type parameter (return_type_param_index >= 0), OR
-    // 3. Return type is a parameterized type (return_parameterized_type != NULL)
+    // 3. Return type is a parameterized type (return_parameterized_type != NULL), OR
+    // 4. Return type is an enclosing class's type parameter (return_type_is_enclosing_type_param)
     //
     if (control.option.target >= JopaOption::SDK1_5 &&
         (msym -> NumTypeParameters() > 0 || msym -> return_type_param_index >= 0 ||
-         msym -> return_parameterized_type))
+         msym -> return_parameterized_type || msym -> return_type_is_enclosing_type_param))
     {
         msym -> SetGenericSignature(control);
         if (msym -> GenericSignature())
