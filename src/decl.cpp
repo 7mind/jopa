@@ -1476,21 +1476,11 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
                 {
                     const NameSymbol* arg_name = lex_stream -> NameSymbol(
                         type_name -> name -> identifier_token);
-                    // Check processing_type's type parameters
-                    if (processing_type)
-                    {
-                        for (unsigned j = 0; j < processing_type -> NumTypeParameters(); j++)
-                        {
-                            TypeParameterSymbol* tp = processing_type -> TypeParameter(j);
-                            if (tp -> name_symbol == arg_name)
-                            {
-                                type_param_sym = tp;
-                                break;
-                            }
-                        }
-                    }
-                    // Also check enclosing method's type parameters
-                    if (! type_param_sym && ThisMethod())
+
+                    // Check method type parameters FIRST - they shadow class type params
+                    // This is important for generic methods like <S> ServiceLoader<S> load(...)
+                    // inside a generic class like class ServiceLoader<S>
+                    if (ThisMethod())
                     {
                         for (unsigned j = 0; j < ThisMethod() -> NumTypeParameters(); j++)
                         {
@@ -1499,6 +1489,28 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
                             {
                                 type_param_sym = tp;
                                 break;
+                            }
+                        }
+                    }
+
+                    // Then check class type parameters from:
+                    // 1. processing_type (used during header processing)
+                    // 2. ThisType() (used during member processing when processing_type is NULL)
+                    if (! type_param_sym)
+                    {
+                        TypeSymbol* type_param_source = processing_type;
+                        if (! type_param_source)
+                            type_param_source = ThisType();
+                        if (type_param_source)
+                        {
+                            for (unsigned j = 0; j < type_param_source -> NumTypeParameters(); j++)
+                            {
+                                TypeParameterSymbol* tp = type_param_source -> TypeParameter(j);
+                                if (tp -> name_symbol == arg_name)
+                                {
+                                    type_param_sym = tp;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -3449,6 +3461,35 @@ void Semantic::ProcessFieldDeclaration(AstFieldDeclaration* field_declaration)
             if (type_name && type_name -> parameterized_type)
             {
                 variable -> parameterized_type = type_name -> parameterized_type;
+            }
+            // If the field's type is a type parameter, set the generic signature
+            // This is needed for proper type substitution when the field is inherited
+            if (type_name && type_name -> name && ! type_name -> base_opt &&
+                ! type_name -> type_arguments_opt &&
+                this_type -> NumTypeParameters() > 0)
+            {
+                const NameSymbol* type_name_sym = lex_stream -> NameSymbol(
+                    type_name -> name -> identifier_token);
+                for (unsigned j = 0; j < this_type -> NumTypeParameters(); j++)
+                {
+                    TypeParameterSymbol* type_param = this_type -> TypeParameter(j);
+                    if (type_param -> name_symbol == type_name_sym)
+                    {
+                        // Build generic signature: T<name>;
+                        const char* tp_name = type_param -> Utf8Name();
+                        unsigned tp_name_len = strlen(tp_name);
+                        char* sig_str = new char[tp_name_len + 3];
+                        sig_str[0] = 'T';
+                        memcpy(sig_str + 1, tp_name, tp_name_len);
+                        sig_str[tp_name_len + 1] = ';';
+                        sig_str[tp_name_len + 2] = '\0';
+                        Utf8LiteralValue* sig_literal = control.Utf8_pool.
+                            FindOrInsert(sig_str, tp_name_len + 2);
+                        variable -> SetGenericSignature(sig_literal);
+                        delete [] sig_str;
+                        break;
+                    }
+                }
             }
             if (must_be_constant &&
                 (dims || ! variable_declarator -> variable_initializer_opt ||

@@ -2354,6 +2354,15 @@ void Semantic::ProcessClassFile(TypeSymbol* type, const char* buffer,
         symbol -> SetFlags(field -> Flags());
         symbol -> SetSignatureString(field -> Signature(pool, control),
                                      field -> SignatureLength(pool, control));
+        // Store generic signature if present (e.g., TV; for type parameter V)
+        const SignatureAttribute* gen_sig = field -> GenericSignature();
+        if (gen_sig)
+        {
+            const CPUtf8Info* sig_info = gen_sig -> Signature(pool);
+            Utf8LiteralValue* gen_sig_literal = control.Utf8_pool.
+                FindOrInsert(sig_info -> Bytes(), sig_info -> Length());
+            symbol -> SetGenericSignature(gen_sig_literal);
+        }
         if (field -> Deprecated())
             symbol -> MarkDeprecated();
         const CPInfo* value = field -> ConstantValue(pool);

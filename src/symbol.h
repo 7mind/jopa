@@ -1617,6 +1617,7 @@ public:
     Symbol* owner;
     LiteralValue* initial_value;
     Utf8LiteralValue* signature;
+    Utf8LiteralValue* generic_signature; // Generic signature (TV; format) from class file
     ParameterizedType* parameterized_type; // For tracking generic type arguments
 
     // Index of element in symbol_pool (in the relevant symbol table) that
@@ -1689,6 +1690,7 @@ public:
         , owner(NULL)
         , initial_value(NULL)
         , signature(NULL)
+        , generic_signature(NULL)
         , parameterized_type(NULL)
         , enum_ordinal(-1)
         , accessed_local(NULL)
@@ -1746,6 +1748,12 @@ public:
     {
         type_ = _type;
         signature = type_ -> signature;
+    }
+
+    void SetGenericSignature(Utf8LiteralValue* sig) { generic_signature = sig; }
+    const char* GenericSignatureString() const
+    {
+        return generic_signature ? generic_signature -> value : NULL;
     }
 
     void ProcessVariableSignature(Semantic*, TokenIndex);

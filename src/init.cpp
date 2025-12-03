@@ -57,6 +57,13 @@ void Semantic::ProcessVariableInitializer(AstVariableDeclarator* variable_declar
             }
         }
 
+        // Copy parameterized type from initializer expression to variable
+        // This enables chained method calls like: Set<T> set = getSet(...); set.iterator().next();
+        if (init -> resolved_parameterized_type && ! symbol -> parameterized_type)
+        {
+            symbol -> parameterized_type = init -> resolved_parameterized_type;
+        }
+
         if (field_type != init -> Type() && init -> Type() != control.no_type)
         {
             if (CanAssignmentConvert(field_type, init))

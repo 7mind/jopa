@@ -571,7 +571,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         // Also check if the base expression has resolved_parameterized_type (for chained calls)
         if (base)
         {
-            VariableSymbol* var = base -> symbol -> VariableCast();
+            VariableSymbol* var = base -> symbol ? base -> symbol -> VariableCast() : NULL;
             ParameterizedType* base_param_type = NULL;
 
             if (var && var -> parameterized_type)
@@ -1014,6 +1014,7 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     {
         int return_type_param = method -> method_return_type_param_index;
         TypeSymbol* inferred_type = NULL;
+        Type* inferred_full_type = NULL;  // Track full Type* for parameterized return types
 
         // Try to infer the type from actual arguments
         if (method -> param_type_param_indices)
@@ -1108,6 +1109,40 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     else
                     {
                         arg_type = arg -> Type();
+
+                        // For parameterized type arguments like Iterable<G>, extract the type argument
+                        // to infer the method's type parameter. Check multiple sources for parameterized type.
+                        ParameterizedType* arg_param_type = NULL;
+
+                        // Check if arg is a variable with a parameterized type
+                        if (arg -> symbol)
+                        {
+                            VariableSymbol* var = arg -> symbol -> VariableCast();
+                            if (var && var -> parameterized_type)
+                                arg_param_type = var -> parameterized_type;
+                        }
+                        // Check if arg expression has resolved_parameterized_type
+                        if (! arg_param_type && arg -> resolved_parameterized_type)
+                            arg_param_type = arg -> resolved_parameterized_type;
+
+                        // If we have a parameterized type with type arguments, extract the first one
+                        // For Iterable<G>, extract G as the inferred type
+                        if (arg_param_type && arg_param_type -> NumTypeArguments() > 0)
+                        {
+                            Type* first_type_arg = arg_param_type -> TypeArgument(0);
+                            if (first_type_arg && ! first_type_arg -> IsWildcard())
+                            {
+                                TypeSymbol* type_arg_erasure = first_type_arg -> Erasure();
+                                if (type_arg_erasure && type_arg_erasure != control.Object())
+                                {
+                                    arg_type = type_arg_erasure;
+                                    // Track the full Type* for constructing resolved_parameterized_type
+                                    // This is important when first_type_arg is a type parameter
+                                    inferred_full_type = first_type_arg;
+                                }
+                            }
+                        }
+
                         // For array parameters like T[], extract the element type from the argument
                         // For example, if argument is String[], we want String (not String[])
                         // so that the return type T[] becomes String[] (not String[][])
@@ -1226,6 +1261,57 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             {
                 method_call -> resolved_type = inferred_type;
             }
+
+            // Construct resolved_parameterized_type for chained method calls
+            // For <T> Set<T> getSet(Class<T> c) called with Class<U> where U is a type parameter,
+            // we need resolved_parameterized_type = Set<U> for set.iterator().next() to work
+            if (inferred_full_type && method -> return_parameterized_type &&
+                ! method_call -> resolved_parameterized_type)
+            {
+                ParameterizedType* ret_ptype = method -> return_parameterized_type;
+                // Substitute the method's type parameter with the inferred type
+                // The return type's type arguments reference the method's type parameters
+                Tuple<Type*>* new_type_args = new Tuple<Type*>(ret_ptype -> NumTypeArguments());
+                for (unsigned j = 0; j < ret_ptype -> NumTypeArguments(); j++)
+                {
+                    Type* type_arg = ret_ptype -> TypeArgument(j);
+                    if (type_arg && type_arg -> IsTypeParameter())
+                    {
+                        TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                        // Check if this type parameter belongs to the method
+                        bool is_method_type_param = false;
+                        for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                        {
+                            if (method -> TypeParameter(k) == tparam)
+                            {
+                                is_method_type_param = true;
+                                // If return type param index matches, use inferred_full_type
+                                if ((int)k == return_type_param)
+                                {
+                                    new_type_args -> Next() = inferred_full_type;
+                                }
+                                else
+                                {
+                                    // Different method type param - keep as-is or use erasure
+                                    new_type_args -> Next() = new Type(inferred_type);
+                                }
+                                break;
+                            }
+                        }
+                        if (!is_method_type_param)
+                        {
+                            // Not a method type param (class type param?) - keep as-is
+                            new_type_args -> Next() = type_arg;
+                        }
+                    }
+                    else
+                    {
+                        new_type_args -> Next() = type_arg ? type_arg : new Type(control.Object());
+                    }
+                }
+                ParameterizedType* substituted = new ParameterizedType(ret_ptype -> generic_type, new_type_args);
+                method_call -> resolved_parameterized_type = substituted;
+            }
         }
         //
         // Secondary inference: if the return type parameter is only constrained
@@ -1324,10 +1410,15 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
     // is itself generic. These may need target type inference if we haven't already
     // resolved the concrete return type.
     // Examples: <T> Container<T> of(Class<T> clazz), <T> List<T> emptyList()
+    // Skip if we already resolved the type from arguments - that takes precedence.
+    // Also skip if we have param_type_param_indices - the return_parameterized_type
+    // processing can infer from arguments.
     //
     if (method && method -> NumTypeParameters() > 0 &&
+        ! method_call -> resolved_type &&
         ! method_call -> resolved_parameterized_type &&
-        ! method_call -> needs_target_type_inference)
+        ! method_call -> needs_target_type_inference &&
+        ! method -> param_type_param_indices)
     {
         TypeSymbol* return_type = method -> Type();
         // If the return type is a generic class (has type parameters), mark for inference
@@ -1351,7 +1442,6 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         ! method_call -> needs_target_type_inference)
     {
         ParameterizedType* ret_ptype = method -> return_parameterized_type;
-
         // Get the receiver's parameterized type for substitution
         ParameterizedType* base_param_type = NULL;
         if (method_call -> base_opt)
@@ -1405,6 +1495,110 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         {
             // Perform substitution: create new type arguments with substituted types
             TypeSymbol* containing = method -> containing_type;
+
+            // First, find the correct type argument mapping from base_param_type to containing type
+            // The receiver may be a subtype of the containing type (e.g., Set<T> calling Collection.iterator())
+            // We need to walk up the hierarchy to find the type arguments for the containing type
+            ParameterizedType* containing_param_type = NULL;
+            if (base_param_type -> generic_type == containing)
+            {
+                containing_param_type = base_param_type;
+            }
+            else
+            {
+                // BFS to find the containing type in the interface hierarchy
+                TypeSymbol* receiver_type = base_param_type -> generic_type;
+                if (receiver_type)
+                {
+                    const int MAX_DEPTH = 10;
+                    struct SearchNode { TypeSymbol* type; ParameterizedType* param_type; };
+                    SearchNode queue[MAX_DEPTH * 4];
+                    int queue_start = 0, queue_end = 0;
+
+                    // Start with receiver's interfaces
+                    for (unsigned i = 0; i < receiver_type -> NumInterfaces() && queue_end < MAX_DEPTH * 4; i++)
+                    {
+                        ParameterizedType* iface_param = receiver_type -> ParameterizedInterface(i);
+                        if (iface_param)
+                        {
+                            Tuple<Type*>* subst_args = new Tuple<Type*>(iface_param -> NumTypeArguments());
+                            for (unsigned j = 0; j < iface_param -> NumTypeArguments(); j++)
+                            {
+                                Type* type_arg = iface_param -> TypeArgument(j);
+                                Type* subst_arg = type_arg;
+                                if (type_arg && type_arg -> IsTypeParameter())
+                                {
+                                    TypeParameterSymbol* tp = type_arg -> GetTypeParameter();
+                                    for (unsigned k = 0; k < receiver_type -> NumTypeParameters(); k++)
+                                    {
+                                        if (receiver_type -> TypeParameter(k) == tp &&
+                                            k < base_param_type -> NumTypeArguments())
+                                        {
+                                            subst_arg = base_param_type -> TypeArgument(k);
+                                            break;
+                                        }
+                                    }
+                                }
+                                subst_args -> Next() = subst_arg;
+                            }
+                            ParameterizedType* subst_iface = new ParameterizedType(iface_param -> generic_type, subst_args);
+                            queue[queue_end].type = iface_param -> generic_type;
+                            queue[queue_end].param_type = subst_iface;
+                            queue_end++;
+                        }
+                    }
+
+                    while (queue_start < queue_end && ! containing_param_type)
+                    {
+                        TypeSymbol* cur_type = queue[queue_start].type;
+                        ParameterizedType* cur_param = queue[queue_start].param_type;
+                        queue_start++;
+
+                        if (cur_type == containing)
+                        {
+                            containing_param_type = cur_param;
+                            break;
+                        }
+
+                        for (unsigned i = 0; i < cur_type -> NumInterfaces() && queue_end < MAX_DEPTH * 4; i++)
+                        {
+                            ParameterizedType* super_iface = cur_type -> ParameterizedInterface(i);
+                            if (super_iface)
+                            {
+                                Tuple<Type*>* new_args = new Tuple<Type*>(super_iface -> NumTypeArguments());
+                                for (unsigned j = 0; j < super_iface -> NumTypeArguments(); j++)
+                                {
+                                    Type* type_arg = super_iface -> TypeArgument(j);
+                                    Type* subst_arg = type_arg;
+                                    if (type_arg && type_arg -> IsTypeParameter())
+                                    {
+                                        TypeParameterSymbol* tp = type_arg -> GetTypeParameter();
+                                        for (unsigned k = 0; k < cur_type -> NumTypeParameters(); k++)
+                                        {
+                                            if (cur_type -> TypeParameter(k) == tp &&
+                                                cur_param && k < cur_param -> NumTypeArguments())
+                                            {
+                                                subst_arg = cur_param -> TypeArgument(k);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    new_args -> Next() = subst_arg;
+                                }
+                                ParameterizedType* new_param = new ParameterizedType(super_iface -> generic_type, new_args);
+                                queue[queue_end].type = super_iface -> generic_type;
+                                queue[queue_end].param_type = new_param;
+                                queue_end++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Use containing_param_type for substitution (fallback to base_param_type)
+            ParameterizedType* subst_source = containing_param_type ? containing_param_type : base_param_type;
+            TypeSymbol* subst_type = subst_source -> generic_type;
+
             Tuple<Type*>* new_type_args = new Tuple<Type*>(ret_ptype -> NumTypeArguments());
 
             for (unsigned i = 0; i < ret_ptype -> NumTypeArguments(); i++)
@@ -1416,13 +1610,13 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 {
                     // Simple type parameter - substitute directly
                     TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
-                    for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                    for (unsigned k = 0; subst_type && k < subst_type -> NumTypeParameters(); k++)
                     {
-                        if (containing -> TypeParameter(k) == tparam &&
-                            k < base_param_type -> NumTypeArguments())
+                        if (subst_type -> TypeParameter(k) == tparam &&
+                            k < subst_source -> NumTypeArguments())
                         {
-                            // Use the receiver's type argument
-                            new_arg = base_param_type -> TypeArgument(k);
+                            // Use the resolved type argument
+                            new_arg = subst_source -> TypeArgument(k);
                             break;
                         }
                     }
@@ -1456,12 +1650,12 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                             if (nested_arg && nested_arg -> IsTypeParameter())
                             {
                                 TypeParameterSymbol* tparam = nested_arg -> GetTypeParameter();
-                                for (unsigned k = 0; containing && k < containing -> NumTypeParameters(); k++)
+                                for (unsigned k = 0; subst_type && k < subst_type -> NumTypeParameters(); k++)
                                 {
-                                    if (containing -> TypeParameter(k) == tparam &&
-                                        k < base_param_type -> NumTypeArguments())
+                                    if (subst_type -> TypeParameter(k) == tparam &&
+                                        k < subst_source -> NumTypeArguments())
                                     {
-                                        subst_arg = base_param_type -> TypeArgument(k);
+                                        subst_arg = subst_source -> TypeArgument(k);
                                         break;
                                     }
                                 }
@@ -1491,7 +1685,263 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
         }
         else
         {
-            method_call -> resolved_parameterized_type = ret_ptype;
+            // Check if the return type references method type parameters
+            // that need to be inferred from arguments (for generic methods)
+            bool has_method_type_params = false;
+
+            if (method -> NumTypeParameters() > 0 && ret_ptype -> NumTypeArguments() > 0)
+            {
+                for (unsigned i = 0; i < ret_ptype -> NumTypeArguments() && !has_method_type_params; i++)
+                {
+                    Type* type_arg = ret_ptype -> TypeArgument(i);
+                    if (type_arg && type_arg -> IsTypeParameter())
+                    {
+                        TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                        for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                        {
+                            if (method -> TypeParameter(k) == tparam)
+                            {
+                                has_method_type_params = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (has_method_type_params && method -> param_type_param_indices)
+            {
+                // Infer method type parameters from arguments
+                Tuple<Type*>* inferred_types = new Tuple<Type*>(method -> NumTypeParameters());
+                for (unsigned tp = 0; tp < method -> NumTypeParameters(); tp++)
+                    inferred_types -> Next() = NULL;
+
+                unsigned num_args = method_call -> arguments -> NumArguments();
+                unsigned num_params = method -> param_type_param_indices -> Length();
+                unsigned limit = (num_args < num_params) ? num_args : num_params;
+
+                for (unsigned i = 0; i < limit; i++)
+                {
+                    int param_type_param = (*(method -> param_type_param_indices))[i];
+                    if (param_type_param >= 0 && (unsigned)param_type_param < method -> NumTypeParameters())
+                    {
+                        AstExpression* arg = method_call -> arguments -> Argument(i);
+
+                        // Get parameterized type from argument
+                        ParameterizedType* arg_param_type = NULL;
+                        if (arg -> symbol)
+                        {
+                            VariableSymbol* var = arg -> symbol -> VariableCast();
+                            if (var && var -> parameterized_type)
+                                arg_param_type = var -> parameterized_type;
+                        }
+                        if (! arg_param_type && arg -> resolved_parameterized_type)
+                            arg_param_type = arg -> resolved_parameterized_type;
+
+                        if (arg_param_type && arg_param_type -> NumTypeArguments() > 0)
+                        {
+                            Type* first_type_arg = arg_param_type -> TypeArgument(0);
+                            if (first_type_arg && ! first_type_arg -> IsWildcard())
+                            {
+                                (*inferred_types)[param_type_param] = first_type_arg;
+                            }
+                        }
+                    }
+                }
+
+                // Substitute method type parameters in return type
+                Tuple<Type*>* new_type_args = new Tuple<Type*>(ret_ptype -> NumTypeArguments());
+                for (unsigned j = 0; j < ret_ptype -> NumTypeArguments(); j++)
+                {
+                    Type* type_arg = ret_ptype -> TypeArgument(j);
+                    Type* new_arg = NULL;
+
+                    if (type_arg && type_arg -> IsTypeParameter())
+                    {
+                        TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                        for (unsigned k = 0; k < method -> NumTypeParameters(); k++)
+                        {
+                            if (method -> TypeParameter(k) == tparam)
+                            {
+                                new_arg = (*inferred_types)[k];
+                                break;
+                            }
+                        }
+                    }
+                    if (!new_arg)
+                        new_arg = type_arg ? type_arg : new Type(control.Object());
+                    new_type_args -> Next() = new_arg;
+                }
+
+                ParameterizedType* substituted = new ParameterizedType(ret_ptype -> generic_type, new_type_args);
+                method_call -> resolved_parameterized_type = substituted;
+                delete inferred_types;
+            }
+            else
+            {
+                method_call -> resolved_parameterized_type = ret_ptype;
+            }
+        }
+    }
+
+    //
+    // Fallback: If method returns a generic type but return_parameterized_type is NULL
+    // (e.g., when loaded from class file), construct it from the return type and
+    // the receiver's parameterized type arguments.
+    // Example: set.iterator() where set is Set<T> and iterator() returns Iterator<E>
+    // (with E being Set's type param) - construct Iterator<T>
+    //
+    if (method && ! method_call -> resolved_parameterized_type && base)
+    {
+        TypeSymbol* return_type = method -> Type();
+        if (return_type && return_type -> NumTypeParameters() > 0 &&
+            method -> containing_type && method -> containing_type -> NumTypeParameters() > 0)
+        {
+            // Get receiver's parameterized type
+            ParameterizedType* base_param_type = NULL;
+            VariableSymbol* var = base -> symbol ? base -> symbol -> VariableCast() : NULL;
+            if (var && var -> parameterized_type)
+                base_param_type = var -> parameterized_type;
+            else if (base -> ExpressionCast() && base -> ExpressionCast() -> resolved_parameterized_type)
+                base_param_type = base -> ExpressionCast() -> resolved_parameterized_type;
+
+            // If receiver has parameterized type, find type arguments for method's containing type
+            // The method may be declared in a supertype (e.g., iterator() in Iterable, called on Set)
+            if (base_param_type)
+            {
+                TypeSymbol* containing = method -> containing_type;
+                ParameterizedType* containing_param_type = NULL;
+
+                // Check if the receiver's type directly matches the containing type
+                if (base_param_type -> generic_type == containing)
+                {
+                    containing_param_type = base_param_type;
+                }
+                else
+                {
+                    // Walk up the inheritance hierarchy to find how the receiver implements
+                    // the method's containing type. E.g., Set<T> -> Collection<T> -> Iterable<T>
+                    // We need to recursively search through interfaces since the containing type
+                    // may be a super-interface (e.g., Iterable is a super-interface of Collection)
+
+                    // Use a simple BFS-like approach to search the interface hierarchy
+                    // We keep track of the current type arguments at each level
+                    TypeSymbol* receiver_type = base_param_type -> generic_type;
+                    if (receiver_type)
+                    {
+                        // Stack of (type, parameterized_type_or_args) to process
+                        // We use a simple linear search with limited depth
+                        const int MAX_DEPTH = 10;
+                        struct SearchNode {
+                            TypeSymbol* type;
+                            ParameterizedType* param_type;  // Current substituted type args
+                        };
+                        SearchNode queue[MAX_DEPTH * 4];
+                        int queue_start = 0;
+                        int queue_end = 0;
+
+                        // Start with the receiver's interfaces
+                        for (unsigned i = 0; i < receiver_type -> NumInterfaces() && queue_end < MAX_DEPTH * 4; i++)
+                        {
+                            ParameterizedType* iface_param = receiver_type -> ParameterizedInterface(i);
+                            if (iface_param)
+                            {
+                                // Substitute type arguments using receiver's type args
+                                Tuple<Type*>* subst_args = new Tuple<Type*>(iface_param -> NumTypeArguments());
+                                for (unsigned j = 0; j < iface_param -> NumTypeArguments(); j++)
+                                {
+                                    Type* type_arg = iface_param -> TypeArgument(j);
+                                    Type* subst_arg = type_arg;
+                                    if (type_arg && type_arg -> IsTypeParameter())
+                                    {
+                                        TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                                        for (unsigned k = 0; k < receiver_type -> NumTypeParameters(); k++)
+                                        {
+                                            if (receiver_type -> TypeParameter(k) == tparam &&
+                                                k < base_param_type -> NumTypeArguments())
+                                            {
+                                                subst_arg = base_param_type -> TypeArgument(k);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    subst_args -> Next() = subst_arg;
+                                }
+                                ParameterizedType* subst_iface = new ParameterizedType(iface_param -> generic_type, subst_args);
+                                queue[queue_end].type = iface_param -> generic_type;
+                                queue[queue_end].param_type = subst_iface;
+                                queue_end++;
+                            }
+                        }
+
+                        // Process the queue
+                        while (queue_start < queue_end && ! containing_param_type)
+                        {
+                            TypeSymbol* cur_type = queue[queue_start].type;
+                            ParameterizedType* cur_param = queue[queue_start].param_type;
+                            queue_start++;
+
+                            // Check if this is the containing type
+                            if (cur_type == containing)
+                            {
+                                containing_param_type = cur_param;
+                                break;
+                            }
+
+                            // Add this type's interfaces to the queue
+                            for (unsigned i = 0; i < cur_type -> NumInterfaces() && queue_end < MAX_DEPTH * 4; i++)
+                            {
+                                ParameterizedType* super_iface = cur_type -> ParameterizedInterface(i);
+                                if (super_iface)
+                                {
+                                    // Substitute type arguments using current type's args
+                                    Tuple<Type*>* new_args = new Tuple<Type*>(super_iface -> NumTypeArguments());
+                                    for (unsigned j = 0; j < super_iface -> NumTypeArguments(); j++)
+                                    {
+                                        Type* type_arg = super_iface -> TypeArgument(j);
+                                        Type* subst_arg = type_arg;
+                                        if (type_arg && type_arg -> IsTypeParameter())
+                                        {
+                                            TypeParameterSymbol* tparam = type_arg -> GetTypeParameter();
+                                            for (unsigned k = 0; k < cur_type -> NumTypeParameters(); k++)
+                                            {
+                                                if (cur_type -> TypeParameter(k) == tparam &&
+                                                    cur_param && k < cur_param -> NumTypeArguments())
+                                                {
+                                                    subst_arg = cur_param -> TypeArgument(k);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        new_args -> Next() = subst_arg;
+                                    }
+                                    ParameterizedType* new_param = new ParameterizedType(super_iface -> generic_type, new_args);
+                                    queue[queue_end].type = super_iface -> generic_type;
+                                    queue[queue_end].param_type = new_param;
+                                    queue_end++;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Construct parameterized return type using the resolved containing type's arguments
+                if (containing_param_type)
+                {
+                    unsigned num_return_params = return_type -> NumTypeParameters();
+                    unsigned num_containing_args = containing_param_type -> NumTypeArguments();
+                    if (num_return_params <= num_containing_args)
+                    {
+                        Tuple<Type*>* new_type_args = new Tuple<Type*>(num_return_params);
+                        for (unsigned i = 0; i < num_return_params; i++)
+                        {
+                            new_type_args -> Next() = containing_param_type -> TypeArgument(i);
+                        }
+                        ParameterizedType* result = new ParameterizedType(return_type, new_type_args);
+                        method_call -> resolved_parameterized_type = result;
+                    }
+                }
+            }
         }
     }
 
@@ -1619,7 +2069,20 @@ void Semantic::ProcessClassLiteral(Ast* expr)
         class_lit -> symbol = var;
         class_lit -> resolution_opt = name;
     }
-    else class_lit -> symbol = control.Class();
+    else
+    {
+        class_lit -> symbol = control.Class();
+        //
+        // For generics support: Provider.class has type Class<Provider>.
+        // Create a parameterized type for the class literal so that
+        // method type parameter inference works correctly.
+        // E.g., for ServiceLoader.load(Class<S> service), passing Provider.class
+        // should infer S = Provider.
+        //
+        Tuple<Type*>* type_args = new Tuple<Type*>(1);
+        type_args -> Next() = new Type(type);  // The type argument is the class type
+        class_lit -> resolved_parameterized_type = new ParameterizedType(control.Class(), type_args);
+    }
 }
 
 

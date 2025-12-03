@@ -1266,30 +1266,139 @@ void Semantic::ProcessAmbiguousName(AstName* name)
                 // If we found the parameterized superclass, try to substitute
                 if (param_super && param_super -> NumTypeArguments() > 0)
                 {
-                    for (unsigned i = 0; i < field_containing_type -> NumTypeParameters(); i++)
+                    // Get the field's declared type name
+                    // We need to match by NAME, not by erasure, because multiple
+                    // type parameters can have the same erasure (e.g., K and V both erase to Object)
+                    const char* field_type_param_name = NULL;
+
+                    // First check if the field's generic signature indicates a type parameter (TV; format)
+                    // Use GenericSignatureString() which returns the generic signature, not erased
+                    const char* sig_str = variable_symbol -> GenericSignatureString();
+                    if (sig_str && sig_str[0] == 'T')
                     {
-                        TypeParameterSymbol* type_param = field_containing_type -> TypeParameter(i);
-                        // ErasedType() returns NULL for unbounded type parameters, meaning Object
-                        TypeSymbol* erased = type_param ? type_param -> ErasedType() : NULL;
-                        if (!erased)
-                            erased = control.Object();  // Unbounded T erases to Object
-                        if (type_param && erased == field_type)
+                        // Type parameter signature: T<name>;
+                        // Extract the type parameter name between 'T' and ';'
+                        field_type_param_name = sig_str + 1;
+                    }
+
+                    // Also try from source file if available
+                    const wchar_t* field_type_name_wide = NULL;
+                    AstFieldDeclaration* field_decl = variable_symbol -> field_declaration ?
+                        variable_symbol -> field_declaration -> FieldDeclarationCast() : NULL;
+                    // Use the field's containing type's lex_stream (which may be different from current file)
+                    if (field_decl && field_decl -> type &&
+                        field_containing_type -> file_symbol &&
+                        field_containing_type -> file_symbol -> lex_stream)
+                    {
+                        LexStream* field_lex_stream = field_containing_type -> file_symbol -> lex_stream;
+                        AstTypeName* type_name_ast = field_decl -> type -> TypeNameCast();
+                        if (type_name_ast && type_name_ast -> name && ! type_name_ast -> base_opt &&
+                            ! type_name_ast -> type_arguments_opt)
                         {
-                            // The field's type is this type parameter's erasure
-                            // Substitute with the actual type argument
-                            if (i < param_super -> NumTypeArguments())
+                            // Simple type name - could be a type parameter
+                            field_type_name_wide = field_lex_stream -> NameString(type_name_ast -> name -> identifier_token);
+                        }
+                    }
+
+                    bool found_match = false;
+                    if (field_type_param_name)
+                    {
+                        // Match using signature's type parameter name (narrow string)
+                        // The name is from 'T' to ';' (exclusive)
+                        for (unsigned i = 0; i < field_containing_type -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = field_containing_type -> TypeParameter(i);
+                            if (type_param)
                             {
-                                Type* type_arg = param_super -> TypeArgument(i);
-                                if (type_arg)
+                                // Compare with type parameter's Utf8 name
+                                const char* tp_utf8 = type_param -> Utf8Name();
+                                if (tp_utf8)
                                 {
-                                    TypeSymbol* substituted = type_arg -> Erasure();
-                                    if (substituted && substituted != control.no_type)
+                                    // Check if the names match (field_type_param_name ends at ';')
+                                    unsigned tp_len = strlen(tp_utf8);
+                                    if (strncmp(field_type_param_name, tp_utf8, tp_len) == 0 &&
+                                        field_type_param_name[tp_len] == ';')
                                     {
-                                        name -> resolved_type = substituted;
+                                        // Match! Substitute with the actual type argument
+                                        if (i < param_super -> NumTypeArguments())
+                                        {
+                                            Type* type_arg = param_super -> TypeArgument(i);
+                                            if (type_arg)
+                                            {
+                                                TypeSymbol* substituted = type_arg -> Erasure();
+                                                // ErasedType() returns NULL for unbounded type parameters, use Object
+                                                if (! substituted)
+                                                    substituted = control.Object();
+                                                if (substituted && substituted != control.no_type)
+                                                {
+                                                    name -> resolved_type = substituted;
+                                                    found_match = true;
+                                                }
+                                            }
+                                        }
+                                        break;
                                     }
                                 }
                             }
-                            break;
+                        }
+                    }
+                    else if (field_type_name_wide)
+                    {
+                        // Match using source file wide string
+                        for (unsigned i = 0; i < field_containing_type -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = field_containing_type -> TypeParameter(i);
+                            if (type_param && wcscmp(field_type_name_wide, type_param -> Name()) == 0)
+                            {
+                                // Match! Substitute with the actual type argument
+                                if (i < param_super -> NumTypeArguments())
+                                {
+                                    Type* type_arg = param_super -> TypeArgument(i);
+                                    if (type_arg)
+                                    {
+                                        TypeSymbol* substituted = type_arg -> Erasure();
+                                        // ErasedType() returns NULL for unbounded type parameters, use Object
+                                        if (! substituted)
+                                            substituted = control.Object();
+                                        if (substituted && substituted != control.no_type)
+                                        {
+                                            name -> resolved_type = substituted;
+                                            found_match = true;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    if (!found_match)
+                    {
+                        // Fall back to erasure comparison for fields without signature info
+                        for (unsigned i = 0; i < field_containing_type -> NumTypeParameters(); i++)
+                        {
+                            TypeParameterSymbol* type_param = field_containing_type -> TypeParameter(i);
+                            // ErasedType() returns NULL for unbounded type parameters, meaning Object
+                            TypeSymbol* erased = type_param ? type_param -> ErasedType() : NULL;
+                            if (!erased)
+                                erased = control.Object();  // Unbounded T erases to Object
+                            if (type_param && erased == field_type)
+                            {
+                                // The field's type is this type parameter's erasure
+                                // Substitute with the actual type argument
+                                if (i < param_super -> NumTypeArguments())
+                                {
+                                    Type* type_arg = param_super -> TypeArgument(i);
+                                    if (type_arg)
+                                    {
+                                        TypeSymbol* substituted = type_arg -> Erasure();
+                                        if (substituted && substituted != control.no_type)
+                                        {
+                                            name -> resolved_type = substituted;
+                                        }
+                                    }
+                                }
+                                break;
+                            }
                         }
                     }
                 }

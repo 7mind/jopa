@@ -1890,7 +1890,10 @@ void Semantic::ProcessReturnStatement(Ast* stmt)
         AstExpression* expression = return_statement -> expression_opt;
         ProcessExpressionOrStringConstant(expression);
         TypeSymbol* method_type = this_method -> Type();
-        TypeSymbol* expression_type = expression -> Type();
+        // Use resolved_type if available (for generic method type inference)
+        // Otherwise fall back to the erased Type()
+        TypeSymbol* expression_type = expression -> resolved_type
+            ? expression -> resolved_type : expression -> Type();
 
         if (method_type == control.void_type ||
             this_method -> name_symbol == control.init_name_symbol)

@@ -3099,7 +3099,7 @@ public:
         return attr_constantvalue ? attr_constantvalue -> Value(constant_pool)
             : (const CPInfo*) NULL;
     }
-    
+    const SignatureAttribute* GenericSignature() const { return attr_signature; }
 
     inline void Put(OutputBuffer& out) const
     {
