@@ -1652,8 +1652,11 @@ void MethodSymbol::SetGenericSignature(Control& control)
     else if (return_type_param_index >= 0 && containing_type)
     {
         // Return type is a class type parameter - use TName; format
-        // Get type parameter from containing type
-        TypeParameterSymbol* type_param = containing_type -> TypeParameter(return_type_param_index);
+        // Get type parameter from the right type: enclosing class if flag is set
+        TypeSymbol* type_owner = return_type_is_enclosing_type_param && enclosing_type_for_return_param
+            ? enclosing_type_for_return_param : containing_type;
+        TypeParameterSymbol* type_param = (return_type_param_index < (int)type_owner -> NumTypeParameters())
+            ? type_owner -> TypeParameter(return_type_param_index) : NULL;
         if (type_param)
         {
             buffer[length++] = 'T';

@@ -5219,8 +5219,10 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
                     TypeParameterSymbol* type_param = enclosing -> TypeParameter(i);
                     if (type_param -> name_symbol == type_name)
                     {
-                        // Found in enclosing class - set flag for signature generation
+                        // Found in enclosing class - set both flag and index for type substitution
                         method -> return_type_is_enclosing_type_param = true;
+                        method -> return_type_param_index = (int) i;
+                        method -> enclosing_type_for_return_param = enclosing;
                         found = true;
                     }
                 }

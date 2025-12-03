@@ -1093,6 +1093,41 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
             }
         }
 
+        // Case 4: Inner class ("rare type") access - method return type is a type
+        // parameter from an enclosing class.
+        // Example: class A<T> { class B { T rett(); } }
+        //          class C extends A<String> { static class D { B b; b.rett(); } }
+        // Here B.rett() returns T which is from A. We need to find that C extends A<String>
+        // so we can substitute T=String.
+        if (! param_type && method -> return_type_is_enclosing_type_param &&
+            method -> enclosing_type_for_return_param)
+        {
+            TypeSymbol* enclosing_class = method -> enclosing_type_for_return_param;
+            // Look in the current context to see if we extend/implement enclosing_class
+            // with specific type arguments.
+            TypeSymbol* this_type = ThisType();
+            for (TypeSymbol* search_type = this_type;
+                 search_type && ! param_type;
+                 search_type = search_type -> ContainingType())
+            {
+                // Check if search_type extends enclosing_class
+                TypeSymbol* super_chain = search_type;
+                while (super_chain && ! param_type)
+                {
+                    if (super_chain -> HasParameterizedSuper())
+                    {
+                        ParameterizedType* psuper = super_chain -> GetParameterizedSuper();
+                        if (psuper -> generic_type == enclosing_class)
+                        {
+                            param_type = psuper;
+                            break;
+                        }
+                    }
+                    super_chain = super_chain -> super;
+                }
+            }
+        }
+
         // Substitute if we found the parameterized type and have the type argument.
         // Skip this if resolved_type was already set by the cases above (which handle
         // complex type parameter chains through inheritance hierarchies).
@@ -1291,20 +1326,50 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     {
                         arg_type = arg -> Type();
 
+                        // Check if this is a "bare" type parameter (like L l) vs a "wrapped"
+                        // type parameter (like Class<T> clazz). For bare type parameters,
+                        // we should use the argument type directly. For wrapped ones,
+                        // we extract the type argument from the argument's parameterized type.
+                        //
+                        // A bare type parameter has formal param erasure == type param erasure.
+                        // E.g., for <L extends List<?>> L m(L l), param erasure is List,
+                        // and L's erasure is also List -> bare type param.
+                        // For <T> T m(Class<T> c), param erasure is Class but T's erasure
+                        // is Object -> wrapped type param.
+                        //
+                        bool is_bare_type_param = false;
+                        if (i < method -> NumFormalParameters() &&
+                            param_type_param >= 0 &&
+                            (unsigned)param_type_param < method -> NumTypeParameters())
+                        {
+                            VariableSymbol* formal_param = method -> FormalParameter(i);
+                            TypeParameterSymbol* tparam = method -> TypeParameter(param_type_param);
+                            TypeSymbol* tparam_erasure = tparam -> ErasedType();
+                            if (formal_param && tparam_erasure &&
+                                formal_param -> Type() == tparam_erasure)
+                            {
+                                is_bare_type_param = true;
+                            }
+                        }
+
                         // For parameterized type arguments like Iterable<G>, extract the type argument
                         // to infer the method's type parameter. Check multiple sources for parameterized type.
+                        // But only do this for wrapped type parameters, not bare ones.
                         ParameterizedType* arg_param_type = NULL;
 
-                        // Check if arg is a variable with a parameterized type
-                        if (arg -> symbol)
+                        if (! is_bare_type_param)
                         {
-                            VariableSymbol* var = arg -> symbol -> VariableCast();
-                            if (var && var -> parameterized_type)
-                                arg_param_type = var -> parameterized_type;
+                            // Check if arg is a variable with a parameterized type
+                            if (arg -> symbol)
+                            {
+                                VariableSymbol* var = arg -> symbol -> VariableCast();
+                                if (var && var -> parameterized_type)
+                                    arg_param_type = var -> parameterized_type;
+                            }
+                            // Check if arg expression has resolved_parameterized_type
+                            if (! arg_param_type && arg -> resolved_parameterized_type)
+                                arg_param_type = arg -> resolved_parameterized_type;
                         }
-                        // Check if arg expression has resolved_parameterized_type
-                        if (! arg_param_type && arg -> resolved_parameterized_type)
-                            arg_param_type = arg -> resolved_parameterized_type;
 
                         // If we have a parameterized type with type arguments, extract the first one
                         // For Iterable<G>, extract G as the inferred type
