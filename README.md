@@ -14,7 +14,7 @@ Could be useful for [bootstrap](https://bootstrappable.org/) purposes.
 ## FAQ
 
 - **Christ, does this thing even work?** Yes, it can compile many complex Java projects of that era and the compiled code executes.
-- **How compliant it with Java specifications?** That's a mystery bubblewrapped in an enigma. Usually JOPA spits out bytecode which looks like bytecode, runs like bytecode and even validates like bytecode, but its typer is an abyss, don't stare into it. I think my dog is more compliant with Java specifications, but somehow JOPA works and builds complex projects.
+- **How compliant it with Java specifications?** That's a mystery bubblewrapped in an enigma. Usually JOPA spits out bytecode which looks like bytecode, runs like bytecode and even validates like bytecode, but its typer is an abyss, don't stare into it. I think my dog is more compliant with Java specifications, he would definitely refuse any non-compliant Java code. But somehow JOPA works and builds complex projects.
 - **How many bugs are there in JOPA?** Plenty, probably. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
 Also we partially check for JDK [compliance](#jdk-compliance-snapshot). Also it can build GNU Classpath, Apache ANT and Eclipse ECJ. But the parser, the typer and the bytecode generator are definitely buggy.
 The original compiler had many bugs too.
