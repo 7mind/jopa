@@ -21,6 +21,7 @@ Also we partially check for JDK [compliance](#jdk-compliance-snapshot). Also it 
 The original compiler had many bugs too.
 - **What does JOPA mean?** Javac One Patch Away (from completeness).
 - **But?..** No.
+- **Why?!1** [Read this](EXPLANATION.md).
 
 ## Achievement Unlocked: Bootstrapping ECJ and Ant
 
@@ -43,8 +44,6 @@ JOPA can build a fully self-contained Java development kit without any prebuilt 
 - **JamVM classes** - Bootstrap classes for JamVM, **compiled by JOPA itself**
 
 This creates a complete Java toolchain where all Java bytecode is compiled from source using JOPA, making it suitable for reproducible and auditable builds.
-
-[Notes on this project, LLMs and the lessons](EXPLANATION.md).
 
 ### Building DevJopaK
 
