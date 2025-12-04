@@ -322,7 +322,14 @@ def main():
         print("Scanning for tests...")
         tests = scan_tests(roots, blacklist)
         
-        outfile = args.testlist if args.testlist else 'test_whitelist.txt'
+        # Determine output file for prepare mode
+        outfile = args.testlist
+        if not outfile:
+            if args.jdk:
+                outfile = f"./scripts/jdk{args.jdk}-test-whitelist.txt"
+            else:
+                outfile = 'test_whitelist.txt' # Fallback if --jdk is not provided (should be caught by roots check)
+        
         run_count = 0
         compile_count = 0
         
@@ -346,19 +353,28 @@ def main():
         print(f"Using classpath: {resolved_cp}")
         
         tests = []
-        if args.testlist:
-             print(f"Reading tests from {args.testlist}...")
-             if not os.path.exists(args.testlist):
-                 print(f"Error: Test list {args.testlist} not found.")
+        # Determine input file for test mode
+        input_testlist = args.testlist
+        if not input_testlist:
+            if args.jdk:
+                input_testlist = f"./scripts/jdk{args.jdk}-test-whitelist.txt"
+            else:
+                print("Error: --jdk {7,8} is required for --test if --testlist is not provided")
+                sys.exit(1)
+        
+        if input_testlist:
+             print(f"Reading tests from {input_testlist}...")
+             if not os.path.exists(input_testlist):
+                 print(f"Error: Test list {input_testlist} not found.")
                  sys.exit(1)
-             with open(args.testlist, 'r') as f:
+             with open(input_testlist, 'r') as f:
                  for line in f:
                      path = line.strip()
                      if path and os.path.exists(path):
                          instructions = parse_test_file(path)
                          if instructions:
                              tests.append(Test(path, instructions, instructions['reason']))
-        else:
+        else: # This block is now effectively unreachable due to input_testlist determination above
             if not roots:
                 print("Error: --jdk {7,8} is required for --test if --testlist is not provided")
                 sys.exit(1)
