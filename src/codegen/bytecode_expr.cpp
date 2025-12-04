@@ -46,6 +46,8 @@ int ByteCode::EmitExpression(AstExpression* expression, bool need_value)
         if (need_value)
         {
             PutOp(OP_ALOAD_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(unit_type);
             return 1;
         }
         return 0;
@@ -58,6 +60,8 @@ int ByteCode::EmitExpression(AstExpression* expression, bool need_value)
         if (need_value)
         {
             PutOp(OP_ALOAD_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(unit_type);
             return 1;
         }
         return 0;
@@ -78,8 +82,14 @@ int ByteCode::EmitExpression(AstExpression* expression, bool need_value)
                 assert(type == control.Class());
                 LoadConstantAtIndex(RegisterClass(class_lit -> type ->
                                                   symbol));
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.Class());
                 if (! need_value)
+                {
                     PutOp(OP_POP);
+                    if (stack_map_generator)
+                        stack_map_generator->PopType();
+                }
             }
             else if (need_value)
             {
@@ -88,6 +98,8 @@ int ByteCode::EmitExpression(AstExpression* expression, bool need_value)
                 PutOp(OP_GETSTATIC);
                 PutU2(RegisterFieldref((VariableSymbol*) expression ->
                                        symbol));
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.Class());
             }
             return need_value ? 1 : 0;
         }
@@ -130,6 +142,8 @@ int ByteCode::EmitExpression(AstExpression* expression, bool need_value)
         if (need_value)
         {
             PutOp(OP_ACONST_NULL);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.null_type);
             return 1;
         }
         return 0;
@@ -232,12 +246,19 @@ void ByteCode::EmitFieldAccessLhs(AstExpression* expression)
 {
     EmitFieldAccessLhsBase(expression);
     PutOp(OP_DUP);     // save base address of field for later store
+    if (stack_map_generator)
+        stack_map_generator->Dup();
     PutOp(OP_GETFIELD);
     if (control.IsDoubleWordType(expression -> Type()))
         ChangeStack(1);
 
     VariableSymbol* sym = (VariableSymbol*) expression -> symbol;
     PutU2(RegisterFieldref(VariableTypeResolution(expression, sym), sym));
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopType();  // pop object ref consumed by GETFIELD
+        stack_map_generator->PushType(expression->Type());  // push field value
+    }
 }
 
 
@@ -875,7 +896,11 @@ int ByteCode::EmitArrayCreationExpression(AstArrayCreationExpression* expression
         {
             EmitNewArray(num_dims, expression -> Type());
             if (! need_value)
+            {
                 PutOp(OP_POP);
+                if (stack_map_generator)
+                    stack_map_generator->PopType();
+            }
         }
     }
 
@@ -979,6 +1004,8 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
             // lhs must be array access
             EmitArrayAccessLhs(left_hand_side -> ArrayAccessCast());
             PutOp(OP_DUP2); // save base and index for later store
+            if (stack_map_generator)
+                stack_map_generator->Dup2();  // duplicate array_ref and index
 
             //
             // load current value
@@ -1040,16 +1067,23 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
              AstAssignmentExpression::PLUS_EQUAL) &&
             left_type == control.String())
         {
+            TypeSymbol* builder_type = control.option.target >= JopaOption::SDK1_5
+                                       ? control.StringBuilder()
+                                       : control.StringBuffer();
             PutOp(OP_NEW);
-            PutU2(RegisterClass(control.option.target >= JopaOption::SDK1_5
-                                ? control.StringBuilder()
-                                : control.StringBuffer()));
+            PutU2(RegisterClass(builder_type));
+            if (stack_map_generator)
+                stack_map_generator->PushType(builder_type);
             PutOp(OP_DUP_X1);
+            if (stack_map_generator)
+                stack_map_generator->DupX1();
             PutOp(OP_INVOKESPECIAL);
             PutU2(RegisterLibraryMethodref
                   (control.option.target >= JopaOption::SDK1_5
                    ? control.StringBuilder_InitMethod()
                    : control.StringBuffer_InitMethod()));
+            if (stack_map_generator)
+                stack_map_generator->PopType();  // INVOKESPECIAL consumes 'this'
             EmitStringAppendMethod(control.String());
             AppendString(assignment_expression -> expression, true);
             PutOp(OP_INVOKEVIRTUAL);
@@ -1058,6 +1092,11 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
                    ? control.StringBuilder_toStringMethod()
                    : control.StringBuffer_toStringMethod()));
             ChangeStack(1); // account for return value
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopType();  // pop StringBuilder
+                stack_map_generator->PushType(control.String());  // push String result
+            }
         }
         //
         // Here for operation other than string concatenation. Determine the
@@ -1223,6 +1262,14 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
 
             PutOp(opc);
 
+            // Track the arithmetic operation in stack_map_generator
+            // The operation pops 2 operands and pushes 1 result
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);  // pop LHS value and RHS value
+                stack_map_generator->PushType(op_type);  // push result
+            }
+
             if (casted_left_hand_side) // now cast result back to type of result
                 EmitCast(left_type, casted_left_hand_side -> Type());
         }
@@ -1312,6 +1359,8 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
         if (! need_value)
         {
             PutOp(OP_POP);
+            if (stack_map_generator)
+                stack_map_generator->PopType();  // pop StringBuilder
             return 0;
         }
         PutOp(OP_INVOKEVIRTUAL);
@@ -1320,6 +1369,11 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
                ? control.StringBuilder_toStringMethod()
                : control.StringBuffer_toStringMethod()));
         ChangeStack(1); // account for return value
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType();  // pop StringBuilder
+            stack_map_generator->PushType(control.String());  // push String result
+        }
         return 1;
     }
 
@@ -1349,6 +1403,8 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
                 type = left_expr -> Type();
                 EmitExpression(left_expr);
                 PutOp(type == control.long_type ? OP_LCONST_0 : OP_ICONST_0);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(type);
             }
             else
             {
@@ -1359,13 +1415,27 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             {
                 PutOp(expression -> Tag() == AstBinaryExpression::SLASH
                       ? OP_LDIV : OP_LREM);
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);  // pop two longs
+                    stack_map_generator->PushType(control.long_type);  // push result
+                }
                 PutOp(OP_POP2);
+                if (stack_map_generator)
+                    stack_map_generator->PopType();  // pop long result
             }
             else
             {
                 PutOp(expression -> Tag() == AstBinaryExpression::SLASH
                       ? OP_IDIV : OP_IREM);
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);  // pop two ints
+                    stack_map_generator->PushType(control.int_type);  // push result
+                }
                 PutOp(OP_POP);
+                if (stack_map_generator)
+                    stack_map_generator->PopType();  // pop int result
             }
         }
         else if (expression -> Tag() == AstBinaryExpression::OR_OR)
@@ -1442,13 +1512,23 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
         {
         case AstBinaryExpression::AND_AND:
             PutOp(OP_ICONST_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             return 1;
         case AstBinaryExpression::EQUAL_EQUAL:
             if (right_type != control.boolean_type)
                 break;
             EmitExpression(right_expr);
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(OP_IXOR);
+            // XOR pops 2 ints, pushes 1 int - net effect: pop 1
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             return 1;
         case AstBinaryExpression::NOT_EQUAL:
             if (right_type != control.boolean_type)
@@ -1500,6 +1580,8 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
 
             EmitExpression(right_expr, false);
             PutOp(type == control.long_type ? OP_LCONST_0 : OP_ICONST_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(type);
             return GetTypeWords(type);
         case AstBinaryExpression::MINUS:
             //
@@ -1559,12 +1641,21 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
                 // Fallthrough
             case AstBinaryExpression::OR_OR:
                 PutOp(OP_ICONST_1);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
                 break;
             case AstBinaryExpression::NOT_EQUAL:
             case AstBinaryExpression::XOR:
                 EmitExpression(expression -> right_expression);
                 PutOp(OP_ICONST_1);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
                 PutOp(OP_IXOR);
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);
+                    stack_map_generator->PushType(control.int_type);
+                }
                 break;
             default:
                 assert(false && "Invalid operator on boolean");
@@ -1591,7 +1682,14 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
                 break;
             EmitExpression(left_expr);
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(OP_IXOR);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             return 1;
         case AstBinaryExpression::NOT_EQUAL:
             if (left_type != control.boolean_type)
@@ -1648,6 +1746,8 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
 
             EmitExpression(left_expr, false);
             PutOp(type == control.long_type ? OP_LCONST_0 : OP_ICONST_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(type);
             return GetTypeWords(type);
         default:
             break;
@@ -1675,12 +1775,21 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             case AstBinaryExpression::OR_OR:
                 EmitExpression(expression -> left_expression, false);
                 PutOp(OP_ICONST_1);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
                 break;
             case AstBinaryExpression::NOT_EQUAL:
             case AstBinaryExpression::XOR:
                 EmitExpression(expression -> left_expression);
                 PutOp(OP_ICONST_1);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
                 PutOp(OP_IXOR);
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);
+                    stack_map_generator->PushType(control.int_type);
+                }
                 break;
             default:
                 assert(false && "Invalid operator on boolean");
@@ -1699,10 +1808,22 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
         EmitExpression(expression -> left_expression);
         EmitExpression(expression -> right_expression);
         PutOp(OP_IXOR);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.int_type);
+        }
         if (expression -> Tag() == AstBinaryExpression::EQUAL_EQUAL)
         {
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(OP_IXOR);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
         }
         return 1;
     }
@@ -1728,16 +1849,28 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             // At MERGE, both paths have: [...stuff, int] where int is 0 or 1.
             // This pattern has only ONE branch target (MERGE), not two.
             //
-            // For Java 7+ bytecode, we mark this as no_frame because the stack
-            // tracking for internal expression labels is incomplete. The StackMapTable
-            // generator doesn't track all stack operations, so we can't reliably
-            // record the correct frame. Use target 1.6 for strict verification.
+            // For Java 7+ bytecode, we need proper StackMapTable frames at all
+            // branch targets. The boolean-to-value pattern has both paths converging
+            // at MERGE with the same stack: [...original, int] where int is 0 or 1.
+            //
+            // Save the underlying stack depth before pushing iconst_0. This will be
+            // used at DefineLabel to correctly size the result stack.
+            int underlying_depth = stack_depth;
             Label label;
-            label.no_frame = true;
+            label.needs_int_on_stack = true;
             PutOp(OP_ICONST_0); // push false (assume false)
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             EmitBranchIfExpression(expression, false, label);
             PutOp(OP_POP); // pop the false
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             PutOp(OP_ICONST_1); // push true
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
+            // Override saved_stack_depth to be the underlying depth + 1 (for the result)
+            // This fixes the calculation in DefineLabel which subtracts 1 to get underlying
+            label.saved_stack_depth = underlying_depth + 1;
             DefineLabel(label);
             CompleteLabel(label);
         }
@@ -1806,6 +1939,14 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
         break;
     default:
         assert(false && "binary unknown tag");
+    }
+
+    // Binary arithmetic operations pop 2 operands and push 1 result
+    // Track this transformation in stack_map_generator
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopTypes(2); // pop both operands
+        stack_map_generator->PushType(type); // push result
     }
 
     return GetTypeWords(expression -> Type());
@@ -1892,6 +2033,8 @@ int ByteCode::EmitCastExpression(AstCastExpression* expression,
         {
             assert(source_type -> IsSubtype(control.Object()));
             PutOp(OP_POP);
+            if (stack_map_generator)
+                stack_map_generator->PopType();
         }
     }
 
@@ -2088,11 +2231,22 @@ void ByteCode::EmitCheckForNull(AstExpression* expression, bool need_value)
     //
     EmitExpression(expression, true);
     if (need_value)
+    {
         PutOp(OP_DUP);
+        if (stack_map_generator)
+            stack_map_generator->Dup();
+    }
     PutOp(OP_INVOKEVIRTUAL);
     ChangeStack(1); // for returned value
     PutU2(RegisterLibraryMethodref(control.Object_getClassMethod()));
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopType();  // pop object ref consumed by getClass
+        stack_map_generator->PushType(control.Class());  // push Class result
+    }
     PutOp(OP_POP);
+    if (stack_map_generator)
+        stack_map_generator->PopType();  // pop Class result
 }
 
 int ByteCode::EmitClassCreationExpression(AstClassCreationExpression* expr,
@@ -2108,8 +2262,14 @@ int ByteCode::EmitClassCreationExpression(AstClassCreationExpression* expr,
 
     PutOp(OP_NEW);
     PutU2(RegisterClass(type));
+    if (stack_map_generator)
+        stack_map_generator->PushType(type);
     if (need_value) // save address of new object for constructor
+    {
         PutOp(OP_DUP);
+        if (stack_map_generator)
+            stack_map_generator->Dup();
+    }
 
     //
     // Pass enclosing instance along, then real arguments, then shadow
@@ -2135,11 +2295,16 @@ int ByteCode::EmitClassCreationExpression(AstClassCreationExpression* expr,
     if (expr -> arguments -> NeedsExtraNullArgument())
     {
         PutOp(OP_ACONST_NULL);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.null_type);
         stack_words++;
     }
 
     PutOp(OP_INVOKESPECIAL);
     ChangeStack(-stack_words);
+    // Constructor consumes 'this' + all arguments, returns void
+    if (stack_map_generator)
+        stack_map_generator->PopTypes(stack_words + 1);
     PutU2(RegisterMethodref(type, constructor));
     return 1;
 }
@@ -2225,8 +2390,15 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
                     return EmitExpression(expression -> test_expression);
                 if (left -> value == right -> value + 1)
                 {
+                    // boolean-to-value pushes int, EmitExpression for constant also pushes
                     EmitExpression(expression -> test_expression);
                     EmitExpression(expression -> false_expression);
+                    // Pop both types since IADD consumes them, then it produces 1 int
+                    if (stack_map_generator)
+                    {
+                        stack_map_generator->PopTypes(2);
+                        stack_map_generator->PushType(control.int_type);
+                    }
                     PutOp(OP_IADD);
                     return 1;
                 }
@@ -2234,6 +2406,12 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
                 {
                     EmitExpression(expression -> false_expression);
                     EmitExpression(expression -> test_expression);
+                    // Pop both since ISUB consumes them, then it produces 1 int
+                    if (stack_map_generator)
+                    {
+                        stack_map_generator->PopTypes(2);
+                        stack_map_generator->PushType(control.int_type);
+                    }
                     PutOp(OP_ISUB);
                     return 1;
                 }
@@ -2250,11 +2428,19 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
             //
             Label label;
             if (need_value)
+            {
                 PutOp(IsZero(expression -> true_expression)
                       ? OP_ICONST_0 : OP_ICONST_1);
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
+            }
             EmitBranchIfExpression(expression -> test_expression, true, label);
             if (need_value)
+            {
                 PutOp(OP_POP);
+                if (stack_map_generator)
+                    stack_map_generator->PopType();
+            }
             EmitExpression(expression -> false_expression, need_value);
             DefineLabel(label);
             CompleteLabel(label);
@@ -2269,14 +2455,25 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
         //
         // Optimize (cond ? a : 0) to (cond && a)
         // Optimize (cond ? a : 1) to (!cond || a)
+        // Pattern: push 0/1, branch if false, pop, push true_expr, merge
+        // At merge point, both paths have int on stack.
         //
         Label label;
+        label.needs_int_on_stack = need_value;
         if (need_value)
+        {
             PutOp(IsZero(expression -> false_expression)
                   ? OP_ICONST_0 : OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
+        }
         EmitBranchIfExpression(expression -> test_expression, false, label);
         if (need_value)
+        {
             PutOp(OP_POP);
+            if (stack_map_generator)
+                stack_map_generator->PopType();
+        }
         EmitExpression(expression -> true_expression, need_value);
         DefineLabel(label);
         CompleteLabel(label);
@@ -2284,6 +2481,12 @@ int ByteCode::EmitConditionalExpression(AstConditionalExpression* expression,
     }
     Label lab1,
         lab2;
+    // Set the result type on lab2 so DefineLabel creates the correct frame
+    // with the expression result on the stack. This avoids trying to track
+    // types through nested expressions (which is error-prone since PutOp
+    // doesn't update stack_map_generator).
+    if (need_value)
+        lab2.result_type = expression->Type();
     EmitBranchIfExpression(expression -> test_expression, false, lab1);
     EmitExpression(expression -> true_expression, need_value);
     EmitBranch(OP_GOTO, lab2);
@@ -2352,7 +2555,12 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             is_super = base -> SuperExpressionCast() != NULL;
             EmitExpression(base);
         }
-        else PutOp(OP_ALOAD_0);
+        else
+        {
+            PutOp(OP_ALOAD_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(unit_type);
+        }
     }
 
     int stack_words = 0; // words on stack needed for arguments
@@ -2452,6 +2660,17 @@ int ByteCode::CompleteCall(MethodSymbol* msym, int stack_words,
     if (! msym)
         return need_value ? 1 : 0;
     ChangeStack(- stack_words);
+
+    // Track argument consumption in stack_map_generator
+    // Arguments were pushed by EmitExpression calls, now they're consumed by the invoke
+    // For instance methods, also pop the receiver
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopTypes(stack_words);
+        if (!msym->ACC_STATIC())
+            stack_map_generator->PopType(); // pop receiver
+    }
+
     TypeSymbol* type = (base_type ? base_type : msym -> containing_type);
     PutU2(RegisterMethodref(type, msym));
     // invokeinterface requires extra bytes (count and zero)
@@ -2469,9 +2688,16 @@ int ByteCode::CompleteCall(MethodSymbol* msym, int stack_words,
         return 0;
     bool wide = control.IsDoubleWordType(msym -> Type());
     ChangeStack(wide ? 2 : 1);
+
+    // Track return value in stack_map_generator
+    if (stack_map_generator)
+        stack_map_generator->PushType(msym->Type());
+
     if (! need_value)
     {
         PutOp(wide ? OP_POP2 : OP_POP);
+        if (stack_map_generator)
+            stack_map_generator->PopType();
         return 0;
     }
     return wide ? 2 : 1;
@@ -2569,6 +2795,11 @@ void ByteCode::EmitNewArray(unsigned num_dims, const TypeSymbol* type)
             PutOp(OP_ANEWARRAY);
             PutU2(RegisterClass(element_type));
         }
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType();  // pop size (int)
+            stack_map_generator->PushType(const_cast<TypeSymbol*>(type));  // push array reference
+        }
     }
     else
     {
@@ -2576,6 +2807,11 @@ void ByteCode::EmitNewArray(unsigned num_dims, const TypeSymbol* type)
         PutU2(RegisterClass(type));
         PutU1(num_dims); // load dims count
         ChangeStack(1 - static_cast<int>(num_dims));
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(num_dims);  // pop all dimension sizes
+            stack_map_generator->PushType(const_cast<TypeSymbol*>(type));  // push array reference
+        }
     }
 }
 

@@ -117,7 +117,11 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
         // For post-increment, we need to save the original value
         // Stack: [obj_ref, wrapper_val]
         if (need_value)
+        {
             PutOp(OP_DUP_X1); // duplicate wrapper value under obj ref
+            if (stack_map_generator)
+                stack_map_generator->DupX1();
+        }
 
         // Unbox, increment, rebox
         EmitUnboxingConversion(expression_type, unboxed_type);
@@ -125,27 +129,55 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
         if (control.IsSimpleIntegerValueType(unboxed_type))
         {
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_IADD : OP_ISUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             EmitCast(unboxed_type, control.int_type);
         }
         else if (unboxed_type == control.long_type)
         {
             PutOp(OP_LCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.long_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_LADD : OP_LSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.long_type);
+            }
         }
         else if (unboxed_type == control.float_type)
         {
             PutOp(OP_FCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.float_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_FADD : OP_FSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.float_type);
+            }
         }
         else if (unboxed_type == control.double_type)
         {
             PutOp(OP_DCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.double_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_DADD : OP_DSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.double_type);
+            }
         }
 
         EmitBoxingConversion(unboxed_type, expression_type);
@@ -153,33 +185,73 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
     else
     {
         if (need_value)
-            PutOp(control.IsDoubleWordType(expression_type)
-                  ? OP_DUP2_X1 : OP_DUP_X1);
+        {
+            if (control.IsDoubleWordType(expression_type))
+            {
+                PutOp(OP_DUP2_X1);
+                if (stack_map_generator)
+                    stack_map_generator->Dup2X1();
+            }
+            else
+            {
+                PutOp(OP_DUP_X1);
+                if (stack_map_generator)
+                    stack_map_generator->DupX1();
+            }
+        }
 
         if (control.IsSimpleIntegerValueType(expression_type))
         {
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_IADD : OP_ISUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             EmitCast(expression_type, control.int_type);
         }
         else if (expression_type == control.long_type)
         {
             PutOp(OP_LCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.long_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_LADD : OP_LSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.long_type);
+            }
         }
         else if (expression_type == control.float_type)
         {
             PutOp(OP_FCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.float_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_FADD : OP_FSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.float_type);
+            }
         }
         else if (expression_type == control.double_type)
         {
             PutOp(OP_DCONST_1); // load 1.0
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.double_type);
             PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                   ? OP_DADD : OP_DSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.double_type);
+            }
         }
     }
 
@@ -226,32 +298,73 @@ void ByteCode::EmitPostUnaryExpressionSimple(VariableCategory kind,
     LoadVariable(kind, StripNops(expression -> expression));
 
     if (need_value)
-        PutOp(control.IsDoubleWordType(expression_type) ? OP_DUP2 : OP_DUP);
+    {
+        if (control.IsDoubleWordType(expression_type))
+        {
+            PutOp(OP_DUP2);
+            if (stack_map_generator)
+                stack_map_generator->Dup2();
+        }
+        else
+        {
+            PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
+        }
+    }
 
     if (control.IsSimpleIntegerValueType(expression_type))
     {
         PutOp(OP_ICONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.int_type);
         PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
               ? OP_IADD : OP_ISUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.int_type);
+        }
         EmitCast(expression_type, control.int_type);
     }
     else if (expression_type == control.long_type)
     {
         PutOp(OP_LCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.long_type);
         PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
               ? OP_LADD : OP_LSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.long_type);
+        }
     }
     else if (expression_type == control.float_type)
     {
         PutOp(OP_FCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.float_type);
         PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
               ? OP_FADD : OP_FSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.float_type);
+        }
     }
     else if (expression_type == control.double_type)
     {
         PutOp(OP_DCONST_1); // load 1.0
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.double_type);
         PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
               ? OP_DADD : OP_DSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.double_type);
+        }
     }
 
     if (kind == ACCESSED_VAR)
@@ -278,80 +391,208 @@ void ByteCode::EmitPostUnaryExpressionArray(AstPostUnaryExpression* expression,
     EmitArrayAccessLhs((AstArrayAccess*) StripNops(expression -> expression));
     // lhs must be array access
     PutOp(OP_DUP2); // save array base and index for later store
+    if (stack_map_generator)
+        stack_map_generator->Dup2();
 
     TypeSymbol* expression_type = expression -> Type();
     if (expression_type == control.int_type)
     {
          PutOp(OP_IALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP_X2);
+             if (stack_map_generator)
+                 stack_map_generator->DupX2();
+         }
          PutOp(OP_ICONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.int_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_IADD : OP_ISUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          PutOp(OP_IASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.byte_type )
     {
          PutOp(OP_BALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP_X2);
+             if (stack_map_generator)
+                 stack_map_generator->DupX2();
+         }
          PutOp(OP_ICONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.int_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_IADD : OP_ISUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          PutOp(OP_I2B);
          PutOp(OP_BASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.char_type )
     {
          PutOp(OP_CALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP_X2);
+             if (stack_map_generator)
+                 stack_map_generator->DupX2();
+         }
          PutOp(OP_ICONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.int_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_IADD : OP_ISUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          PutOp(OP_I2C);
          PutOp(OP_CASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.short_type)
     {
          PutOp(OP_SALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP_X2);
+             if (stack_map_generator)
+                 stack_map_generator->DupX2();
+         }
          PutOp(OP_ICONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.int_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_IADD : OP_ISUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.int_type);
+         }
          PutOp(OP_I2S);
          PutOp(OP_SASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.long_type)
     {
          PutOp(OP_LALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.long_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP2_X2);
+             if (stack_map_generator)
+                 stack_map_generator->Dup2X2();
+         }
          PutOp(OP_LCONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.long_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_LADD : OP_LSUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.long_type);
+         }
          PutOp(OP_LASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.float_type)
     {
          PutOp(OP_FALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.float_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP_X2);
+             if (stack_map_generator)
+                 stack_map_generator->DupX2();
+         }
          PutOp(OP_FCONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.float_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_FADD : OP_FSUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.float_type);
+         }
          PutOp(OP_FASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else if (expression_type == control.double_type)
     {
          PutOp(OP_DALOAD);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.double_type);
+         }
          if (need_value) // save value below saved array base and index
+         {
              PutOp(OP_DUP2_X2);
+             if (stack_map_generator)
+                 stack_map_generator->Dup2X2();
+         }
          PutOp(OP_DCONST_1);
+         if (stack_map_generator)
+             stack_map_generator->PushType(control.double_type);
          PutOp(expression -> Tag() == AstPostUnaryExpression::PLUSPLUS
                ? OP_DADD : OP_DSUB);
+         if (stack_map_generator)
+         {
+             stack_map_generator->PopTypes(2);
+             stack_map_generator->PushType(control.double_type);
+         }
          PutOp(OP_DASTORE);
+         if (stack_map_generator)
+             stack_map_generator->PopTypes(3);
     }
     else assert(false && "unsupported postunary type");
 }
@@ -390,20 +631,41 @@ int ByteCode::EmitPreUnaryExpression(AstPreUnaryExpression* expression,
             if (control.IsSimpleIntegerValueType(type))
             {
                 PutOp(OP_ICONST_M1); // -1
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.int_type);
                 PutOp(OP_IXOR);      // exclusive or to get result
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);
+                    stack_map_generator->PushType(control.int_type);
+                }
             }
             else if (type == control.long_type)
             {
                 PutOp(OP_LCONST_1); // make -1
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.long_type);
                 PutOp(OP_LNEG);
                 PutOp(OP_LXOR);     // exclusive or to get result
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopTypes(2);
+                    stack_map_generator->PushType(control.long_type);
+                }
             }
             else assert(false && "unary ~ on unsupported type");
             break;
         case AstPreUnaryExpression::NOT:
             assert(type == control.boolean_type);
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(OP_IXOR); // !(e) <=> (e)^true
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             break;
         default:
             assert(false && "unknown preunary tag");
@@ -475,35 +737,79 @@ void ByteCode::EmitPreUnaryIncrementExpressionSimple(VariableCategory kind,
     if (control.IsSimpleIntegerValueType(type))
     {
         PutOp(OP_ICONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.int_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_IADD : OP_ISUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.int_type);
+        }
         EmitCast(type, control.int_type);
         if (need_value)
+        {
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
+        }
     }
     else if (type == control.long_type)
     {
         PutOp(OP_LCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.long_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_LADD : OP_LSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.long_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP2);
+            if (stack_map_generator)
+                stack_map_generator->Dup2();
+        }
     }
     else if (type == control.float_type)
     {
         PutOp(OP_FCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.float_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_FADD : OP_FSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.float_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
+        }
     }
     else if (type == control.double_type)
     {
         PutOp(OP_DCONST_1); // load 1.0
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.double_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_DADD : OP_DSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.double_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP2);
+            if (stack_map_generator)
+                stack_map_generator->Dup2();
+        }
     }
 
     if (kind == ACCESSED_VAR)
@@ -847,11 +1153,16 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
     }
     else
     {
+        TypeSymbol* sb_type = control.option.target >= JopaOption::SDK1_5
+                              ? control.StringBuilder()
+                              : control.StringBuffer();
         PutOp(OP_NEW);
-        PutU2(RegisterClass(control.option.target >= JopaOption::SDK1_5
-                            ? control.StringBuilder()
-                            : control.StringBuffer()));
+        PutU2(RegisterClass(sb_type));
+        if (stack_map_generator)
+            stack_map_generator->PushType(sb_type);
         PutOp(OP_DUP);
+        if (stack_map_generator)
+            stack_map_generator->Dup();
         if (left_expr -> IsConstant())
         {
             //
@@ -871,16 +1182,24 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
                       (control.option.target >= JopaOption::SDK1_5
                        ? control.StringBuilder_InitMethod()
                        : control.StringBuffer_InitMethod()));
+                // Constructor consumes 'this', returns void
+                if (stack_map_generator)
+                    stack_map_generator->PopType();
             }
             else
             {
                 LoadConstantAtIndex(RegisterString(value));
+                if (stack_map_generator)
+                    stack_map_generator->PushType(control.String());
                 PutOp(OP_INVOKESPECIAL);
                 PutU2(RegisterLibraryMethodref
                       (control.option.target >= JopaOption::SDK1_5
                        ? control.StringBuilder_InitWithStringMethod()
                        : control.StringBuffer_InitWithStringMethod()));
                 ChangeStack(-1); // account for the argument
+                // Constructor consumes 'this' + String arg, returns void
+                if (stack_map_generator)
+                    stack_map_generator->PopTypes(2);
             }
         }
         else
@@ -890,6 +1209,9 @@ void ByteCode::ConcatenateString(AstBinaryExpression* expression,
                   (control.option.target >= JopaOption::SDK1_5
                    ? control.StringBuilder_InitMethod()
                    : control.StringBuffer_InitMethod()));
+            // Constructor consumes 'this', returns void
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             //
             // Don't pass stripped left_expr, or ((int)char)+"" would be
             // treated as a char append rather than int append.
@@ -1034,8 +1356,8 @@ void ByteCode::EmitStringAppendMethod(TypeSymbol* type)
 #ifdef JOPA_DEBUG
 static void op_trap()
 {
-    int i = 0; // used for debugger trap
-    i++;       // avoid compiler warnings about unused variable
+    volatile int i = 0; // used for debugger trap
+    (void)i;
 }
 #endif // JOPA_DEBUG
 
@@ -1195,23 +1517,159 @@ void ByteCode::DefineLabel(Label& lab)
         last_label_pc = lab.definition;
 
     //
+    // Save the locals state at definition time for potential backward branches.
+    // This is critical because backward branches (like loop back-edges) need
+    // to use the locals state at the label definition, not the state at the
+    // branch point (which may include variables declared inside the loop body).
+    //
+    if (stack_map_generator && !lab.no_frame)
+    {
+        lab.definition_locals = stack_map_generator->SaveLocals();
+    }
+
+    //
     // Record StackMapTable frame at branch targets (Java 7+)
     // A label with forward references (uses) indicates a branch target that
     // needs a stack map frame for verification.
     // Skip if no_frame is set (internal expression labels like boolean-to-value pattern).
     //
+    // IMPORTANT: For forward branches, we use the saved locals AND stack from the
+    // branch site, not the current state. This is critical because the branch may
+    // jump over variable declarations, and the frame at the target should reflect
+    // the state at the branch point.
+    //
     if (stack_map_generator && lab.uses.Length() > 0 && !lab.no_frame)
     {
-        if (lab.stack_saved && lab.saved_stack_types && lab.needs_int_on_stack)
+        if (lab.result_type)
         {
-            // Boolean-to-value pattern: saved stack + int result
-            stack_map_generator->RecordFrameWithSavedStackPlusInt(lab.definition, lab.saved_stack_types);
+            // Ternary expression merge point: use saved locals with result type on stack
+            // This is for general ternary expressions that produce a value. The result_type
+            // is set by EmitConditionalExpression and represents the type of the result.
+            Tuple<StackMapGenerator::VerificationType>* result_stack =
+                new Tuple<StackMapGenerator::VerificationType>(4);
+            result_stack->Next() = stack_map_generator->TypeToVerificationType(lab.result_type);
+            // For wide types (long, double), add a second slot
+            if (lab.result_type == control.long_type || lab.result_type == control.double_type)
+            {
+                result_stack->Next() = StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Top);
+            }
+            stack_map_generator->RecordFrameWithSavedLocalsAndStack(
+                lab.definition, lab.saved_locals_types, result_stack);
+            delete result_stack;
+        }
+        else if (lab.stack_saved && lab.needs_int_on_stack)
+        {
+            // Boolean-to-value pattern: saved locals, saved stack + Integer
+            // The frame at MERGE point has: saved_locals, saved_stack, and an Integer on top.
+            //
+            // WORKAROUND: saved_stack_types is often empty because PutOp doesn't update
+            // the stack_map_generator. However, saved_stack_depth correctly tracks the
+            // number of items. For integer operations (like the nested ternary optimization),
+            // we can safely assume all stack items are integers.
+            //
+            // Frame will have: saved_stack_depth integers + 1 more integer for the boolean result
+            int underlying_depth = lab.saved_stack_depth - 1; // -1 because iconst_0 was pushed
+            if (underlying_depth < 0) underlying_depth = 0;
+
+            Tuple<StackMapGenerator::VerificationType>* result_stack =
+                new Tuple<StackMapGenerator::VerificationType>(underlying_depth + 4);
+
+            // First, try to use saved_stack_types if available
+            unsigned types_used = 0;
+            if (lab.saved_stack_types && lab.saved_stack_types->Length() > 0)
+            {
+                // Use all saved types except the last one (which is the iconst_0)
+                for (unsigned i = 0; i + 1 < lab.saved_stack_types->Length(); i++)
+                {
+                    result_stack->Next() = (*lab.saved_stack_types)[i];
+                    types_used++;
+                }
+            }
+
+            // Fill remaining slots with Integer (assumes integer operations)
+            for (int i = types_used; i < underlying_depth; i++)
+            {
+                result_stack->Next() = StackMapGenerator::VerificationType(
+                    StackMapGenerator::VerificationType::TYPE_Integer);
+            }
+
+            // Add the Integer result from the boolean expression
+            result_stack->Next() = StackMapGenerator::VerificationType(
+                StackMapGenerator::VerificationType::TYPE_Integer);
+
+            stack_map_generator->RecordFrameWithSavedLocalsAndStack(
+                lab.definition, lab.saved_locals_types, result_stack);
+            // Restore current_stack to match what was recorded
+            stack_map_generator->RestoreStack(result_stack);
+            delete result_stack;
+        }
+        else if (lab.stack_saved && lab.saved_locals_types)
+        {
+            // Forward branch with saved locals - but first merge with current locals
+            // to handle fallthrough paths (e.g., catch block falling through to after try-catch)
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+            {
+                Coutput << "DefineLabel: pc=" << lab.definition
+                        << " with saved_stack_types len=" << lab.saved_stack_types->Length()
+                        << " saved_stack_depth=" << lab.saved_stack_depth << endl;
+                for (unsigned dbg_i = 0; dbg_i < lab.saved_stack_types->Length(); dbg_i++)
+                {
+                    Coutput << "  stack[" << dbg_i << "] = " << (*lab.saved_stack_types)[dbg_i].Tag() << endl;
+                }
+            }
+#endif
+            Tuple<StackMapGenerator::VerificationType>* current_locals =
+                stack_map_generator->SaveLocals();
+
+            unsigned max_len = lab.saved_locals_types->Length();
+            if (current_locals->Length() > max_len)
+                max_len = current_locals->Length();
+
+            // Create merged locals
+            Tuple<StackMapGenerator::VerificationType>* merged_locals =
+                new Tuple<StackMapGenerator::VerificationType>(max_len + 4, 8);
+
+            for (unsigned i = 0; i < max_len; i++)
+            {
+                StackMapGenerator::VerificationType saved_type =
+                    (i < lab.saved_locals_types->Length())
+                    ? (*lab.saved_locals_types)[i]
+                    : StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+                StackMapGenerator::VerificationType current_type =
+                    (i < current_locals->Length())
+                    ? (*current_locals)[i]
+                    : StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+
+                // Use TOP where types differ
+                if (saved_type != current_type)
+                {
+                    merged_locals->Next() = StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+                }
+                else
+                {
+                    merged_locals->Next() = saved_type;
+                }
+            }
+
+            delete current_locals;
+            stack_map_generator->RecordFrameWithSavedLocalsAndStack(
+                lab.definition, merged_locals, lab.saved_stack_types);
+            // Restore current_stack to match what was recorded
+            stack_map_generator->RestoreStack(lab.saved_stack_types);
+            delete merged_locals;
         }
         else if (lab.stack_saved && lab.saved_stack_types)
         {
             // Use the saved stack types from the branch point
             // This handles all cases: empty stack, non-empty stack with any types
             stack_map_generator->RecordFrameWithSavedStack(lab.definition, lab.saved_stack_types);
+            // Restore current_stack to match what was recorded, so subsequent code tracks correctly
+            stack_map_generator->RestoreStack(lab.saved_stack_types);
         }
         else if (lab.stack_saved && lab.saved_stack_depth == 0)
         {
@@ -1289,16 +1747,82 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
     lab.uses[lab_index].use_offset = code_attribute -> CodeLength();
 
     //
-    // For forward branches (label not yet defined), save the current stack state.
+    // For forward branches (label not yet defined), save the current stack and locals state.
     // This is needed for StackMapTable generation - the frame at the branch target
-    // should reflect the stack types at the branch point (before the branch instruction
-    // pops its operands).
+    // should reflect the types at the branch point, not at the label definition point.
+    // This is critical for branches that jump over variable declarations.
     //
-    if (stack_map_generator && !lab.defined && !lab.stack_saved)
+    // When multiple forward branches target the same label (e.g., from try and catch blocks),
+    // we need to merge the saved locals with the current locals. Where they differ, use TOP.
+    //
+    if (stack_map_generator && !lab.defined)
     {
-        lab.saved_stack_depth = stack_depth;
-        lab.saved_stack_types = stack_map_generator->SaveStack();
-        lab.stack_saved = true;
+        if (!lab.stack_saved)
+        {
+            // First forward branch - save the state
+            lab.saved_stack_depth = stack_depth;
+            lab.saved_stack_types = stack_map_generator->SaveStack();
+            lab.saved_locals_types = stack_map_generator->SaveLocals();
+            lab.stack_saved = true;
+#ifdef JOPA_DEBUG
+            if (control.option.debug_trace_stack_change)
+            {
+                Coutput << "UseLabel: first branch at pc " << code_attribute->CodeLength()
+                        << " depth=" << stack_depth
+                        << " stack_types=" << lab.saved_stack_types->Length() << endl;
+                for (unsigned dbg_i = 0; dbg_i < lab.saved_stack_types->Length(); dbg_i++)
+                {
+                    Coutput << "  stack[" << dbg_i << "] = " << (*lab.saved_stack_types)[dbg_i].Tag() << endl;
+                }
+            }
+#endif
+        }
+        else if (lab.saved_locals_types)
+        {
+            // Subsequent forward branch - merge locals (use TOP where they differ)
+            // This is critical for try-catch where try and catch have different types
+            // in the same local slot
+            Tuple<StackMapGenerator::VerificationType>* current_locals =
+                stack_map_generator->SaveLocals();
+
+            unsigned max_len = lab.saved_locals_types->Length();
+            if (current_locals->Length() > max_len)
+                max_len = current_locals->Length();
+
+            // Create new merged locals tuple
+            Tuple<StackMapGenerator::VerificationType>* merged_locals =
+                new Tuple<StackMapGenerator::VerificationType>(max_len + 4, 8);
+
+            // Merge: use TOP where types differ
+            for (unsigned i = 0; i < max_len; i++)
+            {
+                StackMapGenerator::VerificationType saved_type =
+                    (i < lab.saved_locals_types->Length())
+                    ? (*lab.saved_locals_types)[i]
+                    : StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+                StackMapGenerator::VerificationType current_type =
+                    (i < current_locals->Length())
+                    ? (*current_locals)[i]
+                    : StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+
+                // If types differ, use TOP; otherwise keep the saved type
+                if (saved_type != current_type)
+                {
+                    merged_locals->Next() = StackMapGenerator::VerificationType(
+                        StackMapGenerator::VerificationType::TYPE_Top);
+                }
+                else
+                {
+                    merged_locals->Next() = saved_type;
+                }
+            }
+
+            delete current_locals;
+            delete lab.saved_locals_types;
+            lab.saved_locals_types = merged_locals;
+        }
     }
 
     //
@@ -1306,15 +1830,27 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
     // at the target if one hasn't been recorded already. This is critical for
     // loop back-edges where the target was defined before any branches to it.
     //
+    // IMPORTANT: We use the locals state saved at definition time, NOT the current
+    // locals. This is because backward branches often occur after the loop body
+    // has declared additional variables that shouldn't appear in the frame at
+    // the loop header.
+    //
     if (stack_map_generator && lab.defined && !lab.no_frame)
     {
-        // Record a frame at the backward branch target.
-        // Use the current locals state but with an empty stack (typical for loop back-edges).
-        // The frame recording function will handle duplicate detection.
         if (!stack_map_generator->HasFrameAt(lab.definition))
         {
-            stack_map_generator->ClearStack();
-            stack_map_generator->RecordFrame(lab.definition);
+            // Use definition_locals if available (preferred for correct frames)
+            if (lab.definition_locals)
+            {
+                stack_map_generator->RecordFrameWithSavedLocalsAndStack(
+                    lab.definition, lab.definition_locals, NULL);
+            }
+            else
+            {
+                // Fallback: use current locals (may be incorrect for some patterns)
+                stack_map_generator->ClearStack();
+                stack_map_generator->RecordFrame(lab.definition);
+            }
         }
     }
 
@@ -1359,6 +1895,10 @@ void ByteCode::LoadLocal(int varno, const TypeSymbol* type)
              PutOp((Opcode) (OP_ALOAD_0 + varno)); // Exploit opcode encodings
          else PutOpWide(OP_ALOAD, varno);
     }
+
+    // Track type in stack_map_generator
+    if (stack_map_generator)
+        stack_map_generator->PushType(const_cast<TypeSymbol*>(type));
 }
 
 
@@ -1453,6 +1993,10 @@ void ByteCode::LoadLiteral(LiteralValue* litp, const TypeSymbol* type)
         }
     }
     else assert(false && "unsupported constant kind");
+
+    // Track type in stack_map_generator
+    if (stack_map_generator)
+        stack_map_generator->PushType(const_cast<TypeSymbol*>(type));
 }
 
 
@@ -1592,9 +2136,16 @@ int ByteCode::LoadVariable(VariableCategory kind, AstExpression* expr,
             }
             EmitExpression(base);
             PutOp(OP_ARRAYLENGTH);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopType(); // pop array ref
+                stack_map_generator->PushType(control.int_type); // push length
+            }
             if (need_value)
                 return 1;
             PutOp(OP_POP);
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             return 0;
         }
         if (sym -> initial_value)
@@ -1614,8 +2165,19 @@ int ByteCode::LoadVariable(VariableCategory kind, AstExpression* expr,
         }
         if (base)
             EmitExpression(base);
-        else PutOp(OP_ALOAD_0);
+        else
+        {
+            PutOp(OP_ALOAD_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(unit_type);
+        }
         PutOp(OP_GETFIELD);
+        // GETFIELD pops object ref and pushes field value
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType(); // pop object ref
+            stack_map_generator->PushType(expression_type); // push field value
+        }
         break;
     case STATIC_VAR:
         //
@@ -1637,6 +2199,9 @@ int ByteCode::LoadVariable(VariableCategory kind, AstExpression* expr,
                 return GetTypeWords(expression_type);
             }
             PutOp(OP_GETSTATIC);
+            // GETSTATIC pushes field value
+            if (stack_map_generator)
+                stack_map_generator->PushType(expression_type);
             break;
         }
         else return 0;
@@ -1665,6 +2230,8 @@ int ByteCode::LoadVariable(VariableCategory kind, AstExpression* expr,
         return GetTypeWords(expression_type);
     }
     PutOp(control.IsDoubleWordType(expression_type) ? OP_POP2 : OP_POP);
+    if (stack_map_generator)
+        stack_map_generator->PopType();
     return 0;
 }
 
@@ -1681,6 +2248,14 @@ int ByteCode::LoadArrayElement(const TypeSymbol* type)
           : type == control.double_type ? OP_DALOAD
           : OP_AALOAD); // assume reference
 
+    // XALOAD: pops index (int), pops arrayref, pushes element
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopType(); // pop index
+        stack_map_generator->PopType(); // pop arrayref
+        stack_map_generator->PushType(const_cast<TypeSymbol*>(type)); // push element
+    }
+
     return GetTypeWords(type);
 }
 
@@ -1696,6 +2271,10 @@ void ByteCode::StoreArrayElement(const TypeSymbol* type)
           : type == control.float_type ? OP_FASTORE
           : type == control.double_type ? OP_DASTORE
           : OP_AASTORE); // assume reference
+
+    // XASTORE: pops value, pops index, pops arrayref
+    if (stack_map_generator)
+        stack_map_generator->PopTypes(3);
 }
 
 
@@ -1710,11 +2289,17 @@ void ByteCode::StoreField(AstExpression* expression)
     {
         PutOp(OP_PUTSTATIC);
         ChangeStack(1 - GetTypeWords(expression_type));
+        // PUTSTATIC pops value
+        if (stack_map_generator)
+            stack_map_generator->PopType();
     }
     else
     {
         PutOp(OP_PUTFIELD);
         ChangeStack(1 - GetTypeWords(expression_type));
+        // PUTFIELD pops value and objectref
+        if (stack_map_generator)
+            stack_map_generator->PopTypes(2);
     }
 
     PutU2(RegisterFieldref(VariableTypeResolution(expression, sym), sym));
@@ -1734,6 +2319,8 @@ void ByteCode::StoreLocal(int varno, const TypeSymbol* type)
                 StackMapTableAttribute::VerificationTypeInfo(
                     StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
         }
+        // Store pops a value from the stack
+        stack_map_generator->PopType();
     }
 
     if (control.IsSimpleIntegerValueType(type) || type == control.boolean_type)
@@ -2690,6 +3277,56 @@ void StackMapGenerator::RecordFrameWithSavedStackPlusInt(u2 pc, Tuple<Verificati
 
     // Add Integer type on top
     entry->stack.Next() = VerificationType(VerificationType::TYPE_Integer);
+
+    // Insert in sorted order by PC
+    unsigned insert_pos = recorded_frames.Length();
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc > pc)
+        {
+            insert_pos = i;
+            break;
+        }
+    }
+
+    // Make room and insert
+    if (insert_pos == recorded_frames.Length())
+    {
+        recorded_frames.Next() = entry;
+    }
+    else
+    {
+        // Shift elements to make room
+        recorded_frames.Next() = NULL; // Extend array
+        for (unsigned i = recorded_frames.Length() - 1; i > insert_pos; i--)
+            recorded_frames[i] = recorded_frames[i - 1];
+        recorded_frames[insert_pos] = entry;
+    }
+}
+
+void StackMapGenerator::RecordFrameWithSavedLocalsAndStack(u2 pc,
+                                                           Tuple<VerificationType>* saved_locals,
+                                                           Tuple<VerificationType>* saved_stack)
+{
+    // Don't record duplicate frames at the same PC
+    if (HasFrameAt(pc))
+        return;
+
+    FrameEntry* entry = new FrameEntry(pc);
+
+    // Copy saved locals (this is the key difference from RecordFrameWithSavedStack)
+    if (saved_locals)
+    {
+        for (unsigned i = 0; i < saved_locals->Length(); i++)
+            entry->locals.Next() = (*saved_locals)[i];
+    }
+
+    // Copy saved stack
+    if (saved_stack)
+    {
+        for (unsigned i = 0; i < saved_stack->Length(); i++)
+            entry->stack.Next() = (*saved_stack)[i];
+    }
 
     // Insert in sorted order by PC
     unsigned insert_pos = recorded_frames.Length();
