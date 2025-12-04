@@ -1642,6 +1642,18 @@ static void CheckAndCreateBridge(
             // - inherited_param is subtype of method_param: interface is more specific
             //   (e.g., foo(String) in interface, foo(Object) in generic superclass)
             // In both cases, a bridge may be needed.
+            //
+            // IMPORTANT: Array covariance does NOT create an override relationship!
+            // foo(FileSet[]) and foo(ResourceCollection[]) are DIFFERENT overloaded methods
+            // even though FileSet[] is a subtype of ResourceCollection[].
+            // Only generic erasure (e.g., T erasing to Object) creates override relationships.
+            if (inherited_param -> IsArray() && method_param -> IsArray())
+            {
+                // Both are arrays - if element types differ, these are different overloads
+                // Array covariance is NOT generic erasure
+                params_compatible = false;
+                break;
+            }
             if (! method_param -> IsSubtype(inherited_param) &&
                 ! inherited_param -> IsSubtype(method_param))
             {
