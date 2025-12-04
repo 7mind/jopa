@@ -239,6 +239,23 @@ def copy_recursive(src, dst):
     else:
         shutil.copy2(src, dst)
 
+def get_clean_env():
+    """
+    Returns a clean environment for running compiler and JVM.
+    Excludes CLASSPATH and other potentially polluting variables.
+    """
+    # Start with minimal required variables
+    clean = {
+        'PATH': os.environ.get('PATH', '/usr/bin:/bin'),
+        'HOME': os.environ.get('HOME', '/tmp'),
+        'USER': os.environ.get('USER', 'nobody'),
+        'LANG': os.environ.get('LANG', 'C.UTF-8'),
+        'LC_ALL': os.environ.get('LC_ALL', 'C.UTF-8'),
+        'TMPDIR': os.environ.get('TMPDIR', '/tmp'),
+    }
+    # Explicitly do NOT include: CLASSPATH, JIKESPATH, JAVA_HOME, etc.
+    return clean
+
 def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=None, verbose=False):
     """
     Executes a single test.
@@ -299,7 +316,8 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
                     cwd=tmpdir,
                     stdout=f_out,
                     stderr=f_err,
-                    timeout=timeout
+                    timeout=timeout,
+                    env=get_clean_env()
                 )
             
             # Read back for reporting
@@ -355,7 +373,8 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
                         cwd=tmpdir,
                         stdout=f_out,
                         stderr=f_err,
-                        timeout=timeout
+                        timeout=timeout,
+                        env=get_clean_env()
                     )
                 
                 with open(test_out_path, 'r', errors='replace') as f: last_stdout = f.read()
