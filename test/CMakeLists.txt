@@ -435,6 +435,10 @@ endif()
 # Enum Switch Test
 add_jopa_run_test(EnumSwitchTest "${TEST_DIR}/java7/EnumSwitchTest.java" "EnumSwitchTest")
 
+# Format Hierarchy Test - tests bridge method generation doesn't create
+# invalid bridges for methods with final superclass methods
+add_jopa_run_test(FormatHierarchyTest "${TEST_DIR}/FormatHierarchyTest.java" "FormatHierarchyTest")
+
 # Java 8 Tests
 # Tests default methods (partial Java 8 support).
 # Note: JOPA supports Java 7 bytecode (v51.0) with StackMapTable generation.
