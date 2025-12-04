@@ -255,4 +255,16 @@ processing/model/testgetallmembers/Main.java # javax.lang.model not in gnucp
 # ============================================================================
 ImportPackagePrivateInner/Dummy.java # harness directory error
 processing/6499119/ClassProcessor.java # harness directory error
+T4784219.java # test wants to compile different file (T4683314.java), not itself
+T6665223.java # complex sourcepath dependency (A.java imports from B.java via static import)
+
+# ============================================================================
+# Parser limitations
+# ============================================================================
+Pos03.java # diamond with qualified new (p.new Foo<>()) not yet supported in grammar
+
+# ============================================================================
+# Java 7 features not yet implemented
+# ============================================================================
+Pos07.java # precise rethrow with effectively final catch parameter (JLS 14.20)
 
