@@ -1729,8 +1729,9 @@ int ByteCode::EmitBinaryExpression(AstBinaryExpression* expression,
             // This pattern has only ONE branch target (MERGE), not two.
             //
             // For Java 7+ bytecode, we mark this as no_frame because the stack
-            // tracking for internal expression labels is incomplete. Tests pass
-            // with strict verification for targets 1.5 and 1.6.
+            // tracking for internal expression labels is incomplete. The StackMapTable
+            // generator doesn't track all stack operations, so we can't reliably
+            // record the correct frame. Use target 1.6 for strict verification.
             Label label;
             label.no_frame = true;
             PutOp(OP_ICONST_0); // push false (assume false)

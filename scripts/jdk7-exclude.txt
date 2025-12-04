@@ -213,12 +213,6 @@ diags/MessageInfo.java # requires Example class (jtreg lib)
 diags/RunExamples.java # requires Example class (jtreg lib)
 file/zip/T6865530.java # requires Utils class
 
-# ============================================================================
-# JamVM incompatible options
-# ============================================================================
-VarDeclarationWithAssignment.java # uses -verify JVM option
-boxing/T6348760.java # uses -Xfuture JVM option
-generics/inference/6240565/T6240565.java # uses -Xfuture JVM option
 
 # ============================================================================
 # Tests package-info.class generation (not implemented)
@@ -267,4 +261,14 @@ Pos03.java # diamond with qualified new (p.new Foo<>()) not yet supported in gra
 # Java 7 features not yet implemented
 # ============================================================================
 Pos07.java # precise rethrow with effectively final catch parameter (JLS 14.20)
+
+# ============================================================================
+# StackMapTable generation limitations
+# ============================================================================
+# T6348760 tests boxing operations on generic fields. The test requires proper
+# StackMapTable frames at branch targets for boolean-to-value conversion patterns.
+# The current StackMapTable generator doesn't track all stack operations during
+# expression evaluation, so it can't generate correct frames for these patterns.
+# Fixing this requires comprehensive stack type tracking throughout EmitExpression.
+T6348760.java # StackMapTable generation incomplete for boolean-to-value patterns
 

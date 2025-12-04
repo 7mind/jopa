@@ -31,6 +31,7 @@ assets/jdk7u-langtools/test/tools/javac/StringConversion.java
 assets/jdk7u-langtools/test/tools/javac/NestedFinallyReturn.java
 assets/jdk7u-langtools/test/tools/javac/QualifiedThisExactMatch.java
 assets/jdk7u-langtools/test/tools/javac/SuperclassConstructorException.java
+assets/jdk7u-langtools/test/tools/javac/VarDeclarationWithAssignment.java
 assets/jdk7u-langtools/test/tools/javac/InnerNamedConstant_1.java
 assets/jdk7u-langtools/test/tools/javac/SuperNew4.java
 assets/jdk7u-langtools/test/tools/javac/DeadInnerClass.java
@@ -304,6 +305,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/inference/6995200/T6995200.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/6365166/NewTest.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/6369605/T6369605b.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/6369605/T6369605a.java
+assets/jdk7u-langtools/test/tools/javac/generics/inference/6240565/T6240565.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/6273455/T6273455.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/6569789/T6569789.java
 assets/jdk7u-langtools/test/tools/javac/generics/inference/5073060/T5073060.java

@@ -1270,9 +1270,38 @@ void Semantic::BinaryNumericPromotion(AstAssignmentExpression* assignment_expres
 
 void Semantic::BinaryNumericPromotion(AstConditionalExpression* conditional_expression)
 {
+    AstExpression*& true_expr = conditional_expression -> true_expression;
+    AstExpression*& false_expr = conditional_expression -> false_expression;
+    TypeSymbol* true_type = true_expr -> Type();
+    TypeSymbol* false_type = false_expr -> Type();
+
+    // JLS 15.25.2: If one operand is byte/short/char and the other is a constant
+    // int expression whose value is representable in the narrower type,
+    // the result type is the narrower type (not int).
+    if (true_type == control.byte_type || true_type == control.short_type ||
+        true_type == control.char_type)
+    {
+        if (IsIntValueRepresentableInType(false_expr, true_type))
+        {
+            false_expr = ConvertToType(false_expr, true_type);
+            conditional_expression -> symbol = true_type;
+            return;
+        }
+    }
+    if (false_type == control.byte_type || false_type == control.short_type ||
+        false_type == control.char_type)
+    {
+        if (IsIntValueRepresentableInType(true_expr, false_type))
+        {
+            true_expr = ConvertToType(true_expr, false_type);
+            conditional_expression -> symbol = false_type;
+            return;
+        }
+    }
+
+    // Otherwise, apply standard binary numeric promotion
     conditional_expression -> symbol =
-        BinaryNumericPromotion(conditional_expression -> true_expression,
-                               conditional_expression -> false_expression);
+        BinaryNumericPromotion(true_expr, false_expr);
 }
 
 
