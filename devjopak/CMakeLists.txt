@@ -83,6 +83,7 @@ ExternalProject_Add(gnu_classpath
     INSTALL_DIR "${CLASSPATH_INSTALL_DIR}"
     
     PATCH_COMMAND sed -i -e "/#include <string.h>/a #include <stdlib.h>" <SOURCE_DIR>/native/fdlibm/dtoa.c
+    COMMAND patch -p0 -d <SOURCE_DIR> < ${CMAKE_CURRENT_SOURCE_DIR}/../vendor/classpath-string-valueof.patch
 
     CONFIGURE_COMMAND ${CMAKE_COMMAND} -E env
         ${CLEAN_JAVA_ENV_VARS}
