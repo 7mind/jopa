@@ -266,6 +266,14 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
         PutOp(OP_PUTFIELD);
         if (control.IsDoubleWordType(expression_type))
             ChangeStack(-1);
+        // PUTFIELD pops objectref and value
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType();  // pop value
+            if (control.IsDoubleWordType(expression_type))
+                stack_map_generator->PopType();  // pop second slot for wide types
+            stack_map_generator->PopType();  // pop objectref
+        }
 
         VariableSymbol* sym = (VariableSymbol*) expression -> symbol;
         PutU2(RegisterFieldref(VariableTypeResolution(expression ->
@@ -1350,6 +1358,20 @@ void ByteCode::EmitStringAppendMethod(TypeSymbol* type)
     if (control.IsDoubleWordType(type))
         ChangeStack(-1);
     PutU2(RegisterLibraryMethodref(append_method));
+
+    // Track stack_map_generator: append(X) pops arg and receiver, pushes StringBuilder
+    if (stack_map_generator)
+    {
+        TypeSymbol* sb_type = control.option.target >= JopaOption::SDK1_5
+                              ? control.StringBuilder()
+                              : control.StringBuffer();
+        // Pop the argument (type is the argument type)
+        stack_map_generator->PopType();
+        // Pop the receiver (StringBuilder)
+        stack_map_generator->PopType();
+        // Push the result (StringBuilder)
+        stack_map_generator->PushType(sb_type);
+    }
 }
 
 
@@ -2371,12 +2393,30 @@ void ByteCode::StoreVariable(VariableCategory kind, AstExpression* expr)
             {
                 PutOp(OP_PUTSTATIC);
                 ChangeStack(1 - GetTypeWords(expr -> Type()));
+                // PUTSTATIC pops the value from the stack
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopType();
+                    // For double-word types, pop the second slot too
+                    if (control.IsDoubleWordType(expr -> Type()))
+                        stack_map_generator->PopType();
+                }
             }
             else
             {
                 PutOp(OP_ALOAD_0); // get address of "this"
+                if (stack_map_generator)
+                    stack_map_generator->PushType(unit_type);
                 PutOp(OP_PUTFIELD);
                 ChangeStack(1 - GetTypeWords(expr -> Type()));
+                // PUTFIELD pops objectref and value
+                if (stack_map_generator)
+                {
+                    stack_map_generator->PopType();  // pop value
+                    if (control.IsDoubleWordType(expr -> Type()))
+                        stack_map_generator->PopType();  // pop second slot for wide types
+                    stack_map_generator->PopType();  // pop objectref
+                }
             }
 
             PutU2(RegisterFieldref(VariableTypeResolution(expr, sym), sym));
