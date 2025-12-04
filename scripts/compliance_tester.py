@@ -14,6 +14,8 @@ import time
 # Configuration
 DEFAULT_COMPILER = "javac"
 DEFAULT_JVM = "java"
+STUB_RT_PATH = "build/runtime/jopa-stub-rt.jar"
+GNUCP_PATH = "build-devjopak/vendor-install/classpath/share/classpath/glibj.zip"
 
 class Test:
     def __init__(self, file_path, instructions, reason):
@@ -24,6 +26,29 @@ class Test:
 
     def __repr__(self):
         return f"<Test {self.name} ({self.reason})>"
+
+def resolve_classpath(cp_arg):
+    """
+    Resolves the classpath argument to a concrete path.
+    Handles 'stub', 'gnucp', None (default), and direct paths.
+    Returns absolute path or exits on error.
+    """
+    target_path = None
+    if cp_arg == 'stub':
+        target_path = STUB_RT_PATH
+    elif cp_arg == 'gnucp' or cp_arg is None:
+        target_path = GNUCP_PATH
+    else:
+        target_path = cp_arg
+
+    if not os.path.exists(target_path):
+        if cp_arg is None:
+             print(f"Error: Default GNU Classpath not found at {target_path}. Build it or use --classpath.")
+        else:
+             print(f"Error: Classpath target '{cp_arg}' not found at {target_path}")
+        sys.exit(1)
+        
+    return os.path.abspath(target_path)
 
 def parse_test_file(file_path, blacklist=None):
     """
@@ -148,7 +173,7 @@ def scan_tests(roots, blacklist=None):
                         tests.append(Test(full_path, instructions, instructions['reason']))
     return tests
 
-def run_single_test(test, compiler, jvm, compiler_args, timeout, verbose=False):
+def run_single_test(test, compiler, jvm, compiler_args, timeout, extra_cp=None, verbose=False):
     """
     Executes a single test.
     Returns: (outcome, reason, stdout, stderr, temp_file_path)
@@ -177,7 +202,10 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, verbose=False):
             if not java_files:
                 return 'FAILURE', 'nothing to compile', '', '', dest_test_file
 
-            compile_cmd = [compiler] + (compiler_args if compiler_args else []) + ['-d', '.'] + java_files
+            compile_cmd = [compiler] + (compiler_args if compiler_args else [])
+            if extra_cp:
+                compile_cmd += ['-bootclasspath', extra_cp]
+            compile_cmd += ['-d', '.'] + java_files
             
             if verbose:
                 print(f"Compiling: {' '.join(compile_cmd)}")
@@ -216,7 +244,11 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, verbose=False):
                 main_class = run_args[0]
                 app_args = run_args[1:]
                 
-                jvm_cmd = [jvm] + ['-cp', '.', f'-Dtest.src={tmpdir}'] + [main_class] + app_args
+                cp = '.'
+                if extra_cp:
+                    cp = f'.{os.pathsep}{extra_cp}'
+                
+                jvm_cmd = [jvm] + ['-cp', cp, f'-Dtest.src={tmpdir}'] + [main_class] + app_args
                 
                 if verbose:
                     print(f"Running: {' '.join(jvm_cmd)}")
@@ -263,6 +295,7 @@ def main():
     parser.add_argument('--verbose-failures', action='store_true', help="Print output for failed tests")
     parser.add_argument('--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--blacklist', default='./scripts/test-blacklist.txt', help="Blacklist file")
+    parser.add_argument('--classpath', help="Classpath to use: 'stub', 'gnucp', or path. Default: gnucp")
     
     args = parser.parse_args()
 
@@ -309,6 +342,9 @@ def main():
         return
 
     if args.test:
+        resolved_cp = resolve_classpath(args.classpath)
+        print(f"Using classpath: {resolved_cp}")
+        
         tests = []
         if args.testlist:
              print(f"Reading tests from {args.testlist}...")
@@ -349,7 +385,7 @@ def main():
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
             future_to_test = {
-                executor.submit(run_single_test, test, args.compiler, args.jvm, args.compiler_args, args.timeout, args.verbose): test 
+                executor.submit(run_single_test, test, args.compiler, args.jvm, args.compiler_args, args.timeout, resolved_cp, args.verbose): test 
                 for test in tests
             }
             

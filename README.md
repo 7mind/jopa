@@ -348,3 +348,15 @@ The sources used were retrieved from the Sourcforge site in early July, 2012. Ea
   - Dirk Weigenand
   - Vadim Zaliva
   - Henner Zeller
+
+### Stub Runtime Workflow
+1. Add missing stubs to jopa-stub-rt
+2. Rebuild the stub runtime jar
+3. Run tests (always rebuild before testing!)
+
+## Development Tools
+
+### JDK Compliance Tester
+A custom Python tool is available for running JDK compliance tests. It supports parallel execution, timeouts, and detailed failure reporting.
+See [AGENTS.md](AGENTS.md) for detailed usage instructions.
+
