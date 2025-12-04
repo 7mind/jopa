@@ -644,6 +644,58 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                 }
             }
 
+            // Check if this exception type could be a CLASS type parameter's bound (erased type).
+            // For a class like J<T extends Exception> { void f() throws T }, the throws clause
+            // contains Exception (the erasure). We need to check if the CONTAINING CLASS has a type
+            // parameter with this bound and substitute with the actual type argument from the receiver.
+            if (ex_type && ex_type -> IsSubclass(control.Throwable()) && base_type)
+            {
+                TypeSymbol* containing = method -> containing_type;
+                if (containing && containing -> NumTypeParameters() > 0)
+                {
+                    // Check each class type parameter to find one that matches this exception type
+                    for (unsigned ctp = 0; ctp < containing -> NumTypeParameters(); ctp++)
+                    {
+                        TypeParameterSymbol* class_type_param = containing -> TypeParameter(ctp);
+                        if (! class_type_param)
+                            continue;
+
+                        // Check if this type parameter's bound matches the exception type
+                        TypeSymbol* bound = class_type_param -> ErasedType();
+                        if (! bound)
+                            bound = control.Object();
+
+                        if (bound != ex_type)
+                            continue;
+
+                        // Found a matching class type parameter. Try to get actual type from receiver.
+                        ParameterizedType* receiver_param_type = NULL;
+
+                        // Check if receiver variable has a parameterized type
+                        if (base)
+                        {
+                            VariableSymbol* var = base -> symbol ? base -> symbol -> VariableCast() : NULL;
+                            if (var && var -> parameterized_type)
+                                receiver_param_type = var -> parameterized_type;
+                            else if (base -> ExpressionCast() && base -> ExpressionCast() -> resolved_parameterized_type)
+                                receiver_param_type = base -> ExpressionCast() -> resolved_parameterized_type;
+                        }
+
+                        if (receiver_param_type && ctp < receiver_param_type -> NumTypeArguments())
+                        {
+                            Type* actual_type_arg = receiver_param_type -> TypeArgument(ctp);
+                            if (actual_type_arg)
+                            {
+                                TypeSymbol* actual_type = actual_type_arg -> Erasure();
+                                if (actual_type && actual_type -> IsSubclass(control.Throwable()))
+                                    ex_type = actual_type;
+                            }
+                        }
+                        break; // Found the class type parameter
+                    }
+                }
+            }
+
             exceptions.AddElement(ex_type);
         }
         // Next, add all subclasses thrown in method conflicts
@@ -1054,6 +1106,33 @@ void Semantic::ProcessMethodName(AstMethodInvocation* method_call)
                     if (param_super -> generic_type == method -> containing_type)
                     {
                         // Found the method's containing type. Check if we need to substitute.
+                        // For inner classes, the return type may be a type parameter of the
+                        // ENCLOSING class. Check enclosing_type for the type arguments.
+                        if (method -> return_type_is_enclosing_type_param &&
+                            method -> enclosing_type_for_return_param &&
+                            param_super -> enclosing_type)
+                        {
+                            // The return type is from an enclosing class - use enclosing_type's args
+                            ParameterizedType* enclosing = param_super -> enclosing_type;
+                            if (enclosing -> generic_type == method -> enclosing_type_for_return_param &&
+                                param_index < enclosing -> NumTypeArguments())
+                            {
+                                Type* type_arg = enclosing -> TypeArgument(param_index);
+                                if (type_arg)
+                                {
+                                    TypeSymbol* result = type_arg -> Erasure();
+                                    if (result && result -> fully_qualified_name &&
+                                        ! result -> Primitive())
+                                    {
+                                        method_call -> resolved_type = result;
+                                        if (type_arg -> IsParameterized())
+                                            method_call -> resolved_parameterized_type =
+                                                type_arg -> GetParameterizedType();
+                                    }
+                                }
+                            }
+                            break;
+                        }
                         if (param_super -> NumTypeArguments() > param_index)
                         {
                             Type* type_arg = param_super -> TypeArgument(param_index);

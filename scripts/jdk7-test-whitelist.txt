@@ -148,8 +148,6 @@ assets/jdk7u-langtools/test/tools/javac/BadOptimization/DeadCode5.java
 assets/jdk7u-langtools/test/tools/javac/6979683/TestCast6979683_GOOD.java
 assets/jdk7u-langtools/test/tools/javac/processing/model/util/elements/VacuousEnum.java
 assets/jdk7u-langtools/test/tools/javac/processing/options/XprintDocComments.java
-assets/jdk7u-langtools/test/tools/javac/multicatch/Pos07.java
-assets/jdk7u-langtools/test/tools/javac/multicatch/Pos03.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos06.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08eff_final.java
@@ -206,7 +204,6 @@ assets/jdk7u-langtools/test/tools/javac/generics/Crash01.java
 assets/jdk7u-langtools/test/tools/javac/generics/GenericOverride.java
 assets/jdk7u-langtools/test/tools/javac/generics/Casting5.java
 assets/jdk7u-langtools/test/tools/javac/generics/ParenVerify.java
-assets/jdk7u-langtools/test/tools/javac/generics/T4784219.java
 assets/jdk7u-langtools/test/tools/javac/generics/ReverseOrder.java
 assets/jdk7u-langtools/test/tools/javac/generics/T5094318.java
 assets/jdk7u-langtools/test/tools/javac/generics/FinalBridge.java
@@ -357,8 +354,6 @@ assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos05.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos04.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos02.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos06.java
-assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos03.java
-assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos07.java
 assets/jdk7u-langtools/test/tools/javac/generics/5066774/T5066774.java
 assets/jdk7u-langtools/test/tools/javac/lint/NoWarn.java
 assets/jdk7u-langtools/test/tools/javac/OverrideChecks/InterfaceOverride.java
@@ -415,7 +410,6 @@ assets/jdk7u-langtools/test/tools/javac/overload/T4723909.java
 assets/jdk7u-langtools/test/tools/javac/overload/T6776289.java
 assets/jdk7u-langtools/test/tools/javac/staticImport/StaticImport.java
 assets/jdk7u-langtools/test/tools/javac/staticImport/ImportInherit.java
-assets/jdk7u-langtools/test/tools/javac/staticImport/6665223/T6665223.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6253161a.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6264029.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6253161.java

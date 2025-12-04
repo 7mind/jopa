@@ -79,7 +79,7 @@ def resolve_classpath(cp_arg):
         
     return os.path.abspath(target_path)
 
-def parse_test_file(file_path, blacklist=None):
+def parse_test_file(file_path, blacklist=None, verbose_prepare=False):
     """
     Parses a Java test file to find test instructions.
     Returns a list of instructions or None if not a valid positive test.
@@ -88,18 +88,23 @@ def parse_test_file(file_path, blacklist=None):
         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
     except Exception as e:
-        print(f"Error reading {file_path}: {e}")
+        if verbose_prepare:
+            print(f"Error reading {file_path}: {e}")
         return None
 
     if blacklist:
         for item in blacklist:
             if item in content:
+                if verbose_prepare:
+                    print(f"Excluded '{file_path}' due to blacklist item '{item}' found in content")
                 return None
 
     # Find /* ... */ block containing @test
     # We search for the first block containing @test
     match = re.search(r'/\*.*?\s@test\s.*?\*/', content, re.DOTALL)
     if not match:
+        if verbose_prepare:
+            print(f"Excluded '{file_path}': No '@test' annotation found")
         return None
     
     comment_block = match.group(0)
@@ -207,9 +212,11 @@ def parse_test_file(file_path, blacklist=None):
             'expect_failure': expect_failure
         }
 
+    if verbose_prepare:
+        print(f"Excluded '{file_path}': Not a positive test or marked as negative (@compile/fail)")
     return None
 
-def scan_tests(roots, blacklist=None, exclude_set=None):
+def scan_tests(roots, blacklist=None, exclude_set=None, verbose_prepare=False):
     tests = []
     for root in roots:
         if not os.path.exists(root):
@@ -222,14 +229,18 @@ def scan_tests(roots, blacklist=None, exclude_set=None):
                     # Check exclude set (substring match)
                     if exclude_set:
                         excluded = False
+                        matched_pattern = None
                         for pattern in exclude_set:
                             if pattern in full_path:
                                 excluded = True
+                                matched_pattern = pattern
                                 break
                         if excluded:
+                            if verbose_prepare:
+                                print(f"Excluded '{full_path}' due to exclude pattern '{matched_pattern}'")
                             continue
 
-                    instructions = parse_test_file(full_path, blacklist)
+                    instructions = parse_test_file(full_path, blacklist, verbose_prepare)
                     if instructions:
                         tests.append(Test(full_path, instructions, instructions['reason']))
     return tests
@@ -284,15 +295,20 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
         # 1. Copy main test file
         shutil.copy2(test.file_path, dest_test_file)
         
-        # 2. Handle compile directives (copy extra files)
+        # 2. Handle compile directives (copy extra files preserving directory structure)
         test_dir = os.path.dirname(test.file_path)
-        
+
         for files in test.instructions['compile']:
             for f in files:
                 if f.startswith('-'): continue
                 src = os.path.join(test_dir, f)
                 if os.path.exists(src):
-                    shutil.copy2(src, os.path.join(tmpdir, os.path.basename(f)))
+                    # Preserve directory structure (e.g., pkg/A.java -> tmpdir/pkg/A.java)
+                    dest = os.path.join(tmpdir, f)
+                    dest_dir = os.path.dirname(dest)
+                    if dest_dir and not os.path.exists(dest_dir):
+                        os.makedirs(dest_dir)
+                    shutil.copy2(src, dest)
                 else:
                     pass
 
@@ -450,6 +466,7 @@ def main():
     parser.add_argument('--no-success', action='store_true', help="Do not log successful tests")
     parser.add_argument('--verbose-failures', action='store_true', help="Print output for failed tests")
     parser.add_argument('--verbose', action='store_true', help="Verbose output")
+    parser.add_argument('--verbose-prepare', action='store_true', help="Print explanation for excluded tests during prepare phase")
     parser.add_argument('--blacklist', action='append', help="Blacklist file (can be used multiple times)")
     parser.add_argument('--exclude', help="Exclude file")
     parser.add_argument('--classpath', help="Classpath to use: 'stub', 'gnucp', or path. Default: gnucp")
@@ -502,7 +519,7 @@ def main():
                 print(f"Error reading exclude file {exclude_file}: {e}")
 
         print("Scanning for tests...")
-        tests = scan_tests(roots, blacklist, exclude_set)
+        tests = scan_tests(roots, blacklist, exclude_set, args.verbose_prepare)
         
         # Determine output file for prepare mode
         outfile = args.testlist

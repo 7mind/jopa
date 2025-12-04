@@ -1635,7 +1635,18 @@ void Semantic::FindMethodInEnvironment(Tuple<MethodShadowSymbol*>& methods_found
                     if (!MethodApplicableByArity(method, num_args))
                         continue;
 
-                    methods_found.Next() = shadow;
+                    // Check if this exact method is already found (e.g., inherited by multiple types)
+                    bool already_found = false;
+                    for (unsigned j = 0; j < methods_found.Length(); j++)
+                    {
+                        if (methods_found[j] -> method_symbol == method)
+                        {
+                            already_found = true;
+                            break;
+                        }
+                    }
+                    if (!already_found)
+                        methods_found.Next() = shadow;
                     // where_found remains NULL for static imports
                     break; // Found one matching method from this import
                 }
