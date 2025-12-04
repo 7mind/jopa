@@ -85,7 +85,8 @@ echo "JamVM: ${USE_JAMVM}"
 echo ""
 
 # Target versions to test
-# Target 1.7 requires correct StackMapTable generation for JVM verification
+# Note: Target 1.7 requires -noverify due to known StackMapTable generation issues
+# with complex control flow (nested loops, try-catch). See TODO in test/CMakeLists.txt.
 if $QUICK_MODE; then
     TARGETS=("1.7")
     echo "Mode: Quick (target 1.7 only)"
