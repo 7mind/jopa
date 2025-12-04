@@ -110,10 +110,11 @@ def parse_test_file(file_path, blacklist=None):
     run_directives = []
     compile_directives = []
     library_directives = []
-    
+
     lines = comment_block.split('\n')
     is_positive = False
     is_negative = False
+    expect_failure = False  # For @run main/fail tests
     reason = None
     
     for line in lines:
@@ -122,7 +123,16 @@ def parse_test_file(file_path, blacklist=None):
         line = re.sub(r'^\*\s*', '', line)
         
         # Standard jtreg
-        if line.startswith('@run main'):
+        if line.startswith('@run main/fail'):
+            # Test expected to fail (non-zero exit code)
+            parts = line.split()
+            if len(parts) >= 3:
+                run_directives.append(parts[2:])  # [Class, arg1, arg2...]
+            is_positive = True
+            expect_failure = True
+            reason = "@run main/fail"
+
+        elif line.startswith('@run main'):
             # Extract class name and args
             parts = line.split()
             if len(parts) >= 3:
@@ -193,9 +203,10 @@ def parse_test_file(file_path, blacklist=None):
             'run': run_directives,
             'compile': compile_directives,
             'library': library_directives,
-            'reason': reason
+            'reason': reason,
+            'expect_failure': expect_failure
         }
-    
+
     return None
 
 def scan_tests(roots, blacklist=None, exclude_set=None):
@@ -389,15 +400,26 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
                 reason = f'test crashed: {e}'
                 return outcome, reason, last_stdout, last_stderr, dest_test_file
             
+            expect_failure = test.instructions.get('expect_failure', False)
+
             if proc.returncode != 0:
-                if verbose:
-                    print(f"Execution failed for {test.name} ({main_class}):\n{last_stderr}")
+                if expect_failure:
+                    # Expected failure - this is success
+                    pass
+                else:
+                    if verbose:
+                        print(f"Execution failed for {test.name} ({main_class}):\n{last_stderr}")
+                    outcome = 'FAILURE'
+                    reason = 'exit code not 0'
+                    return outcome, reason, last_stdout, last_stderr, dest_test_file
+            elif expect_failure:
+                # Expected failure but got success - that's a failure
                 outcome = 'FAILURE'
-                reason = 'exit code not 0'
+                reason = 'expected failure but succeeded'
                 return outcome, reason, last_stdout, last_stderr, dest_test_file
-        
+
         outcome = 'SUCCESS'
-        reason = 'exit code 0'
+        reason = 'exit code 0' if not test.instructions.get('expect_failure', False) else 'expected failure'
         return outcome, reason, last_stdout, last_stderr, dest_test_file
 
     except Exception as e:
