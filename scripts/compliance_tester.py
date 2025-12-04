@@ -773,8 +773,15 @@ def main():
             tests = tests[:args.limit]
             print(f"Limiting to {len(tests)} tests.")
         
+        # Add default -source for JDK-specific tests
+        compiler_args = args.compiler_args or []
+        if args.jdk == '7' and '-source' not in ' '.join(compiler_args):
+            compiler_args = ['-source', '1.7'] + compiler_args
+        elif args.jdk == '8' and '-source' not in ' '.join(compiler_args):
+            compiler_args = ['-source', '1.8'] + compiler_args
+
         print(f"Running {len(tests)} tests using {compiler_path} and {jvm_path}...")
-        
+
         results = {
             'SUCCESS': 0,
             'FAILURE': 0,
@@ -787,7 +794,7 @@ def main():
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
             future_to_test = {
-                executor.submit(run_single_test, test, compiler_path, jvm_path, args.compiler_args, args.timeout, args.mode, resolved_cp, args.verbose): test 
+                executor.submit(run_single_test, test, compiler_path, jvm_path, compiler_args, args.timeout, args.mode, resolved_cp, args.verbose): test
                 for test in tests
             }
             

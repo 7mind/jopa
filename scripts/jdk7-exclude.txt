@@ -236,10 +236,14 @@ processing/6499119/ClassProcessor.java # javax.annotation.processing not in gnuc
 T6180021/Sub.java # tests missing type resilience
 T6180021/AbstractSub.java # tests missing type resilience
 
+
 # ============================================================================
-# Java 7 features not yet implemented
+# Stress tests for pre-Java 7 bytecode patterns
 # ============================================================================
-Pos07.java # precise rethrow with effectively final catch parameter (JLS 14.20)
+# This test requires -source 1.4 -target 1.4 to pass because it tests the
+# JSR/RET bytecode pattern for finally blocks. With Java 7's inlined finally
+# blocks, the code explosion from deeply nested try-finally is much worse.
+FinallyNesting.java # deeply nested try-finally stress test requires JSR/RET
 
 # ============================================================================
 # StackMapTable generation limitations

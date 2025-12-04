@@ -2154,10 +2154,13 @@ void Semantic::ProcessThrowStatement(Ast* stmt)
     }
 
     // Precise Rethrow Analysis
+    // When rethrowing an effectively final catch parameter, use the precise
+    // set of exceptions that can actually be thrown in the try block, not the
+    // declared type of the catch parameter. This is a Java 7 feature (JLS 14.20)
+    // but we enable it for all source levels since JOPA is Java 7-ish.
     bool precise_rethrow_handled = false;
     VariableSymbol* var = NULL;
-    if (control.option.source >= JopaOption::SDK1_7 &&
-        throw_statement -> expression -> symbol &&
+    if (throw_statement -> expression -> symbol &&
         throw_statement -> expression -> symbol -> VariableCast())
     {
         var = throw_statement -> expression -> symbol -> VariableCast();
@@ -2683,11 +2686,9 @@ void Semantic::ProcessTryStatement(Ast* stmt)
                 convertible_exceptions.Next() = exception;
         }
 
-        // Java 7: Populate precise rethrow exceptions
-        if (control.option.source >= JopaOption::SDK1_7) {
-            for (unsigned i = initial_catchable; i < catchable_exceptions.Length(); i++) {
-                clause->parameter_symbol->AddMultiThrownException(catchable_exceptions[i]);
-            }
+        // Populate precise rethrow exceptions for catch parameters
+        for (unsigned i = initial_catchable; i < catchable_exceptions.Length(); i++) {
+            clause->parameter_symbol->AddMultiThrownException(catchable_exceptions[i]);
         }
 
         //
