@@ -1630,18 +1630,6 @@ void ByteCode::DefineLabel(Label& lab)
         {
             // Forward branch with saved locals - but first merge with current locals
             // to handle fallthrough paths (e.g., catch block falling through to after try-catch)
-#ifdef JOPA_DEBUG
-            if (control.option.debug_trace_stack_change)
-            {
-                Coutput << "DefineLabel: pc=" << lab.definition
-                        << " with saved_stack_types len=" << lab.saved_stack_types->Length()
-                        << " saved_stack_depth=" << lab.saved_stack_depth << endl;
-                for (unsigned dbg_i = 0; dbg_i < lab.saved_stack_types->Length(); dbg_i++)
-                {
-                    Coutput << "  stack[" << dbg_i << "] = " << (*lab.saved_stack_types)[dbg_i].Tag() << endl;
-                }
-            }
-#endif
             Tuple<StackMapGenerator::VerificationType>* current_locals =
                 stack_map_generator->SaveLocals();
 
@@ -3348,10 +3336,46 @@ void StackMapGenerator::RecordFrameWithSavedLocalsAndStack(u2 pc,
                                                            Tuple<VerificationType>* saved_locals,
                                                            Tuple<VerificationType>* saved_stack)
 {
-    // Don't record duplicate frames at the same PC
-    if (HasFrameAt(pc))
-        return;
+    // Check if a frame already exists at this PC
+    for (unsigned i = 0; i < recorded_frames.Length(); i++)
+    {
+        if (recorded_frames[i]->pc == pc)
+        {
+            // Frame exists - merge by finding common prefix of matching types
+            // When types differ, truncate to that point (conservative approach)
+            FrameEntry* existing = recorded_frames[i];
+            if (saved_locals)
+            {
+                unsigned min_len = existing->locals.Length();
+                if (saved_locals->Length() < min_len)
+                    min_len = saved_locals->Length();
 
+                // Find the common prefix where types match
+                unsigned common_len = 0;
+                for (unsigned j = 0; j < min_len; j++)
+                {
+                    if (existing->locals[j] != (*saved_locals)[j])
+                        break;
+                    common_len++;
+                }
+
+                // Truncate existing locals to common prefix
+                if (common_len < existing->locals.Length())
+                {
+                    Tuple<VerificationType> truncated(common_len + 4);
+                    for (unsigned j = 0; j < common_len; j++)
+                        truncated.Next() = existing->locals[j];
+
+                    existing->locals.Reset();
+                    for (unsigned j = 0; j < truncated.Length(); j++)
+                        existing->locals.Next() = truncated[j];
+                }
+            }
+            return;
+        }
+    }
+
+    // No existing frame - create new one
     FrameEntry* entry = new FrameEntry(pc);
 
     // Copy saved locals (this is the key difference from RecordFrameWithSavedStack)
