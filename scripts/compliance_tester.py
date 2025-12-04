@@ -314,8 +314,8 @@ def get_clean_env():
         'PATH': os.environ.get('PATH', '/usr/bin:/bin'),
         'HOME': os.environ.get('HOME', '/tmp'),
         'USER': os.environ.get('USER', 'nobody'),
-        'LANG': os.environ.get('LANG', 'C.UTF-8'),
-        'LC_ALL': os.environ.get('LC_ALL', 'C.UTF-8'),
+        'LANG': os.environ.get('LANG', 'C'),
+        'LC_ALL': os.environ.get('LC_ALL', 'C'),
         'TMPDIR': os.environ.get('TMPDIR', '/tmp'),
     }
     # Explicitly do NOT include: CLASSPATH, JIKESPATH, JAVA_HOME, etc.
