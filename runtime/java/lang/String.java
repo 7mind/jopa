@@ -13,6 +13,9 @@ public final class String implements java.io.Serializable, Comparable<String>, C
 
     public String(byte[] bytes, int offset, int length) {}
 
+    @Deprecated
+    public String(byte[] ascii, int hibyte) {}
+
     public native int length();
 
     public native char charAt(int index);
