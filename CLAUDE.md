@@ -79,9 +79,10 @@ For comprehensive JDK compliance testing, use the `scripts/compliance_tester.py`
 
 ### Features
 - Scans JDK test directories (e.g., `assets/jdk7u-langtools/test/tools/javac`) for valid tests.
-- Filters tests based on instructions (supports `@run main`, custom `@compile` directives).
-- Supports blacklisting flaky or irrelevant tests via file.
+- Filters tests based on instructions (supports `@run main`, `@compile`, and `@library` directives).
+- Supports blacklisting flaky or irrelevant tests via multiple files.
 - Configurable classpath (stub runtime, GNU Classpath, or custom).
+- Test mode selection: run tests or compile-only.
 - Executes tests in parallel using a thread pool.
 - Provides detailed statistics and failure breakdowns.
 
@@ -93,19 +94,19 @@ The tool operates in two main modes: `--prepare` (to generate a test list) and `
 Scans the asset directories and generates a whitelist of tests to run.
 
 ```bash
-./scripts/compliance_tester.py --prepare --jdk <7|8> [--blacklist <file>] [--testlist <output_file>]
+./scripts/compliance_tester.py --prepare --jdk <7|8> [--blacklist <file>]... [--testlist <output_file>]
 ```
 
 - `--jdk {7,8}`: **Required**. Specifies which JDK version assets to scan.
-- `--blacklist <file>`: Optional. Path to a file containing substrings to blacklist (default: `./scripts/test-blacklist.txt`). Tests containing these strings will be skipped.
+- `--blacklist <file>`: Optional. Path to a file containing substrings to blacklist (default: `./scripts/test-blacklist.txt` if no other blacklist provided). Can be specified multiple times to use multiple files.
 - `--testlist <output_file>`: Optional. Path to write the generated whitelist (default: `scripts/jdk{7|8}-test-whitelist.txt` based on `--jdk`).
 
 **Example:**
 ```bash
 # Prepare tests for JDK 7, writing to scripts/jdk7-test-whitelist.txt (default)
 ./scripts/compliance_tester.py --prepare --jdk 7
-# Prepare tests for JDK 8, writing to my_jdk8_tests.txt
-./scripts/compliance_tester.py --prepare --jdk 8 --testlist my_jdk8_tests.txt
+# Prepare tests with extra blacklist
+./scripts/compliance_tester.py --prepare --jdk 8 --blacklist scripts/test-blacklist.txt --blacklist my-flaky-tests.txt
 ```
 
 #### 2. Test Mode
@@ -118,6 +119,7 @@ Executes the tests using the specified compiler and JVM.
 - `--testlist <input_file>`: Path to the file containing the list of tests to run (default: `scripts/jdk{7|8}-test-whitelist.txt` based on `--jdk`).
 - `--jdk {7,8}`: Used to determine the default testlist path if `--testlist` is not provided. Also implicitly used to determine scan roots if no `--testlist` is provided.
 - `--limit <N>`: Limit the run to N random tests (useful for quick checks).
+- `--mode <run|compile>`: Test mode. `run` (default) compiles and executes the test. `compile` only checks for successful compilation.
 - `--timeout <seconds>`: Set timeout for compilation and execution (default: 5s).
 - `--classpath <target>`: Specify runtime classpath. Options:
     - `gnucp`: Use JOPA-built GNU Classpath (default).

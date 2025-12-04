@@ -12,10 +12,12 @@ from pathlib import Path
 import time
 
 # Configuration
-DEFAULT_COMPILER = "javac"
-DEFAULT_JVM = "java"
+DEFAULT_COMPILER = "jopa"
+DEFAULT_JVM = "jamvm"
 STUB_RT_PATH = "build/runtime/jopa-stub-rt.jar"
 GNUCP_PATH = "build-devjopak/vendor-install/classpath/share/classpath/glibj.zip"
+JOPA_PATH = "build/src/jopa"
+JAMVM_PATH = "build-devjopak/vendor-install/jamvm/bin/jamvm"
 
 class Test:
     def __init__(self, file_path, instructions, reason):
@@ -26,6 +28,33 @@ class Test:
 
     def __repr__(self):
         return f"<Test {self.name} ({self.reason})>"
+
+def resolve_tool(arg, name, default_path, system_name):
+    target = arg
+    if arg == name:
+        target = default_path
+    elif arg == 'system':
+        target = system_name
+    
+    # Check existence (unless it is a system command we assume is in PATH, though we could check shutil.which)
+    if arg != 'system':
+        if not os.path.exists(target):
+             # If default was requested but not found
+             if arg == name:
+                 print(f"Error: Default {name.upper()} not found at {target}. Build it or use --{name.lower()} system or path.")
+             else:
+                 print(f"Error: {name} binary '{arg}' not found at {target}")
+             sys.exit(1)
+    
+    # If system, resolve full path for logging
+    if arg == 'system':
+        resolved = shutil.which(target)
+        if not resolved:
+            print(f"Error: System command '{target}' not found in PATH")
+            sys.exit(1)
+        return resolved
+
+    return os.path.abspath(target)
 
 def resolve_classpath(cp_arg):
     """
@@ -80,6 +109,7 @@ def parse_test_file(file_path, blacklist=None):
     # Directives to collect
     run_directives = []
     compile_directives = []
+    library_directives = []
     
     lines = comment_block.split('\n')
     is_positive = False
@@ -98,9 +128,6 @@ def parse_test_file(file_path, blacklist=None):
             if len(parts) >= 3:
                 run_directives.append(parts[2:]) # [Class, arg1, arg2...]
             else:
-                # If just @run main, implies running the class of the file usually, 
-                # but simplest is to assume the main class matches filename if not specified?
-                # Actually usually it is @run main ClassName
                 pass
             is_positive = True
             reason = "@run main"
@@ -115,11 +142,22 @@ def parse_test_file(file_path, blacklist=None):
                 if not is_positive:
                     is_positive = True
                     reason = "@compile"
+
+        elif line.startswith('@library') or line.startswith('@ library'):
+            # Handle @library path1 path2 ...
+            # Normalize spaces
+            parts = line.split()
+            # parts[0] is @library or @, parts[1] could be library if spaced
+            start_idx = 1
+            if parts[0] == '@':
+                start_idx = 2
+            
+            if len(parts) > start_idx:
+                for lib_path in parts[start_idx:]:
+                    library_directives.append(lib_path)
                 
         # Prompt specific format support
-        # Example: @assets/.../RuntimeAnnotations_attribute.java main ConstValInlining
         elif 'main' in line and 'RuntimeAnnotations_attribute.java' in line:
-            # Heuristic to support the user's specific requested format
             parts = line.split()
             try:
                 idx = parts.index('main')
@@ -154,6 +192,7 @@ def parse_test_file(file_path, blacklist=None):
         return {
             'run': run_directives,
             'compile': compile_directives,
+            'library': library_directives,
             'reason': reason
         }
     
@@ -173,7 +212,23 @@ def scan_tests(roots, blacklist=None):
                         tests.append(Test(full_path, instructions, instructions['reason']))
     return tests
 
-def run_single_test(test, compiler, jvm, compiler_args, timeout, extra_cp=None, verbose=False):
+def copy_recursive(src, dst):
+    """
+    Recursively copies src to dst.
+    If src is a file, copies it to dst.
+    If src is a directory, copies its content to dst, merging if dst exists.
+    """
+    if os.path.isdir(src):
+        if not os.path.exists(dst):
+            os.makedirs(dst)
+        for item in os.listdir(src):
+            s = os.path.join(src, item)
+            d = os.path.join(dst, item)
+            copy_recursive(s, d)
+    else:
+        shutil.copy2(src, dst)
+
+def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=None, verbose=False):
     """
     Executes a single test.
     Returns: (outcome, reason, stdout, stderr, temp_file_path)
@@ -197,7 +252,13 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, extra_cp=None, 
                     else:
                         pass
 
-            # 3. Compile
+            # 3. Handle library directives
+            for lib in test.instructions.get('library', []):
+                src = os.path.join(test_dir, lib)
+                if os.path.exists(src):
+                    copy_recursive(src, tmpdir)
+
+            # 4. Compile
             java_files = glob.glob(os.path.join(tmpdir, "*.java"))
             if not java_files:
                 return 'FAILURE', 'nothing to compile', '', '', dest_test_file
@@ -233,8 +294,8 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, extra_cp=None, 
                     print(f"Compilation failed for {test.name}:\n{stderr_str}")
                 return 'FAILURE', 'compiler failed (exit code not 0)', stdout_str, stderr_str, dest_test_file
 
-            # 4. Run
-            if not test.instructions['run']:
+            # 5. Run
+            if not test.instructions['run'] or mode == 'compile':
                 return 'SUCCESS', 'compiled', stdout_str, stderr_str, dest_test_file
 
             last_stdout = stdout_str
@@ -294,8 +355,9 @@ def main():
     parser.add_argument('--no-success', action='store_true', help="Do not log successful tests")
     parser.add_argument('--verbose-failures', action='store_true', help="Print output for failed tests")
     parser.add_argument('--verbose', action='store_true', help="Verbose output")
-    parser.add_argument('--blacklist', default='./scripts/test-blacklist.txt', help="Blacklist file")
+    parser.add_argument('--blacklist', action='append', help="Blacklist file (can be used multiple times)")
     parser.add_argument('--classpath', help="Classpath to use: 'stub', 'gnucp', or path. Default: gnucp")
+    parser.add_argument('--mode', choices=['run', 'compile'], default='run', help="Test mode: 'run' (default) or 'compile' (only compile)")
     
     args = parser.parse_args()
 
@@ -310,14 +372,20 @@ def main():
              print("Error: --jdk {7,8} is required for --prepare")
              sys.exit(1)
 
+        blacklist_files = args.blacklist if args.blacklist else ['./scripts/test-blacklist.txt']
         blacklist = []
-        if os.path.exists(args.blacklist):
-            try:
-                with open(args.blacklist, 'r') as f:
-                    blacklist = [line.strip() for line in f if line.strip()]
-                print(f"Loaded {len(blacklist)} blacklist items from {args.blacklist}")
-            except Exception as e:
-                print(f"Error reading blacklist: {e}")
+        
+        for bl_file in blacklist_files:
+            if os.path.exists(bl_file):
+                try:
+                    with open(bl_file, 'r') as f:
+                        items = [line.strip() for line in f if line.strip()]
+                        blacklist.extend(items)
+                    print(f"Loaded {len(items)} blacklist items from {bl_file}")
+                except Exception as e:
+                    print(f"Error reading blacklist {bl_file}: {e}")
+            elif args.blacklist: # Only warn if explicitly provided
+                 print(f"Warning: Blacklist file {bl_file} not found")
 
         print("Scanning for tests...")
         tests = scan_tests(roots, blacklist)
@@ -350,7 +418,12 @@ def main():
 
     if args.test:
         resolved_cp = resolve_classpath(args.classpath)
+        compiler_path = resolve_tool(args.compiler, 'jopa', JOPA_PATH, 'javac')
+        jvm_path = resolve_tool(args.jvm, 'jamvm', JAMVM_PATH, 'java')
+        
         print(f"Using classpath: {resolved_cp}")
+        print(f"Using compiler: {compiler_path}")
+        print(f"Using JVM: {jvm_path}")
         
         tests = []
         # Determine input file for test mode
@@ -387,7 +460,7 @@ def main():
             tests = tests[:args.limit]
             print(f"Limiting to {len(tests)} tests.")
         
-        print(f"Running {len(tests)} tests using {args.compiler} and {args.jvm}...")
+        print(f"Running {len(tests)} tests using {compiler_path} and {jvm_path}...")
         
         results = {
             'SUCCESS': 0,
@@ -401,7 +474,7 @@ def main():
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=os.cpu_count()) as executor:
             future_to_test = {
-                executor.submit(run_single_test, test, args.compiler, args.jvm, args.compiler_args, args.timeout, resolved_cp, args.verbose): test 
+                executor.submit(run_single_test, test, compiler_path, jvm_path, args.compiler_args, args.timeout, args.mode, resolved_cp, args.verbose): test 
                 for test in tests
             }
             
