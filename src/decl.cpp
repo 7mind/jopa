@@ -1318,13 +1318,12 @@ ParameterizedType* Semantic::ProcessTypeArguments(TypeSymbol* base_type,
     if (! type_arguments)
         return NULL;
 
-    // Check for Java 7+ diamond operator <>
+    // Check for diamond operator <>
     // Diamond is detected when:
-    // 1. We're in Java 7+ mode
-    // 2. There's exactly 1 type argument
-    // 3. That type argument is a wildcard
-    // 4. The wildcard's question_token is a synthetic diamond token
-    if (control.option.source >= JopaOption::SDK1_7 &&
+    // 1. There's exactly 1 type argument
+    // 2. That type argument is a wildcard
+    // 3. The wildcard's question_token is a synthetic diamond token
+    if (control.option.source >= JopaOption::SDK1_5 &&
         type_arguments -> NumTypeArguments() == 1)
     {
         AstType* first_arg = type_arguments -> TypeArgument(0);

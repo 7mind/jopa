@@ -962,10 +962,13 @@ void Scanner::ClassifyIdOrKeyword()
                              current_token -> Location() + len - 1);
         current_token -> SetKind(TK_Identifier);
     }
-    // Java 8: Handle 'default' as a method modifier when not followed by ':'
+    // Handle 'default' as a method modifier when not followed by ':'
     // For switch labels, 'default:' keeps TK_default
     // For default interface methods, 'default void foo()' becomes TK_abstract
     // (which is a valid modifier) and we track it for semantic analysis
+    // NOTE: We keep SDK1_8 here because 'default' is also used in annotations
+    // for default values (e.g., "String value() default "";"), and we can't
+    // easily distinguish at scan time. This is a Java 8 feature anyway.
     if (current_token -> Kind() == TK_default &&
         control.option.source >= JopaOption::SDK1_8)
     {
@@ -1338,9 +1341,9 @@ void Scanner::ClassifyColon()
 {
     cursor++;
     if (*cursor == U_COLON &&
-        control.option.source >= JopaOption::SDK1_8)
+        control.option.source >= JopaOption::SDK1_5)
     {
-        // Java 8: Method reference ::
+        // Method reference ::
         cursor++;
         current_token -> SetKind(TK_COLON_COLON);
     }
@@ -1382,9 +1385,9 @@ void Scanner::ClassifyMinus()
         current_token -> SetKind(TK_MINUS_EQUAL);
     }
     else if (*cursor == U_GREATER &&
-             control.option.source >= JopaOption::SDK1_8)
+             control.option.source >= JopaOption::SDK1_5)
     {
-        // Java 8: Lambda arrow ->
+        // Lambda arrow ->
         cursor++;
         current_token -> SetKind(TK_ARROW);
     }
@@ -1439,9 +1442,9 @@ void Scanner::ClassifyLess()
         else current_token -> SetKind(TK_LEFT_SHIFT);
     }
     else if (*cursor == U_GREATER &&
-             control.option.source >= JopaOption::SDK1_7)
+             control.option.source >= JopaOption::SDK1_5)
     {
-        // Diamond operator <> for Java 7+
+        // Diamond operator <>
         // We emit < ? > so the parser accepts it as type arguments.
         // The synthetic '?' is marked as a diamond token for semantic analysis.
 
