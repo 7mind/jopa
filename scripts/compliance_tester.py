@@ -208,10 +208,14 @@ def scan_tests(roots, blacklist=None, exclude_set=None):
                 if filename.endswith('.java'):
                     full_path = os.path.join(dirpath, filename)
                     
-                    # Check exclude set
+                    # Check exclude set (substring match)
                     if exclude_set:
-                        # Check exact match or match with ./ prefix
-                        if full_path in exclude_set or f"./{full_path}" in exclude_set:
+                        excluded = False
+                        for pattern in exclude_set:
+                            if pattern in full_path:
+                                excluded = True
+                                break
+                        if excluded:
                             continue
 
                     instructions = parse_test_file(full_path, blacklist)

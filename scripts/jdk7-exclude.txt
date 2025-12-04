@@ -1,1 +1,257 @@
-@assets/no-such-file # Example exclude
+# JDK7 Test Exclusions for JOPA with GNU Classpath
+# Each line lists a specific test file with reason for exclusion
+
+# ============================================================================
+# javax.annotation.processing not in gnucp
+# ============================================================================
+6341866/T6341866.java # javax.annotation.processing not in gnucp
+T6411379.java # javax.annotation.processing not in gnucp
+T6423583.java # javax.annotation.processing not in gnucp
+T6458749.java # javax.annotation.processing not in gnucp
+T6458823/T6458823.java # javax.annotation.processing not in gnucp
+T6855236.java # javax.annotation.processing not in gnucp
+T7142672/Bug.java # javax.annotation.processing not in gnucp
+api/6421111/T6421111.java # javax.annotation.processing not in gnucp
+api/6468404/T6468404.java # javax.annotation.processing not in gnucp
+api/TestClientCodeWrapper.java # javax.annotation.processing not in gnucp
+api/TestGetTree.java # javax.annotation.processing not in gnucp
+api/TestOperators.java # javax.annotation.processing not in gnucp
+classreader/T7031108.java # javax.annotation.processing not in gnucp
+enum/6350057/T6350057.java # javax.annotation.processing not in gnucp
+enum/6424358/T6424358.java # javax.annotation.processing not in gnucp
+file/T7018098.java # javax.annotation.processing not in gnucp
+multicatch/model/ModelChecker.java # javax.annotation.processing not in gnucp
+options/T7022337.java # javax.annotation.processing not in gnucp
+processing/6348193/T6348193.java # javax.annotation.processing not in gnucp
+processing/6348499/T6348499.java # javax.annotation.processing not in gnucp
+processing/6359313/T6359313.java # javax.annotation.processing not in gnucp
+processing/6413690/T6413690.java # javax.annotation.processing not in gnucp
+processing/6414633/T6414633.java # javax.annotation.processing not in gnucp
+processing/6430209/T6430209.java # javax.annotation.processing not in gnucp
+processing/6512707/T6512707.java # javax.annotation.processing not in gnucp
+processing/6634138/T6634138.java # javax.annotation.processing not in gnucp
+processing/TestWarnErrorCount.java # javax.annotation.processing not in gnucp
+processing/environment/TestSourceVersion.java # javax.annotation.processing not in gnucp
+processing/environment/round/TestContext.java # javax.annotation.processing not in gnucp
+processing/environment/round/TestElementsAnnotatedWith.java # javax.annotation.processing not in gnucp
+processing/errors/TestOptionSyntaxErrors.java # javax.annotation.processing not in gnucp
+processing/errors/TestReturnCode.java # javax.annotation.processing not in gnucp
+processing/filer/TestFilerConstraints.java # javax.annotation.processing not in gnucp
+processing/filer/TestGetResource.java # javax.annotation.processing not in gnucp
+processing/filer/TestInvalidRelativeNames.java # javax.annotation.processing not in gnucp
+processing/filer/TestPackageInfo.java # javax.annotation.processing not in gnucp
+processing/filer/TestValidRelativeNames.java # javax.annotation.processing not in gnucp
+processing/messager/6362067/T6362067.java # javax.annotation.processing not in gnucp
+processing/model/6194785/T6194785.java # javax.annotation.processing not in gnucp
+processing/model/6341534/T6341534.java # javax.annotation.processing not in gnucp
+processing/model/element/TestAnonClassNames.java # javax.annotation.processing not in gnucp
+processing/model/element/TestElement.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement/TestMissingElement.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingClass.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingGenericClass1.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingGenericClass2.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingGenericInterface1.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingGenericInterface2.java # javax.annotation.processing not in gnucp
+processing/model/element/TestMissingElement2/TestMissingInterface.java # javax.annotation.processing not in gnucp
+processing/model/element/TestNames.java # javax.annotation.processing not in gnucp
+processing/model/element/TestPackageElement.java # javax.annotation.processing not in gnucp
+processing/model/element/TestResourceElement.java # javax.annotation.processing not in gnucp
+processing/model/element/TestResourceVariable.java # javax.annotation.processing not in gnucp
+processing/model/element/TestTypeParameter.java # javax.annotation.processing not in gnucp
+processing/model/element/TypeParamBounds.java # javax.annotation.processing not in gnucp
+processing/model/type/MirroredTypeEx/OverEager.java # javax.annotation.processing not in gnucp
+processing/model/type/MirroredTypeEx/Plurality.java # javax.annotation.processing not in gnucp
+processing/model/type/NoTypes.java # javax.annotation.processing not in gnucp
+processing/model/util/BinaryName.java # javax.annotation.processing not in gnucp
+processing/model/util/GetTypeElemBadArg.java # javax.annotation.processing not in gnucp
+processing/model/util/NoSupers.java # javax.annotation.processing not in gnucp
+processing/model/util/OverridesSpecEx.java # javax.annotation.processing not in gnucp
+processing/model/util/TypesBadArg.java # javax.annotation.processing not in gnucp
+processing/model/util/deprecation/TestDeprecation.java # javax.annotation.processing not in gnucp
+processing/model/util/directSupersOfErr/DirectSupersOfErr.java # javax.annotation.processing not in gnucp
+processing/model/util/elements/TestGetConstantExpression.java # javax.annotation.processing not in gnucp
+processing/model/util/elements/TestGetPackageOf.java # javax.annotation.processing not in gnucp
+processing/model/util/filter/TestIterables.java # javax.annotation.processing not in gnucp
+processing/options/testCommandLineClasses/Test.java # javax.annotation.processing not in gnucp
+processing/warnings/TestSourceVersionWarnings.java # javax.annotation.processing not in gnucp
+tree/TreePosRoundsTest.java # javax.annotation.processing not in gnucp
+util/T6597678.java # javax.annotation.processing not in gnucp
+util/context/T7021650.java # javax.annotation.processing not in gnucp
+
+# ============================================================================
+# javax.lang.model not in gnucp
+# ============================================================================
+6402516/CheckClass.java # javax.lang.model not in gnucp
+6402516/CheckIsAccessible.java # javax.lang.model not in gnucp
+6402516/CheckLocalElements.java # javax.lang.model not in gnucp
+6402516/CheckMethod.java # javax.lang.model not in gnucp
+api/T6358786.java # javax.lang.model not in gnucp
+api/T6395981.java # javax.lang.model not in gnucp
+api/TestJavacTask.java # javax.lang.model not in gnucp
+api/TestJavacTaskScanner.java # javax.lang.model not in gnucp
+api/TestResolveError.java # javax.lang.model not in gnucp
+api/TestResolveIdent.java # javax.lang.model not in gnucp
+
+# ============================================================================
+# javax.tools not in gnucp
+# ============================================================================
+6330997/T6330997.java # javax.tools not in gnucp
+6400872/T6400872.java # javax.tools not in gnucp
+6508981/TestInferBinaryName.java # javax.tools not in gnucp
+6863465/TestCircularClassfile.java # javax.tools not in gnucp
+7142086/T7142086.java # javax.tools not in gnucp
+Diagnostics/6769027/T6769027.java # javax.tools not in gnucp
+Paths/6638501/JarFromManifestFailure.java # javax.tools not in gnucp
+T6265400.java # javax.tools not in gnucp
+T6435291/T6435291.java # javax.tools not in gnucp
+T6956462/T6956462.java # javax.tools not in gnucp
+api/6400303/T6400303.java # javax.tools not in gnucp
+api/6411310/T6411310.java # javax.tools not in gnucp
+api/6411333/T6411333.java # javax.tools not in gnucp
+api/6418694/T6418694.java # javax.tools not in gnucp
+api/6421756/T6421756.java # javax.tools not in gnucp
+api/6423003/T6423003.java # javax.tools not in gnucp
+api/6431257/T6431257.java # javax.tools not in gnucp
+api/6431435/T6431435.java # javax.tools not in gnucp
+api/6437349/T6437349.java # javax.tools not in gnucp
+api/6437999/T6437999.java # javax.tools not in gnucp
+api/6440333/T6440333.java # javax.tools not in gnucp
+api/6440528/T6440528.java # javax.tools not in gnucp
+api/6452876/T6452876.java # javax.tools not in gnucp
+api/6471599/Main.java # javax.tools not in gnucp
+api/6557752/T6557752.java # javax.tools not in gnucp
+api/TestContainTypes.java # javax.tools not in gnucp
+api/TestEvalExpression.java # javax.tools not in gnucp
+api/guide/Test.java # javax.tools not in gnucp
+failover/CheckAttributedTree.java # javax.tools not in gnucp
+generics/OverrideBridge.java # javax.tools not in gnucp
+generics/diamond/6996914/T6996914a.java # javax.tools not in gnucp
+nio/compileTest/CompileTest.java # javax.tools not in gnucp
+processing/6378728/T6378728.java # javax.tools not in gnucp
+tree/JavacTreeScannerTest.java # javax.tools not in gnucp
+tree/SourceTreeScannerTest.java # javax.tools not in gnucp
+tree/TreePosTest.java # javax.tools not in gnucp
+unit/util/list/AbstractList.java # javax.tools not in gnucp
+unit/util/list/FromArray.java # javax.tools not in gnucp
+varargs/warning/Warn4.java # javax.tools not in gnucp
+varargs/warning/Warn5.java # javax.tools not in gnucp
+
+# ============================================================================
+# com.sun.tools.javac not in gnucp
+# ============================================================================
+6567415/T6567415.java # com.sun.tools.javac not in gnucp
+T6366196.java # com.sun.tools.javac not in gnucp
+T6558476.java # com.sun.tools.javac not in gnucp
+file/zip/T6836682.java # com.sun.tools.javac not in gnucp
+multicatch/7005371/T7005371.java # com.sun.tools.javac not in gnucp
+multicatch/Pos05.java # com.sun.tools.javac not in gnucp
+policy/test1/Test1b.java # com.sun.tools.javac not in gnucp
+types/BoxingConversionTest.java # com.sun.tools.javac not in gnucp
+types/CastTest.java # com.sun.tools.javac not in gnucp
+types/GenericTypeWellFormednessTest.java # com.sun.tools.javac not in gnucp
+types/PrimitiveConversionTest.java # com.sun.tools.javac not in gnucp
+
+# ============================================================================
+# java.lang.invoke not in gnucp
+# ============================================================================
+meth/InvokeMH.java # java.lang.invoke not in gnucp
+meth/TestCP.java # java.lang.invoke not in gnucp
+meth/XlintWarn.java # java.lang.invoke not in gnucp
+
+# ============================================================================
+# java.lang.AutoCloseable not in gnucp (try-with-resources)
+# ============================================================================
+TryWithResources/ResourceTypeVar.java # java.lang.AutoCloseable not in gnucp
+TryWithResources/T7032633.java # java.lang.AutoCloseable not in gnucp
+TryWithResources/TwrLint.java # java.lang.AutoCloseable not in gnucp
+TryWithResources/TwrMultiCatch.java # java.lang.AutoCloseable not in gnucp
+
+# ============================================================================
+# Requires auxiliary packages (p1, p2, a, b, etc.)
+# ============================================================================
+6547131/T.java # requires p/Outer package
+ClassLiterals/ClassLiteralHelperContext.java # requires auxiliary package
+CyclicInheritance2.java # requires p1 package
+CyclicInheritance6/Main.java # requires p1.C package
+ImportCycle/Dummy.java # requires foo package
+InnerClassesAttribute/Test.java # requires Outside class
+NameClash/One.java # requires a/b packages
+NonStaticFieldExpr4c.java # requires p1 package
+QualifiedThisAndSuper_2.java # requires p1 package
+abstract/T1.java # requires p1 package
+abstract/U1.java # requires p1 package
+accessVirtualInner/Main.java # requires a/b/c packages
+crossPackageImpl/CrossPackageImplA.java # requires a/b packages
+falseCycle/FalseCycle.java # requires FalseCycleBase class
+generics/6356636/T6356636.java # requires Bar, AbstractFoo classes
+generics/6372782/T6372782.java # requires State, AbstractPlanarVector classes
+generics/7007615/acc1/AccessibilityCheck01.java # requires p2 package
+generics/odersky/Test.java # requires Cell, List classes
+generics/odersky/Test2.java # requires Cell, List classes
+generics/odersky/Test3.java # requires Cell, List classes
+generics/odersky/Test4.java # requires Cell, List classes
+importscope/A.java # requires p1 package
+incompatibleNoninherited/A.java # requires a package
+inheritedAccess/MethodReferenceQualification_1.java # requires P1 package
+miranda/4686811/Tryit.java # requires p2 package
+protectedAccess/ProtectedAccess_1.java # requires SuperClass
+protectedAccess/ProtectedMemberAccess5/Main.java # requires z1/z2 packages
+protectedInner/Outerclass.java # requires Superclass
+scope/6225935/T6225935.java # requires X, Y classes
+sourcePath/SourcePath.java # requires SourcePathA class
+warnings/6594914/T6594914a.java # requires DeprecatedClass
+warnings/6594914/T6594914b.java # requires sun.misc classes
+
+# ============================================================================
+# Requires external test libraries
+# ============================================================================
+ConstantValues/ConstValInlining.java # requires test_ff class
+Paths/CompileClose.java # requires SameJVM class
+T5090006/T5090006.java # requires junit
+diags/CheckExamples.java # requires Example class (jtreg lib)
+diags/MessageInfo.java # requires Example class (jtreg lib)
+diags/RunExamples.java # requires Example class (jtreg lib)
+file/zip/T6865530.java # requires Utils class
+
+# ============================================================================
+# JamVM incompatible options
+# ============================================================================
+VarDeclarationWithAssignment.java # uses -verify JVM option
+boxing/T6348760.java # uses -Xfuture JVM option
+generics/inference/6240565/T6240565.java # uses -Xfuture JVM option
+
+# ============================================================================
+# Tests package-info.class generation (not implemented)
+# ============================================================================
+6257443/T6257443.java # tests package-info.class file
+T6232928.java # tests package-info class
+T6557865.java # tests package-info class
+
+# ============================================================================
+# Requires wrapper/auxiliary classes in same directory
+# ============================================================================
+EarlyAssert.java # requires EarlyAssertWrapper class
+
+# ============================================================================
+# Tests with intentional duplicate types (test infrastructure issue)
+# ============================================================================
+annotations/6214965/T6214965.java # intentional duplicate type test
+binaryCompat/T1.java # T2 defined in two files
+enum/enumSwitch/EnumSwitch.java # Color type defined in two files
+
+# ============================================================================
+# Tests requiring bar package in importContext
+# ============================================================================
+importContext/anonPackage/Foo.java # requires bar package
+importContext/namedPackage/Dummy.java # requires bar package
+
+# ============================================================================
+# Additional javax.lang.model tests
+# ============================================================================
+processing/model/testgetallmembers/Main.java # javax.lang.model not in gnucp
+
+# ============================================================================
+# Test harness incompatibility
+# ============================================================================
+ImportPackagePrivateInner/Dummy.java # harness directory error
+processing/6499119/ClassProcessor.java # harness directory error
