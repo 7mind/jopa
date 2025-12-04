@@ -157,6 +157,7 @@ assets/jdk7u-langtools/test/tools/javac/BadOptimization/DeadCode5.java
 assets/jdk7u-langtools/test/tools/javac/6979683/TestCast6979683_GOOD.java
 assets/jdk7u-langtools/test/tools/javac/processing/model/util/elements/VacuousEnum.java
 assets/jdk7u-langtools/test/tools/javac/processing/options/XprintDocComments.java
+assets/jdk7u-langtools/test/tools/javac/multicatch/Pos07.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos03.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos06.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08.java
@@ -371,6 +372,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos04.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos02.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos06.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos03.java
+assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos07.java
 assets/jdk7u-langtools/test/tools/javac/generics/5066774/T5066774.java
 assets/jdk7u-langtools/test/tools/javac/lint/NoWarn.java
 assets/jdk7u-langtools/test/tools/javac/OverrideChecks/InterfaceOverride.java
@@ -382,7 +384,6 @@ assets/jdk7u-langtools/test/tools/javac/OverrideChecks/6738538/T6738538b.java
 assets/jdk7u-langtools/test/tools/javac/OverrideChecks/6400189/T6400189c.java
 assets/jdk7u-langtools/test/tools/javac/OverrideChecks/6400189/T6400189d.java
 assets/jdk7u-langtools/test/tools/javac/limits/NumArgs2.java
-assets/jdk7u-langtools/test/tools/javac/limits/FinallyNesting.java
 assets/jdk7u-langtools/test/tools/javac/limits/ArrayDims3.java
 assets/jdk7u-langtools/test/tools/javac/limits/NumArgs4.java
 assets/jdk7u-langtools/test/tools/javac/limits/ArrayDims1.java
