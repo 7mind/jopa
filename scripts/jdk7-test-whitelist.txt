@@ -1,5 +1,6 @@
 assets/jdk7u-langtools/test/tools/javac/ShiftExpressionTest.java
 assets/jdk7u-langtools/test/tools/javac/QualifiedOuterThis2.java
+assets/jdk7u-langtools/test/tools/javac/CyclicInheritance2.java
 assets/jdk7u-langtools/test/tools/javac/ImplicitToString.java
 assets/jdk7u-langtools/test/tools/javac/Capture.java
 assets/jdk7u-langtools/test/tools/javac/AnonymousType.java
@@ -76,6 +77,7 @@ assets/jdk7u-langtools/test/tools/javac/IllegallyOptimizedException.java
 assets/jdk7u-langtools/test/tools/javac/AnonymousNull.java
 assets/jdk7u-langtools/test/tools/javac/OuterParameter_1.java
 assets/jdk7u-langtools/test/tools/javac/Closure2.java
+assets/jdk7u-langtools/test/tools/javac/NonStaticFieldExpr4c.java
 assets/jdk7u-langtools/test/tools/javac/EmptyDocComments.java
 assets/jdk7u-langtools/test/tools/javac/ConditionalClass.java
 assets/jdk7u-langtools/test/tools/javac/CloneableProblem.java
@@ -103,9 +105,11 @@ assets/jdk7u-langtools/test/tools/javac/NullQualifiedNew.java
 assets/jdk7u-langtools/test/tools/javac/ArrayCast.java
 assets/jdk7u-langtools/test/tools/javac/InheritedPrivateImpl.java
 assets/jdk7u-langtools/test/tools/javac/Verify.java
+assets/jdk7u-langtools/test/tools/javac/ImportCycle/Dummy.java
 assets/jdk7u-langtools/test/tools/javac/danglingDep/Test1.java
 assets/jdk7u-langtools/test/tools/javac/danglingDep/NoDepX.java
 assets/jdk7u-langtools/test/tools/javac/danglingDep/DepX.java
+assets/jdk7u-langtools/test/tools/javac/ImportPackagePrivateInner/Dummy.java
 assets/jdk7u-langtools/test/tools/javac/scope/6225935/T6381787.java
 assets/jdk7u-langtools/test/tools/javac/scope/6225935/Test.java
 assets/jdk7u-langtools/test/tools/javac/scope/6225935/StaticImportAccess.java
@@ -128,7 +132,9 @@ assets/jdk7u-langtools/test/tools/javac/depOverrides/doccomment/Test3.java
 assets/jdk7u-langtools/test/tools/javac/depOverrides/annotation/Test1.java
 assets/jdk7u-langtools/test/tools/javac/depOverrides/annotation/Test3.java
 assets/jdk7u-langtools/test/tools/javac/depOverrides/annotation/Test2.java
+assets/jdk7u-langtools/test/tools/javac/importscope/A.java
 assets/jdk7u-langtools/test/tools/javac/T4994049/DeprecatedNOT.java
+assets/jdk7u-langtools/test/tools/javac/accessVirtualInner/Main.java
 assets/jdk7u-langtools/test/tools/javac/6521805/T6521805b.java
 assets/jdk7u-langtools/test/tools/javac/6521805/T6521805c.java
 assets/jdk7u-langtools/test/tools/javac/unicode/UnicodeUnicode.java
@@ -138,6 +144,8 @@ assets/jdk7u-langtools/test/tools/javac/unicode/SubChar.java
 assets/jdk7u-langtools/test/tools/javac/unicode/UnicodeAtEOL.java
 assets/jdk7u-langtools/test/tools/javac/unicode/SupplementaryJavaID1.java
 assets/jdk7u-langtools/test/tools/javac/abstract/T4717181b.java
+assets/jdk7u-langtools/test/tools/javac/abstract/U1.java
+assets/jdk7u-langtools/test/tools/javac/abstract/T1.java
 assets/jdk7u-langtools/test/tools/javac/abstract/T4717181a.java
 assets/jdk7u-langtools/test/tools/javac/BadOptimization/Switch1.java
 assets/jdk7u-langtools/test/tools/javac/BadOptimization/DeadCode3.java
@@ -156,6 +164,8 @@ assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08eff_final.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos09.java
 assets/jdk7u-langtools/test/tools/javac/6734819/T6734819a.java
 assets/jdk7u-langtools/test/tools/javac/6734819/T6734819b.java
+assets/jdk7u-langtools/test/tools/javac/importContext/anonPackage/Foo.java
+assets/jdk7u-langtools/test/tools/javac/importContext/namedPackage/Dummy.java
 assets/jdk7u-langtools/test/tools/javac/rawDiags/Note.java
 assets/jdk7u-langtools/test/tools/javac/rawDiags/Warning.java
 assets/jdk7u-langtools/test/tools/javac/mandatoryWarnings/deprecated/Test.java
@@ -246,6 +256,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/6332204/T6346876.java
 assets/jdk7u-langtools/test/tools/javac/generics/6294779/T6294779b.java
 assets/jdk7u-langtools/test/tools/javac/generics/6294779/T6294779a.java
 assets/jdk7u-langtools/test/tools/javac/generics/6956758/T6956758pos.java
+assets/jdk7u-langtools/test/tools/javac/generics/7007615/acc1/AccessibilityCheck01.java
 assets/jdk7u-langtools/test/tools/javac/generics/6207386/Test.java
 assets/jdk7u-langtools/test/tools/javac/generics/7022054/T7022054pos2.java
 assets/jdk7u-langtools/test/tools/javac/generics/7022054/T7022054pos1.java
@@ -348,6 +359,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/rawSeparate/RetroLexer.java
 assets/jdk7u-langtools/test/tools/javac/generics/odersky/BadTest2.java
 assets/jdk7u-langtools/test/tools/javac/generics/7034019/T7034019a.java
 assets/jdk7u-langtools/test/tools/javac/generics/7034019/T7034019b.java
+assets/jdk7u-langtools/test/tools/javac/generics/6356636/T6356636.java
 assets/jdk7u-langtools/test/tools/javac/generics/genericAbstract/A.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/T6951833.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/T6939780.java
@@ -379,8 +391,7 @@ assets/jdk7u-langtools/test/tools/javac/5045412/Bar.java
 assets/jdk7u-langtools/test/tools/javac/ForwardReference/T6676362b.java
 assets/jdk7u-langtools/test/tools/javac/ForwardReference/UseBeforeDeclaration.java
 assets/jdk7u-langtools/test/tools/javac/ForwardReference/T6676362a.java
-assets/jdk7u-langtools/test/tools/javac/T6180021/Sub.java
-assets/jdk7u-langtools/test/tools/javac/T6180021/AbstractSub.java
+assets/jdk7u-langtools/test/tools/javac/NameClash/One.java
 assets/jdk7u-langtools/test/tools/javac/6996626/Main.java
 assets/jdk7u-langtools/test/tools/javac/inheritAccess/PvtMbrsNotInherit1.java
 assets/jdk7u-langtools/test/tools/javac/6835430/T6835430.java
@@ -393,6 +404,7 @@ assets/jdk7u-langtools/test/tools/javac/miranda/T4279316c.java
 assets/jdk7u-langtools/test/tools/javac/miranda/T4279316b.java
 assets/jdk7u-langtools/test/tools/javac/miranda/T4528315.java
 assets/jdk7u-langtools/test/tools/javac/miranda/6964669/T6964669.java
+assets/jdk7u-langtools/test/tools/javac/miranda/4686811/Tryit.java
 assets/jdk7u-langtools/test/tools/javac/6390045/T6390045a.java
 assets/jdk7u-langtools/test/tools/javac/6390045/T6390045b.java
 assets/jdk7u-langtools/test/tools/javac/capture/Capture1.java
@@ -401,6 +413,8 @@ assets/jdk7u-langtools/test/tools/javac/capture/Capture3.java
 assets/jdk7u-langtools/test/tools/javac/6520152/T6520152.java
 assets/jdk7u-langtools/test/tools/javac/policy/test2/Test.java
 assets/jdk7u-langtools/test/tools/javac/protectedAccess/ProtectedAccess_3.java
+assets/jdk7u-langtools/test/tools/javac/protectedAccess/ProtectedAccess_1.java
+assets/jdk7u-langtools/test/tools/javac/protectedAccess/ProtectedMemberAccess5/Main.java
 assets/jdk7u-langtools/test/tools/javac/AccessMethods/LateAddition.java
 assets/jdk7u-langtools/test/tools/javac/AccessMethods/BitwiseAssignment.java
 assets/jdk7u-langtools/test/tools/javac/AccessMethods/UplevelPrivateConstants.java
@@ -415,9 +429,11 @@ assets/jdk7u-langtools/test/tools/javac/overload/T4723909.java
 assets/jdk7u-langtools/test/tools/javac/overload/T6776289.java
 assets/jdk7u-langtools/test/tools/javac/staticImport/StaticImport.java
 assets/jdk7u-langtools/test/tools/javac/staticImport/ImportInherit.java
+assets/jdk7u-langtools/test/tools/javac/staticImport/6665223/T6665223.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6253161a.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6264029.java
 assets/jdk7u-langtools/test/tools/javac/positions/T6253161.java
+assets/jdk7u-langtools/test/tools/javac/incompatibleNoninherited/A.java
 assets/jdk7u-langtools/test/tools/javac/ClassFileModifiers/MemberModifiers.java
 assets/jdk7u-langtools/test/tools/javac/ClassFileModifiers/ClassModifiers.java
 assets/jdk7u-langtools/test/tools/javac/jvm/6397652/T6397652.java
@@ -444,6 +460,7 @@ assets/jdk7u-langtools/test/tools/javac/annotations/pos/ClassA.java
 assets/jdk7u-langtools/test/tools/javac/annotations/pos/Dep.java
 assets/jdk7u-langtools/test/tools/javac/annotations/pos/NType.java
 assets/jdk7u-langtools/test/tools/javac/annotations/6359949/T6359949.java
+assets/jdk7u-langtools/test/tools/javac/annotations/6365854/T6365854.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis7.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis3.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis11.java
@@ -473,6 +490,7 @@ assets/jdk7u-langtools/test/tools/javac/depDocComment/SuppressDeprecation.java
 assets/jdk7u-langtools/test/tools/javac/ConstantValues/ConstValInit.java
 assets/jdk7u-langtools/test/tools/javac/ClassLiterals/InitializeOuter.java
 assets/jdk7u-langtools/test/tools/javac/ClassLiterals/InitializeTarget.java
+assets/jdk7u-langtools/test/tools/javac/ClassLiterals/ClassLiteralHelperContext.java
 assets/jdk7u-langtools/test/tools/javac/ClassLiterals/evalinit/ClassLiteralEvalInit.java
 assets/jdk7u-langtools/test/tools/javac/cast/6569057/T6569057.java
 assets/jdk7u-langtools/test/tools/javac/cast/6286112/T6286112.java
@@ -497,6 +515,7 @@ assets/jdk7u-langtools/test/tools/javac/cast/6358534/T6358534.java
 assets/jdk7u-langtools/test/tools/javac/cast/5065215/T5065215.java
 assets/jdk7u-langtools/test/tools/javac/cast/6586091/T6586091.java
 assets/jdk7u-langtools/test/tools/javac/FloatingPointChanges/Test.java
+assets/jdk7u-langtools/test/tools/javac/CyclicInheritance6/Main.java
 assets/jdk7u-langtools/test/tools/javac/T6356217/T6356217.java
 assets/jdk7u-langtools/test/tools/javac/varargs/T7013865.java
 assets/jdk7u-langtools/test/tools/javac/varargs/Anon.java

@@ -115,18 +115,20 @@ def parse_test_file(file_path, blacklist=None, verbose_prepare=False):
     run_directives = []
     compile_directives = []
     library_directives = []
+    # Track ordered steps for multi-step tests (compile, clean, compile, etc.)
+    ordered_steps = []
 
     lines = comment_block.split('\n')
     is_positive = False
     is_negative = False
     expect_failure = False  # For @run main/fail tests
     reason = None
-    
+
     for line in lines:
         line = line.strip()
         # Remove leading *
         line = re.sub(r'^\*\s*', '', line)
-        
+
         # Standard jtreg - handle @run main, @run main/fail, @run main/othervm
         if line.startswith('@run main'):
             parts = line.split()
@@ -151,17 +153,52 @@ def parse_test_file(file_path, blacklist=None, verbose_prepare=False):
                     reason = "@run main/fail"
                 else:
                     reason = "@run main"
-        
+
         elif line.startswith('@compile'):
             if line.startswith('@compile/fail'):
                 is_negative = True
-            else:
+            elif line.startswith('@compile/ref'):
+                # @compile/ref=output.txt - ignore ref output checks
                 parts = line.split()
                 if len(parts) > 1:
-                    compile_directives.append(parts[1:])
+                    # Skip the /ref=xxx part, get the actual files
+                    files = [p for p in parts[1:] if not p.startswith('-')]
+                    if files:
+                        compile_directives.append(files)
+                        ordered_steps.append(('compile', files))
                 if not is_positive:
                     is_positive = True
                     reason = "@compile"
+            else:
+                parts = line.split()
+                if len(parts) > 1:
+                    # Filter out compiler options and their arguments
+                    # e.g., -classpath . or -d outdir or -XDrawDiagnostics
+                    files = []
+                    skip_next = False
+                    for p in parts[1:]:
+                        if skip_next:
+                            skip_next = False
+                            continue
+                        if p.startswith('-'):
+                            # Options that take arguments
+                            if p in ('-classpath', '-cp', '-d', '-sourcepath', '-bootclasspath', '-extdirs', '-encoding', '-source', '-target'):
+                                skip_next = True
+                            continue
+                        files.append(p)
+                    if files:
+                        compile_directives.append(files)
+                        ordered_steps.append(('compile', files))
+                if not is_positive:
+                    is_positive = True
+                    reason = "@compile"
+
+        elif line.startswith('@clean'):
+            # @clean fully.qualified.ClassName [ClassName2 ...]
+            parts = line.split()
+            if len(parts) > 1:
+                classes_to_clean = parts[1:]
+                ordered_steps.append(('clean', classes_to_clean))
 
         elif line.startswith('@library') or line.startswith('@ library'):
             # Handle @library path1 path2 ...
@@ -213,6 +250,7 @@ def parse_test_file(file_path, blacklist=None, verbose_prepare=False):
             'run': run_directives,
             'compile': compile_directives,
             'library': library_directives,
+            'steps': ordered_steps,  # Ordered list of ('compile', files) or ('clean', classes)
             'reason': reason,
             'expect_failure': expect_failure
         }
@@ -324,6 +362,14 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
                     if dest_dir and not os.path.exists(dest_dir):
                         os.makedirs(dest_dir)
                     shutil.copy2(src, dest)
+            # Also copy all subdirectories from test_dir - they may contain
+            # dependencies (e.g., pkg/B.java when compiling pkg/A.java)
+            # Use copy_recursive which handles existing directories by merging
+            for item in os.listdir(test_dir):
+                src = os.path.join(test_dir, item)
+                if os.path.isdir(src):
+                    dest = os.path.join(tmpdir, item)
+                    copy_recursive(src, dest)
             # If @run exists and test file wasn't in compile list, also copy test file
             # (the test file contains the main method to run)
             if test.instructions['run'] and test_file_explicitly_excluded:
@@ -351,59 +397,132 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
             if os.path.exists(src):
                 copy_recursive(src, tmpdir)
 
-        # 3. Compile
-        if explicit_compile_files:
-            # Compile only the explicitly specified files
-            java_files = [os.path.join(tmpdir, f) for f in explicit_compile_files if os.path.exists(os.path.join(tmpdir, f))]
-        else:
-            # Compile all .java files in tmpdir
-            java_files = glob.glob(os.path.join(tmpdir, "*.java"))
-        if not java_files:
-            outcome = 'FAILURE'
-            reason = 'nothing to compile'
-            return outcome, reason, stdout_str, stderr_str, dest_test_file
+        # 3. Compile - check if we have multi-step with @clean
+        ordered_steps = test.instructions.get('steps', [])
+        has_clean = any(step[0] == 'clean' for step in ordered_steps)
 
-        compile_cmd = [compiler] + (compiler_args if compiler_args else [])
-        if extra_cp:
-            compile_cmd += ['-bootclasspath', extra_cp]
-        compile_cmd += ['-d', '.'] + java_files
-        
-        if verbose:
-            print(f"Compiling: {' '.join(compile_cmd)}")
-        
         javac_out_path = os.path.join(tmpdir, 'javac.out')
         javac_err_path = os.path.join(tmpdir, 'javac.err')
 
-        try:
-            with open(javac_out_path, 'w') as f_out, open(javac_err_path, 'w') as f_err:
-                proc = subprocess.run(
-                    compile_cmd,
-                    cwd=tmpdir,
-                    stdout=f_out,
-                    stderr=f_err,
-                    timeout=timeout,
-                    env=get_clean_env()
-                )
-            
-            # Read back for reporting
-            with open(javac_out_path, 'r', errors='replace') as f: stdout_str = f.read()
-            with open(javac_err_path, 'r', errors='replace') as f: stderr_str = f.read()
+        if has_clean and ordered_steps:
+            # Multi-step compilation with @clean directives
+            for step_type, step_args in ordered_steps:
+                if step_type == 'compile':
+                    # Compile specified files
+                    java_files = [os.path.join(tmpdir, f) for f in step_args if os.path.exists(os.path.join(tmpdir, f))]
+                    if not java_files:
+                        continue  # Skip empty compile steps
 
-        except subprocess.TimeoutExpired:
-            outcome = 'TIMEOUT'
-            reason = 'compiler timed out'
-            return outcome, reason, stdout_str, stderr_str, dest_test_file
-        except Exception as e:
-            outcome = 'CRASH'
-            reason = f'compiler crashed: {e}'
-            return outcome, reason, stdout_str, stderr_str, dest_test_file
-        
-        if proc.returncode != 0:
+                    compile_cmd = [compiler] + (compiler_args if compiler_args else [])
+                    if extra_cp:
+                        compile_cmd += ['-bootclasspath', extra_cp]
+                    compile_cmd += ['-d', '.'] + java_files
+
+                    if verbose:
+                        print(f"Compiling step: {' '.join(compile_cmd)}")
+
+                    try:
+                        with open(javac_out_path, 'w') as f_out, open(javac_err_path, 'w') as f_err:
+                            proc = subprocess.run(
+                                compile_cmd,
+                                cwd=tmpdir,
+                                stdout=f_out,
+                                stderr=f_err,
+                                timeout=timeout,
+                                env=get_clean_env()
+                            )
+
+                        with open(javac_out_path, 'r', errors='replace') as f: stdout_str = f.read()
+                        with open(javac_err_path, 'r', errors='replace') as f: stderr_str = f.read()
+
+                    except subprocess.TimeoutExpired:
+                        outcome = 'TIMEOUT'
+                        reason = 'compiler timed out'
+                        return outcome, reason, stdout_str, stderr_str, dest_test_file
+                    except Exception as e:
+                        outcome = 'CRASH'
+                        reason = f'compiler crashed: {e}'
+                        return outcome, reason, stdout_str, stderr_str, dest_test_file
+
+                    if proc.returncode != 0:
+                        if verbose:
+                            print(f"Compilation failed for {test.name}:\n{stderr_str}")
+                        outcome = 'FAILURE'
+                        reason = 'compiler failed (exit code not 0)'
+                        return outcome, reason, stdout_str, stderr_str, dest_test_file
+
+                elif step_type == 'clean':
+                    # Delete specified class files
+                    # @clean takes fully qualified class names like pkg.ClassName
+                    for class_name in step_args:
+                        # Convert pkg.ClassName to pkg/ClassName.class
+                        class_file = class_name.replace('.', '/') + '.class'
+                        class_path = os.path.join(tmpdir, class_file)
+                        if os.path.exists(class_path):
+                            os.remove(class_path)
+                            if verbose:
+                                print(f"Cleaned: {class_path}")
+                        # Also try with $ for inner classes (pkg.Outer$Inner)
+                        # The @clean might specify pkg.Outer.Inner but file is Outer$Inner.class
+                        parts = class_name.rsplit('.', 1)
+                        if len(parts) == 2:
+                            alt_file = parts[0].replace('.', '/') + '$' + parts[1] + '.class'
+                            alt_path = os.path.join(tmpdir, alt_file)
+                            if os.path.exists(alt_path):
+                                os.remove(alt_path)
+                                if verbose:
+                                    print(f"Cleaned: {alt_path}")
+        else:
+            # Single compilation - use existing logic
+            if explicit_compile_files:
+                # Compile only the explicitly specified files
+                java_files = [os.path.join(tmpdir, f) for f in explicit_compile_files if os.path.exists(os.path.join(tmpdir, f))]
+            else:
+                # Compile all .java files in tmpdir
+                java_files = glob.glob(os.path.join(tmpdir, "*.java"))
+            if not java_files:
+                outcome = 'FAILURE'
+                reason = 'nothing to compile'
+                return outcome, reason, stdout_str, stderr_str, dest_test_file
+
+            compile_cmd = [compiler] + (compiler_args if compiler_args else [])
+            if extra_cp:
+                compile_cmd += ['-bootclasspath', extra_cp]
+            compile_cmd += ['-d', '.'] + java_files
+
             if verbose:
-                print(f"Compilation failed for {test.name}:\n{stderr_str}")
-            outcome = 'FAILURE'
-            reason = 'compiler failed (exit code not 0)'
-            return outcome, reason, stdout_str, stderr_str, dest_test_file
+                print(f"Compiling: {' '.join(compile_cmd)}")
+
+            try:
+                with open(javac_out_path, 'w') as f_out, open(javac_err_path, 'w') as f_err:
+                    proc = subprocess.run(
+                        compile_cmd,
+                        cwd=tmpdir,
+                        stdout=f_out,
+                        stderr=f_err,
+                        timeout=timeout,
+                        env=get_clean_env()
+                    )
+
+                # Read back for reporting
+                with open(javac_out_path, 'r', errors='replace') as f: stdout_str = f.read()
+                with open(javac_err_path, 'r', errors='replace') as f: stderr_str = f.read()
+
+            except subprocess.TimeoutExpired:
+                outcome = 'TIMEOUT'
+                reason = 'compiler timed out'
+                return outcome, reason, stdout_str, stderr_str, dest_test_file
+            except Exception as e:
+                outcome = 'CRASH'
+                reason = f'compiler crashed: {e}'
+                return outcome, reason, stdout_str, stderr_str, dest_test_file
+
+            if proc.returncode != 0:
+                if verbose:
+                    print(f"Compilation failed for {test.name}:\n{stderr_str}")
+                outcome = 'FAILURE'
+                reason = 'compiler failed (exit code not 0)'
+                return outcome, reason, stdout_str, stderr_str, dest_test_file
 
         # 5. Run
         if not test.instructions['run'] or mode == 'compile':

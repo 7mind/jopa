@@ -169,35 +169,19 @@ TryWithResources/TwrMultiCatch.java # java.lang.AutoCloseable not in gnucp
 # ============================================================================
 # Requires auxiliary packages (p1, p2, a, b, etc.)
 # ============================================================================
-6547131/T.java # requires p/Outer package
-ClassLiterals/ClassLiteralHelperContext.java # requires auxiliary package
-CyclicInheritance2.java # requires p1 package
-CyclicInheritance6/Main.java # requires p1.C package
-ImportCycle/Dummy.java # requires foo package
-InnerClassesAttribute/Test.java # requires Outside class
-NameClash/One.java # requires a/b packages
-NonStaticFieldExpr4c.java # requires p1 package
-QualifiedThisAndSuper_2.java # requires p1 package
-abstract/T1.java # requires p1 package
-abstract/U1.java # requires p1 package
-accessVirtualInner/Main.java # requires a/b/c packages
-crossPackageImpl/CrossPackageImplA.java # requires a/b packages
-falseCycle/FalseCycle.java # requires FalseCycleBase class
-generics/6356636/T6356636.java # requires Bar, AbstractFoo classes
-generics/6372782/T6372782.java # requires State, AbstractPlanarVector classes
-generics/7007615/acc1/AccessibilityCheck01.java # requires p2 package
-generics/odersky/Test.java # requires Cell, List classes
-generics/odersky/Test2.java # requires Cell, List classes
-generics/odersky/Test3.java # requires Cell, List classes
-generics/odersky/Test4.java # requires Cell, List classes
-importscope/A.java # requires p1 package
-incompatibleNoninherited/A.java # requires a package
-inheritedAccess/MethodReferenceQualification_1.java # requires P1 package
-miranda/4686811/Tryit.java # requires p2 package
-protectedAccess/ProtectedAccess_1.java # requires SuperClass
-protectedAccess/ProtectedMemberAccess5/Main.java # requires z1/z2 packages
-protectedInner/Outerclass.java # requires Superclass
-scope/6225935/T6225935.java # requires X, Y classes
+6547131/T.java # requires p/Outer package (not copied by harness)
+InnerClassesAttribute/Test.java # requires Outside class (not in subdirectory)
+QualifiedThisAndSuper_2.java # requires p1 package (not in subdirectory)
+crossPackageImpl/CrossPackageImplA.java # requires a/b packages (cross-package compilation)
+falseCycle/FalseCycle.java # requires FalseCycleBase class (not in subdirectory)
+generics/6372782/T6372782.java # requires State, AbstractPlanarVector classes (not in subdirectory)
+generics/odersky/Test.java # requires Cell, List classes (not in subdirectory)
+generics/odersky/Test2.java # requires Cell, List classes (not in subdirectory)
+generics/odersky/Test3.java # requires Cell, List classes (not in subdirectory)
+generics/odersky/Test4.java # requires Cell, List classes (not in subdirectory)
+inheritedAccess/MethodReferenceQualification_1.java # requires P1 package (not in subdirectory)
+protectedInner/Outerclass.java # requires mypackage.Superclass (not in subdirectory)
+scope/6225935/T6225935.java # requires X, Y classes (not in subdirectory)
 sourcePath/SourcePath.java # requires SourcePathA class
 warnings/6594914/T6594914a.java # requires DeprecatedClass
 warnings/6594914/T6594914b.java # requires sun.misc classes
@@ -234,27 +218,23 @@ binaryCompat/T1.java # T2 defined in two files
 enum/enumSwitch/EnumSwitch.java # Color type defined in two files
 
 # ============================================================================
-# Tests requiring bar package in importContext
-# ============================================================================
-importContext/anonPackage/Foo.java # requires bar package
-importContext/namedPackage/Dummy.java # requires bar package
-
-# ============================================================================
 # Additional javax.lang.model tests
 # ============================================================================
 processing/model/testgetallmembers/Main.java # javax.lang.model not in gnucp
 
 # ============================================================================
-# Test harness incompatibility
+# javax.annotation.processing in test itself (not just dependency)
 # ============================================================================
-ImportPackagePrivateInner/Dummy.java # harness directory error
-processing/6499119/ClassProcessor.java # harness directory error
-T6365854.java # multi-step compilation with @clean directive not supported
+processing/6499119/ClassProcessor.java # javax.annotation.processing not in gnucp
 
 # ============================================================================
-# Static import of inherited members not implemented
+# Missing type resilience (not supported)
 # ============================================================================
-T6665223.java # static import of inherited protected method (import static pkg.B.b where b is in B2)
+# These tests deliberately delete a class file after compilation to test
+# javac's resilience when a referenced type is missing. JOPA requires all
+# referenced types to be available.
+T6180021/Sub.java # tests missing type resilience
+T6180021/AbstractSub.java # tests missing type resilience
 
 # ============================================================================
 # Java 7 features not yet implemented

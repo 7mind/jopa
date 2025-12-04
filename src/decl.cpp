@@ -1905,6 +1905,117 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
             super_type = super_type -> super;
         }
     }
+
+    //
+    // Second pass: Handle inherited methods that implement interface methods.
+    // This is needed when a class inherits a concrete method from a superclass
+    // that doesn't know about the interface, but the current class uses it to
+    // satisfy an interface requirement with a different erased signature.
+    //
+    // Example: interface A<T> { void f(T); }  // erased: void f(Object)
+    //          class B { void f(Integer) {} }  // no interface
+    //          class C<T> extends B implements A<T> {}
+    //          class D extends C<Integer> {}
+    //
+    // D needs a bridge f(Object) -> f(Integer) because it implements A<Integer>
+    // via C<Integer>, but B.f(Integer) was not written to implement any interface.
+    //
+    for (unsigned i = 0; i < table -> symbol_pool.Length(); i++)
+    {
+        MethodShadowSymbol* current_shadow = table -> symbol_pool[i];
+        MethodSymbol* method = current_shadow -> method_symbol;
+
+        // Now consider inherited methods (from superclasses)
+        // that are concrete and non-private/static
+        if (method -> containing_type == type ||
+            method -> Identity() == control.init_name_symbol ||
+            method -> ACC_STATIC() ||
+            method -> ACC_PRIVATE() ||
+            method -> IsBridge() ||
+            method -> ACC_ABSTRACT())
+        {
+            continue;
+        }
+
+        if (! method -> IsTyped())
+            method -> ProcessMethodSignature(this, tok);
+
+        // Check this inherited method against all interfaces this type implements
+        // (directly or through superclasses)
+        for (unsigned k = 0; k < type -> NumInterfaces(); k++)
+        {
+            TypeSymbol* interf = type -> Interface(k);
+            if (! interf -> expanded_method_table)
+                continue;
+
+            MethodShadowSymbol* iface_shadow = interf -> expanded_method_table ->
+                FindMethodShadowSymbol(method -> name_symbol);
+
+            while (iface_shadow)
+            {
+                MethodSymbol* iface_method = iface_shadow -> method_symbol;
+                if (iface_method -> containing_type -> ACC_INTERFACE())
+                {
+                    if (! iface_method -> IsTyped())
+                        iface_method -> ProcessMethodSignature(this, tok);
+                    CheckAndCreateBridge(method, iface_method, type, control, this, tok);
+                }
+
+                for (unsigned c = 0; c < iface_shadow -> NumConflicts(); c++)
+                {
+                    MethodSymbol* conflict = iface_shadow -> Conflict(c);
+                    if (conflict -> containing_type -> ACC_INTERFACE())
+                    {
+                        if (! conflict -> IsTyped())
+                            conflict -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                    }
+                }
+
+                iface_shadow = iface_shadow -> next_method;
+            }
+        }
+
+        // Also check interfaces from superclasses
+        TypeSymbol* super_class = type -> super;
+        while (super_class && super_class != control.Object())
+        {
+            for (unsigned k = 0; k < super_class -> NumInterfaces(); k++)
+            {
+                TypeSymbol* interf = super_class -> Interface(k);
+                if (! interf -> expanded_method_table)
+                    continue;
+
+                MethodShadowSymbol* iface_shadow = interf -> expanded_method_table ->
+                    FindMethodShadowSymbol(method -> name_symbol);
+
+                while (iface_shadow)
+                {
+                    MethodSymbol* iface_method = iface_shadow -> method_symbol;
+                    if (iface_method -> containing_type -> ACC_INTERFACE())
+                    {
+                        if (! iface_method -> IsTyped())
+                            iface_method -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, iface_method, type, control, this, tok);
+                    }
+
+                    for (unsigned c = 0; c < iface_shadow -> NumConflicts(); c++)
+                    {
+                        MethodSymbol* conflict = iface_shadow -> Conflict(c);
+                        if (conflict -> containing_type -> ACC_INTERFACE())
+                        {
+                            if (! conflict -> IsTyped())
+                                conflict -> ProcessMethodSignature(this, tok);
+                            CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                        }
+                    }
+
+                    iface_shadow = iface_shadow -> next_method;
+                }
+            }
+            super_class = super_class -> super;
+        }
+    }
 }
 
 
