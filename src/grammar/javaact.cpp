@@ -5261,4 +5261,25 @@ void Parser::MakeDiamondType()
     Sym(1) = p;
 }
 
+//
+// Rule 582: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+// Rule 583: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+//
+// Diamond support for qualified new expressions (Java 7)
+//
+void Parser::MakeQualifiedNewDiamond()
+{
+    AstClassCreationExpression* p = ast_pool -> NewClassCreationExpression();
+    p -> base_opt = DYNAMIC_CAST<AstExpression*> (Sym(1));
+    p -> new_token = Token(3);
+    p -> type_arguments_opt = MakeExplicitTypeArguments(4);
+    p -> class_type = ast_pool -> NewTypeName(MakeSimpleName(5));
+    p -> class_type -> uses_diamond = true;  // Diamond syntax - type inference needed
+    p -> arguments = DYNAMIC_CAST<AstArguments*> (Sym(8));
+    p -> class_body_opt = DYNAMIC_CAST<AstClassBody*> (Sym(9));
+    if (p -> class_body_opt)
+        p -> class_body_opt -> identifier_token = Token(5);
+    Sym(1) = p;
+}
+
 } // Close namespace Jopa block

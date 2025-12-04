@@ -801,4 +801,10 @@ ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' TypeArgumentList1 Mar
 -- Rule 581: Diamond type (empty type arguments) - Java 7
 ClassOrInterfaceTypeParameterized ::= ClassOrInterface '<' '>'
 
+-- Rule 582: Diamond support for qualified new expressions (Java 7) - Primary.new
+ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+
+-- Rule 583: Diamond support for qualified new expressions (Java 7) - Name.new
+ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+
 %End
