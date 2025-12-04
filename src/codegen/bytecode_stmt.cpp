@@ -2889,7 +2889,16 @@ void ByteCode::EmitBranchIfExpression(AstExpression* p, bool cond, Label& lab,
     else assert(false && "comparison of unsupported type");
 
     if (opcode != OP_NOP)
+    {
         PutOp(opcode); // if need to emit comparison before branch
+        // Update stack_map_generator: comparison opcodes pop 2 operands and push int
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType(); // pop second operand
+            stack_map_generator->PopType(); // pop first operand
+            stack_map_generator->PushType(control.int_type); // push int result
+        }
+    }
 
     EmitBranch (cond ? op_true : op_false, lab, over);
 }
