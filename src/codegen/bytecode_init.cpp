@@ -140,7 +140,9 @@ void ByteCode::GenerateCode()
     }
 
     //
-    // Generate bridge methods for generic covariant overrides
+    // Generate bridge methods for generic covariant overrides.
+    // First, check methods with attached bridges (for inherited methods that
+    // are directly in this type's method symbols).
     //
     for (i = 0; i < unit_type -> NumMethodSymbols(); i++)
     {
@@ -154,6 +156,39 @@ void ByteCode::GenerateCode()
                 BeginMethod(method_index, bridge);
                 GenerateBridgeMethod(bridge);
                 EndMethod(method_index, bridge);
+            }
+        }
+    }
+    //
+    // Also check for bridge methods that were added directly to this type's
+    // method table (for bridges targeting inherited methods from superclasses).
+    // These bridges have ACC_BRIDGE flag and a BridgeTarget set.
+    //
+    for (i = 0; i < unit_type -> NumMethodSymbols(); i++)
+    {
+        MethodSymbol* method = unit_type -> MethodSym(i);
+        if (method -> IsBridge() && method -> BridgeTarget() &&
+            method -> containing_type == unit_type)
+        {
+            // Check if this bridge was already emitted via the loop above
+            // by checking if the target method has this bridge in its list
+            MethodSymbol* target = method -> BridgeTarget();
+            bool already_emitted = false;
+            for (unsigned j = 0; j < target -> NumGeneratedBridges(); j++)
+            {
+                if (target -> GeneratedBridge(j) == method &&
+                    target -> containing_type == unit_type)
+                {
+                    already_emitted = true;
+                    break;
+                }
+            }
+            if (! already_emitted)
+            {
+                int method_index = methods.NextIndex();
+                BeginMethod(method_index, method);
+                GenerateBridgeMethod(method);
+                EndMethod(method_index, method);
             }
         }
     }

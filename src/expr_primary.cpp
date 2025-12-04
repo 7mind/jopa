@@ -294,12 +294,31 @@ MethodShadowSymbol* Semantic::FindMethodMember(TypeSymbol* type,
                 if (super_expr -> base_opt)
                     target_type = super_expr -> base_opt -> symbol;
             }
-            if (this_type != target_type &&
-                (method -> ACC_PRIVATE() ||
-                 (method -> ACC_PROTECTED() &&
-                  ! ProtectedAccessCheck(containing_type)) ||
-                 (target_type != containing_type &&
-                  target_type != this_type)))
+            //
+            // Need accessor if:
+            // 1. Private method declared in a different class (including superclass)
+            // 2. Access to enclosing class's private/protected method
+            // 3. Protected method access across packages without proper subclass relationship
+            //
+            bool need_accessor = false;
+            if (method -> ACC_PRIVATE())
+            {
+                // Private methods always require accessor if not in the declaring class
+                need_accessor = (containing_type != this_type);
+            }
+            else if (method -> ACC_PROTECTED() && ! ProtectedAccessCheck(containing_type))
+            {
+                // Protected method needs accessor across packages
+                need_accessor = this_type != target_type;
+            }
+            else if (this_type != target_type &&
+                     target_type != containing_type &&
+                     target_type != this_type)
+            {
+                // Enclosing class access
+                need_accessor = true;
+            }
+            if (need_accessor)
             {
                 //
                 // Find the right enclosing class to place the accessor method

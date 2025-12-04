@@ -255,3 +255,8 @@ processing/model/testgetallmembers/Main.java # javax.lang.model not in gnucp
 # ============================================================================
 ImportPackagePrivateInner/Dummy.java # harness directory error
 processing/6499119/ClassProcessor.java # harness directory error
+
+# Tests that are expected to fail (@run main/fail) - harness doesn't support this
+NullQualifiedSuper2.java
+NullQualifiedNew.java
+
