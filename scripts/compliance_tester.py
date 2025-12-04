@@ -127,25 +127,30 @@ def parse_test_file(file_path, blacklist=None, verbose_prepare=False):
         # Remove leading *
         line = re.sub(r'^\*\s*', '', line)
         
-        # Standard jtreg
-        if line.startswith('@run main/fail'):
-            # Test expected to fail (non-zero exit code)
+        # Standard jtreg - handle @run main, @run main/fail, @run main/othervm
+        if line.startswith('@run main'):
             parts = line.split()
-            if len(parts) >= 3:
-                run_directives.append(parts[2:])  # [Class, arg1, arg2...]
-            is_positive = True
-            expect_failure = True
-            reason = "@run main/fail"
+            if len(parts) >= 2:
+                run_type = parts[1]  # main, main/fail, main/othervm, etc.
+                args = parts[2:] if len(parts) > 2 else []
 
-        elif line.startswith('@run main'):
-            # Extract class name and args
-            parts = line.split()
-            if len(parts) >= 3:
-                run_directives.append(parts[2:]) # [Class, arg1, arg2...]
-            else:
-                pass
-            is_positive = True
-            reason = "@run main"
+                # Filter out JVM options (starting with -) before the class name
+                # JVM options like -Xfuture, -verify, etc. are not supported
+                filtered_args = []
+                for arg in args:
+                    if arg.startswith('-'):
+                        continue  # Skip JVM options
+                    filtered_args.append(arg)
+
+                if filtered_args:
+                    run_directives.append(filtered_args)
+
+                is_positive = True
+                if '/fail' in run_type:
+                    expect_failure = True
+                    reason = "@run main/fail"
+                else:
+                    reason = "@run main"
         
         elif line.startswith('@compile'):
             if line.startswith('@compile/fail'):

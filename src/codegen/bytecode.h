@@ -248,7 +248,11 @@ public:
     // where the verifier can infer the stack state from fallthrough.
     bool no_frame;
 
-    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false) {}
+    // If true, the frame at this label needs an int on top of the saved stack.
+    // Used for boolean-to-value patterns where both paths merge with an int result.
+    bool needs_int_on_stack;
+
+    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false), needs_int_on_stack(false) {}
 
     //
     // All used labels should have been completed and reset, otherwise a goto
@@ -276,6 +280,7 @@ public:
        saved_stack_depth = 0;
        stack_saved = false;
        no_frame = false;
+       needs_int_on_stack = false;
     }
 };
 

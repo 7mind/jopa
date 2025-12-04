@@ -99,6 +99,21 @@ void ByteCode::EmitPostUnaryExpressionField(VariableCategory kind,
 
     if (is_wrapper)
     {
+        // For generic fields, the actual field type is Object but we need the wrapper.
+        // Check if we need a checkcast before unboxing.
+        VariableSymbol* sym = expression -> expression -> symbol -> VariableCast();
+        if (sym)
+        {
+            TypeSymbol* field_type = sym -> Type();
+            // If field type is Object (generic erasure) but expression type is a wrapper,
+            // we need to cast to the wrapper type before calling the unbox method.
+            if (field_type == control.Object() && expression_type != control.Object())
+            {
+                PutOp(OP_CHECKCAST);
+                PutU2(RegisterClass(expression_type));
+            }
+        }
+
         // For post-increment, we need to save the original value
         // Stack: [obj_ref, wrapper_val]
         if (need_value)
@@ -618,6 +633,21 @@ void ByteCode::EmitPreUnaryIncrementExpressionField(VariableCategory kind,
 
     if (is_wrapper)
     {
+        // For generic fields, the actual field type is Object but we need the wrapper.
+        // Check if we need a checkcast before unboxing.
+        VariableSymbol* sym = expression -> expression -> symbol -> VariableCast();
+        if (sym)
+        {
+            TypeSymbol* field_type = sym -> Type();
+            // If field type is Object (generic erasure) but expression type is a wrapper,
+            // we need to cast to the wrapper type before calling the unbox method.
+            if (field_type == control.Object() && expression_type != control.Object())
+            {
+                PutOp(OP_CHECKCAST);
+                PutU2(RegisterClass(expression_type));
+            }
+        }
+
         // Unbox the wrapper to primitive
         EmitUnboxingConversion(expression_type, unboxed_type);
 
@@ -1172,7 +1202,12 @@ void ByteCode::DefineLabel(Label& lab)
     //
     if (stack_map_generator && lab.uses.Length() > 0 && !lab.no_frame)
     {
-        if (lab.stack_saved && lab.saved_stack_types)
+        if (lab.stack_saved && lab.saved_stack_types && lab.needs_int_on_stack)
+        {
+            // Boolean-to-value pattern: saved stack + int result
+            stack_map_generator->RecordFrameWithSavedStackPlusInt(lab.definition, lab.saved_stack_types);
+        }
+        else if (lab.stack_saved && lab.saved_stack_types)
         {
             // Use the saved stack types from the branch point
             // This handles all cases: empty stack, non-empty stack with any types
@@ -1611,6 +1646,20 @@ int ByteCode::LoadVariable(VariableCategory kind, AstExpression* expr,
     if (control.IsDoubleWordType(expression_type))
         ChangeStack(1);
     PutU2(RegisterFieldref(VariableTypeResolution(expr, sym), sym));
+
+    // For generic fields, the declared field type may be Object (erased)
+    // but the expression type may be a specific type (e.g., Byte).
+    // In this case, we need to emit a checkcast.
+    TypeSymbol* field_type = sym -> Type();
+    if (need_value &&
+        field_type == control.Object() &&
+        expression_type != control.Object() &&
+        ! expression_type -> Primitive())
+    {
+        PutOp(OP_CHECKCAST);
+        PutU2(RegisterClass(expression_type));
+    }
+
     if (need_value)
     {
         return GetTypeWords(expression_type);
