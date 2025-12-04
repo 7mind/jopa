@@ -517,13 +517,11 @@ bool Semantic::CanMethodInvocationConvert(const TypeSymbol* target_type,
         if (target_type -> Primitive()) {
             if (source_type == target_type)
                 return true;
+            // JLS 5.3: Method invocation conversion allows widening primitive
+            // conversion, but NOT narrowing. Narrowing is only allowed in
+            // assignment contexts with compile-time constants.
             bool widening_allowed = CanWideningPrimitiveConvert(target_type, source_type);
-            bool narrowing_allowed = CanNarrowingPrimitiveConvert(target_type, source_type);
-            if (widening_allowed || narrowing_allowed) {
-                return true;
-            } else {
-                return false;
-            }
+            return widening_allowed;
         }
         // Java 5: Boxing conversion (primitive → wrapper) for method invocation
         // JLS 5.3: Boxing conversion followed by widening reference conversion

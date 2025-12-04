@@ -1627,7 +1627,7 @@ static void CheckAndCreateBridge(
         signature_differs = true;
 
     // Check parameter types - parameters must be compatible for this to be an override
-    // Compatible means: same type, OR inherited has broader type due to generic erasure
+    // Compatible means: same type, OR one is a subtype of the other due to generic erasure
     for (unsigned p = 0; p < method -> NumFormalParameters(); p++)
     {
         TypeSymbol* inherited_param = inherited_method -> FormalParameter(p) -> Type();
@@ -1636,13 +1636,16 @@ static void CheckAndCreateBridge(
         if (inherited_param != method_param)
         {
             signature_differs = true;
-            // For this to be a valid override with generic erasure,
-            // inherited_param should be Object (or other erased type param),
-            // and method_param should be a more specific type
-            if (! method_param -> IsSubtype(inherited_param))
+            // For this to be a valid override relationship:
+            // - method_param is subtype of inherited_param: implementation is more specific
+            //   (e.g., String process(String) overrides Object process(Object))
+            // - inherited_param is subtype of method_param: interface is more specific
+            //   (e.g., foo(String) in interface, foo(Object) in generic superclass)
+            // In both cases, a bridge may be needed.
+            if (! method_param -> IsSubtype(inherited_param) &&
+                ! inherited_param -> IsSubtype(method_param))
             {
-                // Not compatible - method_param is NOT a subtype of inherited_param
-                // This means they're completely different methods, not an override
+                // Not compatible - completely unrelated types
                 params_compatible = false;
                 break;
             }
@@ -1836,6 +1839,48 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
                     super_shadow = super_shadow -> next_method;
                 }
             }
+        }
+
+        // Also check interfaces implemented by superclasses - needed for bridge generation
+        // when a subclass provides a concrete implementation for an interface method
+        // declared in a parent class (e.g., D extends C extends E implements A)
+        TypeSymbol* super_type = type -> super;
+        while (super_type && super_type != control.Object())
+        {
+            for (unsigned k = 0; k < super_type -> NumInterfaces(); k++)
+            {
+                TypeSymbol* interf = super_type -> Interface(k);
+                if (! interf -> expanded_method_table)
+                    continue;
+
+                MethodShadowSymbol* iface_shadow = interf -> expanded_method_table ->
+                    FindMethodShadowSymbol(method -> name_symbol);
+
+                while (iface_shadow)
+                {
+                    MethodSymbol* iface_method = iface_shadow -> method_symbol;
+                    if (iface_method -> containing_type -> ACC_INTERFACE())
+                    {
+                        if (! iface_method -> IsTyped())
+                            iface_method -> ProcessMethodSignature(this, tok);
+                        CheckAndCreateBridge(method, iface_method, type, control, this, tok);
+                    }
+
+                    for (unsigned c = 0; c < iface_shadow -> NumConflicts(); c++)
+                    {
+                        MethodSymbol* conflict = iface_shadow -> Conflict(c);
+                        if (conflict -> containing_type -> ACC_INTERFACE())
+                        {
+                            if (! conflict -> IsTyped())
+                                conflict -> ProcessMethodSignature(this, tok);
+                            CheckAndCreateBridge(method, conflict, type, control, this, tok);
+                        }
+                    }
+
+                    iface_shadow = iface_shadow -> next_method;
+                }
+            }
+            super_type = super_type -> super;
         }
     }
 }
@@ -5059,11 +5104,11 @@ void Semantic::ProcessMethodDeclaration(AstMethodDeclaration* method_declaration
     //
     // By JLS2 8.4.3.3, a private method and all methods declared in a
     // final class are implicitly final. Also, all methods in a strictfp
-    // class are strictfp.
+    // class are strictfp, EXCEPT abstract methods (JLS 8.4.3.5).
     //
     if (access_flags.ACC_PRIVATE() || this_type -> ACC_FINAL())
         access_flags.SetACC_FINAL();
-    if (this_type -> ACC_STRICTFP())
+    if (this_type -> ACC_STRICTFP() && ! access_flags.ACC_ABSTRACT())
         access_flags.SetACC_STRICTFP();
 
     //

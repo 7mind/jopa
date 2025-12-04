@@ -512,11 +512,27 @@ def main():
         resolved_cp = resolve_classpath(args.classpath)
         compiler_path = resolve_tool(args.compiler, 'jopa', JOPA_PATH, 'javac')
         jvm_path = resolve_tool(args.jvm, 'jamvm', JAMVM_PATH, 'java')
-        
+
         print(f"Using classpath: {resolved_cp}")
         print(f"Using compiler: {compiler_path}")
         print(f"Using JVM: {jvm_path}")
-        
+
+        # Load exclusions for test mode
+        exclude_set = set()
+        blacklist_files = args.blacklist if args.blacklist else []
+        for bl_file in blacklist_files:
+            if os.path.exists(bl_file):
+                try:
+                    with open(bl_file, 'r') as f:
+                        for line in f:
+                            clean_line = line.split('#')[0].strip()
+                            if clean_line:
+                                if clean_line.startswith('@'):
+                                    clean_line = clean_line[1:].strip()
+                                exclude_set.add(clean_line)
+                except Exception as e:
+                    print(f"Warning: Error reading blacklist {bl_file}: {e}")
+
         tests = []
         # Determine input file for test mode
         input_testlist = args.testlist
@@ -526,7 +542,7 @@ def main():
             else:
                 print("Error: --jdk {7,8} is required for --test if --testlist is not provided")
                 sys.exit(1)
-        
+
         if input_testlist:
              print(f"Reading tests from {input_testlist}...")
              if not os.path.exists(input_testlist):
@@ -535,10 +551,19 @@ def main():
              with open(input_testlist, 'r') as f:
                  for line in f:
                      path = line.strip()
-                     if path and os.path.exists(path):
-                         instructions = parse_test_file(path)
-                         if instructions:
-                             tests.append(Test(path, instructions, instructions['reason']))
+                     if not path or not os.path.exists(path):
+                         continue
+                     # Check against exclude set (substring match)
+                     should_skip = False
+                     for pattern in exclude_set:
+                         if pattern in path:
+                             should_skip = True
+                             break
+                     if should_skip:
+                         continue
+                     instructions = parse_test_file(path)
+                     if instructions:
+                         tests.append(Test(path, instructions, instructions['reason']))
         else: # This block is now effectively unreachable due to input_testlist determination above
             if not roots:
                 print("Error: --jdk {7,8} is required for --test if --testlist is not provided")

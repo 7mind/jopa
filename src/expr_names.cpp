@@ -555,7 +555,17 @@ AstExpression* Semantic::CreateAccessToType(Ast* source,
             exact = true;
     }
     else if (class_creation)
+    {
         left_tok = right_tok = class_creation -> new_token;
+        //
+        // For local classes, we need exact matching. The enclosing instance
+        // must be the one captured when the local class was defined, not just
+        // any subclass-compatible instance. JLS 15.9.2
+        //
+        TypeSymbol* created_type = class_creation -> class_type -> symbol;
+        if (created_type && created_type -> IsLocal())
+            exact = true;
+    }
     else if (super_call)
         left_tok = right_tok = super_call -> super_token;
     else if (this_expr)
@@ -1110,11 +1120,27 @@ void Semantic::FindVariableMember(TypeSymbol* type, AstExpression* expr)
                 if (super_expr -> base_opt)
                     target_type = super_expr -> base_opt -> symbol;
             }
-            if (this_type != target_type &&
-                (variable -> ACC_PRIVATE() ||
-                 (variable -> ACC_PROTECTED() &&
-                  (! ProtectedAccessCheck(containing_type) ||
-                   target_type != containing_type))))
+            //
+            // Need accessor if:
+            // 1. Private field declared in a different class (including superclass)
+            // 2. Access to enclosing class's private/protected field
+            // 3. Protected field access across packages without proper subclass relationship
+            //
+            bool need_accessor = false;
+            if (variable -> ACC_PRIVATE())
+            {
+                // Private fields always require accessor if not in the declaring class
+                need_accessor = (containing_type != this_type);
+            }
+            else if (variable -> ACC_PROTECTED())
+            {
+                // Protected field needs accessor when accessing through enclosing class
+                // or across packages without proper relationship
+                need_accessor = this_type != target_type &&
+                    (! ProtectedAccessCheck(containing_type) ||
+                     target_type != containing_type);
+            }
+            if (need_accessor)
             {
                 if (expr -> IsConstant())
                     expr -> symbol = variable;

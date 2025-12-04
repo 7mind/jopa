@@ -175,11 +175,17 @@ TypeSymbol* ByteCode::VariableTypeResolution(AstExpression* expression,
     // interface is referenced by inheritance, even though the JVMS permits it
     // and JLS 13 requires it.
     //
+    // Java 5: For static imports, base is NULL but we should use the
+    // containing type, not unit_type, so the correct class is referenced.
+    //
+    TypeSymbol* owner_type = sym -> ContainingType();
     TypeSymbol* candidate = field ? field -> base -> Type()
-        : name -> base_opt ? name -> base_opt -> Type() : unit_type;
-    return (sym -> ContainingType() -> ACC_INTERFACE() &&
+        : name -> base_opt ? name -> base_opt -> Type()
+        : sym -> ACC_STATIC() ? owner_type  // Java 5: static import
+        : unit_type;
+    return (owner_type -> ACC_INTERFACE() &&
             control.option.target < JopaOption::SDK1_4)
-        ? sym -> ContainingType() : candidate;
+        ? owner_type : candidate;
 }
 
 
