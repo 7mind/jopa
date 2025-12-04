@@ -318,6 +318,12 @@ def get_clean_env():
         'LC_ALL': os.environ.get('LC_ALL', 'C'),
         'TMPDIR': os.environ.get('TMPDIR', '/tmp'),
     }
+
+    # Pass through important environment variables if they exist
+    for var in ['LD_LIBRARY_PATH', 'NIX_LD_LIBRARY_PATH']:
+        if var in os.environ:
+            clean[var] = os.environ[var]
+
     # Explicitly do NOT include: CLASSPATH, JIKESPATH, JAVA_HOME, etc.
     return clean
 
