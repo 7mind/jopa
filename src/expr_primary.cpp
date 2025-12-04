@@ -3168,8 +3168,8 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
         value.Length(); // +1 for $
     wchar_t* anonymous_name = new wchar_t[length + 1]; // +1 for '\0'
     wcscpy(anonymous_name, this_type -> ExternalName());
-    wcscat(anonymous_name, (control.option.target < JopaOption::SDK1_5
-                            ? StringConstant::US_DS : StringConstant::US_MI));
+    // Always use $ separator for class file naming - it's part of JVM spec
+    wcscat(anonymous_name, StringConstant::US_DS);
     wcscat(anonymous_name, value.String());
 
     NameSymbol* name_symbol = control.FindOrInsertName(anonymous_name, length);
@@ -3223,11 +3223,11 @@ TypeSymbol* Semantic::GetAnonymousType(AstClassCreationExpression* class_creatio
     anon_type -> SetSignature(control);
 
     //
-    // By JLS2 15.9.5, an anonymous class is implicitly final, but never
-    // static. However, the anonymous class only needs access to its enclosing
-    // instance if it is not in a static context.
+    // By JLS2 15.9.5, an anonymous class is implicitly final at the language
+    // level (cannot be subclassed), but ACC_FINAL should NOT be set in the
+    // class file per JDK bug 6520152. Anonymous classes are never static,
+    // but only need access to enclosing instance if not in a static context.
     //
-    anon_type -> SetACC_FINAL();
     if (! StaticRegion())
         anon_type -> InsertThis0();
 
