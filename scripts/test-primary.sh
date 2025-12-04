@@ -85,14 +85,13 @@ echo "JamVM: ${USE_JAMVM}"
 echo ""
 
 # Target versions to test
-# Note: Target 1.7 excluded due to known OOM issue in StackMapTable generation
-# for complex tests with many boolean method arguments (see NumericBitwiseBoxingTest)
+# Target 1.7 requires correct StackMapTable generation for JVM verification
 if $QUICK_MODE; then
-    TARGETS=("1.6")
-    echo "Mode: Quick (target 1.6 only)"
+    TARGETS=("1.7")
+    echo "Mode: Quick (target 1.7 only)"
 else
-    TARGETS=("1.5" "1.6")
-    echo "Mode: Full matrix (targets 1.5, 1.6)"
+    TARGETS=("1.5" "1.6" "1.7")
+    echo "Mode: Full matrix (targets 1.5, 1.6, 1.7)"
 fi
 echo ""
 
