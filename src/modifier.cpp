@@ -408,9 +408,9 @@ AccessFlags Semantic::ProcessInterfaceMethodModifiers(AstMethodDeclaration* meth
     u2 valid_flags = AccessFlags::ACCESS_PUBLIC | AccessFlags::ACCESS_ABSTRACT;
     u2 implicit_flags = AccessFlags::ACCESS_PUBLIC | AccessFlags::ACCESS_ABSTRACT;
 
-    if (control.option.source >= JopaOption::SDK1_8)
+    if (control.option.source >= JopaOption::SDK1_5)
     {
-        // Java 8+ allows static interface methods
+        // Static interface methods
         valid_flags |= AccessFlags::ACCESS_STATIC;
         // Note: 'default' is handled separately in ProcessModifiers
         // where it's recognized as a transformed TK_abstract token
