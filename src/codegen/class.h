@@ -1787,6 +1787,7 @@ public:
 #ifdef JOPA_DEBUG
         void Print(const ConstantPool& constant_pool) const
         {
+            (void)constant_pool;  // May be used in future for symbol resolution
             switch (tag)
             {
             case TYPE_Top: Coutput << "top"; break;

@@ -118,6 +118,128 @@ public:
     void ClearStack();
 
     //
+    // DUP operations - duplicate stack values
+    //
+    void Dup()
+    {
+        if (current_stack.Length() > 0)
+            current_stack.Next() = current_stack[current_stack.Length() - 1];
+    }
+
+    void Dup2()
+    {
+        // Duplicates top two values (or one category 2 value)
+        unsigned len = current_stack.Length();
+        if (len >= 2)
+        {
+            current_stack.Next() = current_stack[len - 2];
+            current_stack.Next() = current_stack[len - 1];
+        }
+        else if (len == 1)
+        {
+            current_stack.Next() = current_stack[len - 1];
+        }
+    }
+
+    void DupX1()
+    {
+        // ..., value2, value1 -> ..., value1, value2, value1
+        unsigned len = current_stack.Length();
+        if (len >= 2)
+        {
+            VerificationType v1 = current_stack[len - 1];
+            VerificationType v2 = current_stack[len - 2];
+            current_stack[len - 2] = v1;
+            current_stack[len - 1] = v2;
+            current_stack.Next() = v1;
+        }
+    }
+
+    void DupX2()
+    {
+        // ..., value3, value2, value1 -> ..., value1, value3, value2, value1
+        unsigned len = current_stack.Length();
+        if (len >= 3)
+        {
+            VerificationType v1 = current_stack[len - 1];
+            VerificationType v2 = current_stack[len - 2];
+            VerificationType v3 = current_stack[len - 3];
+            current_stack[len - 3] = v1;
+            current_stack[len - 2] = v3;
+            current_stack[len - 1] = v2;
+            current_stack.Next() = v1;
+        }
+    }
+
+    void Dup2X1()
+    {
+        // ..., value3, value2, value1 -> ..., value2, value1, value3, value2, value1
+        unsigned len = current_stack.Length();
+        if (len >= 3)
+        {
+            VerificationType v1 = current_stack[len - 1];
+            VerificationType v2 = current_stack[len - 2];
+            VerificationType v3 = current_stack[len - 3];
+            current_stack[len - 3] = v2;
+            current_stack[len - 2] = v1;
+            current_stack[len - 1] = v3;
+            current_stack.Next() = v2;
+            current_stack.Next() = v1;
+        }
+    }
+
+    void Dup2X2()
+    {
+        // ..., v4, v3, v2, v1 -> ..., v2, v1, v4, v3, v2, v1
+        unsigned len = current_stack.Length();
+        if (len >= 4)
+        {
+            VerificationType v1 = current_stack[len - 1];
+            VerificationType v2 = current_stack[len - 2];
+            VerificationType v3 = current_stack[len - 3];
+            VerificationType v4 = current_stack[len - 4];
+            current_stack[len - 4] = v2;
+            current_stack[len - 3] = v1;
+            current_stack[len - 2] = v4;
+            current_stack[len - 1] = v3;
+            current_stack.Next() = v2;
+            current_stack.Next() = v1;
+        }
+    }
+
+    void Swap()
+    {
+        unsigned len = current_stack.Length();
+        if (len >= 2)
+        {
+            VerificationType tmp = current_stack[len - 1];
+            current_stack[len - 1] = current_stack[len - 2];
+            current_stack[len - 2] = tmp;
+        }
+    }
+
+    //
+    // Save/restore stack state for branch targets
+    //
+    Tuple<VerificationType>* SaveStack() const
+    {
+        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_stack.Length(), 8);
+        for (unsigned i = 0; i < current_stack.Length(); i++)
+            saved->Next() = current_stack[i];
+        return saved;
+    }
+
+    void RestoreStack(Tuple<VerificationType>* saved)
+    {
+        current_stack.Reset();
+        if (saved)
+        {
+            for (unsigned i = 0; i < saved->Length(); i++)
+                current_stack.Next() = (*saved)[i];
+        }
+    }
+
+    //
     // Local operations
     //
     void SetLocal(u2 index, const VerificationType& type);
@@ -187,6 +309,16 @@ public:
     void RecordFrameWithSavedStackPlusInt(u2 pc, Tuple<VerificationType>* saved_stack);
 
     //
+    // Record a frame at the given PC with saved locals and saved stack.
+    // This is used for forward branches that jump over variable declarations -
+    // the frame at the target should reflect the state at the branch point,
+    // not the state when the label is defined.
+    //
+    void RecordFrameWithSavedLocalsAndStack(u2 pc,
+                                            Tuple<VerificationType>* saved_locals,
+                                            Tuple<VerificationType>* saved_stack);
+
+    //
     // Check if we already have a frame at this PC
     //
     bool HasFrameAt(u2 pc) const;
@@ -240,6 +372,13 @@ public:
     // Saved stack types for forward branches (for StackMapTable generation)
     // This captures the actual stack types at the first forward reference to this label
     Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_stack_types;
+    // Saved locals types for forward branches (for StackMapTable generation)
+    // This captures the actual locals types at the first forward reference to this label
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_locals_types;
+    // Saved locals at definition time (for backward branches)
+    // This captures the locals state when DefineLabel is called, before any code
+    // that might modify locals (like loop bodies)
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* definition_locals;
     int saved_stack_depth;
     bool stack_saved;
 
@@ -252,7 +391,12 @@ public:
     // Used for boolean-to-value patterns where both paths merge with an int result.
     bool needs_int_on_stack;
 
-    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false), needs_int_on_stack(false) {}
+    // The result type that should be on the stack at this label's merge point.
+    // If non-NULL, DefineLabel will create a frame with this type on the stack.
+    // This is used for general ternary expressions (not just int).
+    TypeSymbol* result_type;
+
+    Label() : defined(false), definition(0), saved_stack_types(NULL), saved_locals_types(NULL), definition_locals(NULL), saved_stack_depth(0), stack_saved(false), no_frame(false), needs_int_on_stack(false), result_type(NULL) {}
 
     //
     // All used labels should have been completed and reset, otherwise a goto
@@ -268,6 +412,8 @@ public:
             uses.Reset();
         }
         delete saved_stack_types;
+        delete saved_locals_types;
+        delete definition_locals;
     }
 
     void Reset()
@@ -277,6 +423,10 @@ public:
        definition = 0;
        delete saved_stack_types;
        saved_stack_types = NULL;
+       delete saved_locals_types;
+       saved_locals_types = NULL;
+       delete definition_locals;
+       definition_locals = NULL;
        saved_stack_depth = 0;
        stack_saved = false;
        no_frame = false;

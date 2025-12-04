@@ -254,6 +254,36 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                 }
                 EmitBlockStatement(for_statement -> statement);
                 assert(stack_depth == 0);
+
+                // Clear FOR init variables when FOR loop ends (early return path)
+                if (stack_map_generator)
+                {
+                    for (unsigned k = 0; k < for_statement -> NumForInitStatements(); k++)
+                    {
+                        AstLocalVariableStatement* local_var =
+                            for_statement -> ForInitStatement(k) -> LocalVariableStatementCast();
+                        if (local_var)
+                        {
+                            for (unsigned m = 0; m < local_var -> NumVariableDeclarators(); m++)
+                            {
+                                VariableSymbol* var_sym = local_var -> VariableDeclarator(m) -> symbol;
+                                if (var_sym)
+                                {
+                                    stack_map_generator->SetLocal(var_sym->LocalVariableIndex(),
+                                        StackMapTableAttribute::VerificationTypeInfo(
+                                            StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                                    if (control.IsDoubleWordType(var_sym->Type()))
+                                    {
+                                        stack_map_generator->SetLocal(var_sym->LocalVariableIndex() + 1,
+                                            StackMapTableAttribute::VerificationTypeInfo(
+                                                StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 return abrupt;
             }
             Label& continue_label = method_stack -> TopContinueLabel();
@@ -301,6 +331,41 @@ bool ByteCode::EmitStatement(AstStatement* statement)
                             for_statement -> statement);
             CompleteLabel(continue_label);
             CompleteLabel(begin_label);
+
+            //
+            // Clear FOR init variables in StackMapGenerator when FOR loop ends.
+            // This is critical for labeled break/continue that target outer scopes -
+            // the FOR init variables should be Top at the label target.
+            //
+            if (stack_map_generator)
+            {
+                for (unsigned k = 0; k < for_statement -> NumForInitStatements(); k++)
+                {
+                    AstLocalVariableStatement* local_var =
+                        for_statement -> ForInitStatement(k) -> LocalVariableStatementCast();
+                    if (local_var)
+                    {
+                        for (unsigned m = 0; m < local_var -> NumVariableDeclarators(); m++)
+                        {
+                            VariableSymbol* var_sym = local_var -> VariableDeclarator(m) -> symbol;
+                            if (var_sym)
+                            {
+                                stack_map_generator->SetLocal(var_sym->LocalVariableIndex(),
+                                    StackMapTableAttribute::VerificationTypeInfo(
+                                        StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                                // For long/double, also clear the second slot
+                                if (control.IsDoubleWordType(var_sym->Type()))
+                                {
+                                    stack_map_generator->SetLocal(var_sym->LocalVariableIndex() + 1,
+                                        StackMapTableAttribute::VerificationTypeInfo(
+                                            StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             return abrupt && ! for_statement -> can_complete_normally;
         }
     case Ast::FOREACH: // JSR 201
@@ -411,6 +476,29 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
     bool abrupt = false;
     for (unsigned i = 0; i < block -> NumStatements() && ! abrupt; i++)
         abrupt = EmitStatement(block -> Statement(i));
+
+    //
+    // Clear block-scoped variables in StackMapGenerator before defining any labels.
+    // This is critical for labeled break/continue that target outer scopes - the
+    // variables defined in this block should be Top at the label target.
+    //
+    if (stack_map_generator)
+    {
+        for (unsigned i = 0; i < block -> NumLocallyDefinedVariables(); i++)
+        {
+            VariableSymbol* variable = block -> LocallyDefinedVariable(i);
+            stack_map_generator->SetLocal(variable->LocalVariableIndex(),
+                StackMapTableAttribute::VerificationTypeInfo(
+                    StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+            // For long/double, also clear the second slot
+            if (control.IsDoubleWordType(variable->Type()))
+            {
+                stack_map_generator->SetLocal(variable->LocalVariableIndex() + 1,
+                    StackMapTableAttribute::VerificationTypeInfo(
+                        StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
+            }
+        }
+    }
 
     //
     // If contained break statements jump out of this block, define the label.
@@ -699,6 +787,9 @@ bool ByteCode::EmitSwitchStatement(AstSwitchStatement* switch_statement)
     }
 
     PutOp(use_lookup ? OP_LOOKUPSWITCH : OP_TABLESWITCH);
+    // tableswitch/lookupswitch consumes the key value from the stack
+    if (stack_map_generator)
+        stack_map_generator->PopType();
     op_start = last_op_pc; // pc at start of instruction
 
     //
