@@ -149,6 +149,7 @@ assets/jdk7u-langtools/test/tools/javac/BadOptimization/DeadCode5.java
 assets/jdk7u-langtools/test/tools/javac/6979683/TestCast6979683_GOOD.java
 assets/jdk7u-langtools/test/tools/javac/processing/model/util/elements/VacuousEnum.java
 assets/jdk7u-langtools/test/tools/javac/processing/options/XprintDocComments.java
+assets/jdk7u-langtools/test/tools/javac/multicatch/Pos03.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos06.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08.java
 assets/jdk7u-langtools/test/tools/javac/multicatch/Pos08eff_final.java
@@ -205,6 +206,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/Crash01.java
 assets/jdk7u-langtools/test/tools/javac/generics/GenericOverride.java
 assets/jdk7u-langtools/test/tools/javac/generics/Casting5.java
 assets/jdk7u-langtools/test/tools/javac/generics/ParenVerify.java
+assets/jdk7u-langtools/test/tools/javac/generics/T4784219.java
 assets/jdk7u-langtools/test/tools/javac/generics/ReverseOrder.java
 assets/jdk7u-langtools/test/tools/javac/generics/T5094318.java
 assets/jdk7u-langtools/test/tools/javac/generics/FinalBridge.java
@@ -356,6 +358,7 @@ assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos05.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos04.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos02.java
 assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos06.java
+assets/jdk7u-langtools/test/tools/javac/generics/diamond/pos/Pos03.java
 assets/jdk7u-langtools/test/tools/javac/generics/5066774/T5066774.java
 assets/jdk7u-langtools/test/tools/javac/lint/NoWarn.java
 assets/jdk7u-langtools/test/tools/javac/OverrideChecks/InterfaceOverride.java
@@ -441,7 +444,6 @@ assets/jdk7u-langtools/test/tools/javac/annotations/pos/ClassA.java
 assets/jdk7u-langtools/test/tools/javac/annotations/pos/Dep.java
 assets/jdk7u-langtools/test/tools/javac/annotations/pos/NType.java
 assets/jdk7u-langtools/test/tools/javac/annotations/6359949/T6359949.java
-assets/jdk7u-langtools/test/tools/javac/annotations/6365854/T6365854.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis7.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis3.java
 assets/jdk7u-langtools/test/tools/javac/implicitThis/WhichImplicitThis11.java

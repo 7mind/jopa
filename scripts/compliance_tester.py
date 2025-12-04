@@ -297,34 +297,67 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
     stderr_str = ''
 
     try:
-        # 1. Copy main test file
-        shutil.copy2(test.file_path, dest_test_file)
-        
-        # 2. Handle compile directives (copy extra files preserving directory structure)
         test_dir = os.path.dirname(test.file_path)
 
+        # Check if @compile directive specifies explicit files to compile
+        explicit_compile_files = []
         for files in test.instructions['compile']:
             for f in files:
                 if f.startswith('-'): continue
+                if f.endswith('.java'):
+                    explicit_compile_files.append(f)
+
+        # Check if test file name matches any explicit compile file
+        test_basename = os.path.basename(test.file_path)
+        test_file_explicitly_excluded = (explicit_compile_files and
+                                         test_basename not in explicit_compile_files and
+                                         not any(f.endswith('/' + test_basename) for f in explicit_compile_files))
+
+        # 1. Copy files to compile
+        if explicit_compile_files:
+            # @compile specifies explicit files - copy those
+            for f in explicit_compile_files:
                 src = os.path.join(test_dir, f)
                 if os.path.exists(src):
-                    # Preserve directory structure (e.g., pkg/A.java -> tmpdir/pkg/A.java)
                     dest = os.path.join(tmpdir, f)
                     dest_dir = os.path.dirname(dest)
                     if dest_dir and not os.path.exists(dest_dir):
                         os.makedirs(dest_dir)
                     shutil.copy2(src, dest)
-                else:
-                    pass
+            # If @run exists and test file wasn't in compile list, also copy test file
+            # (the test file contains the main method to run)
+            if test.instructions['run'] and test_file_explicitly_excluded:
+                shutil.copy2(test.file_path, dest_test_file)
+                explicit_compile_files.append(test_basename)
+        else:
+            # No explicit files - copy main test file
+            shutil.copy2(test.file_path, dest_test_file)
 
-        # 3. Handle library directives
+            # Also copy any extra files from compile directives (non-.java args like directories)
+            for files in test.instructions['compile']:
+                for f in files:
+                    if f.startswith('-'): continue
+                    src = os.path.join(test_dir, f)
+                    if os.path.exists(src):
+                        dest = os.path.join(tmpdir, f)
+                        dest_dir = os.path.dirname(dest)
+                        if dest_dir and not os.path.exists(dest_dir):
+                            os.makedirs(dest_dir)
+                        shutil.copy2(src, dest)
+
+        # 2. Handle library directives
         for lib in test.instructions.get('library', []):
             src = os.path.join(test_dir, lib)
             if os.path.exists(src):
                 copy_recursive(src, tmpdir)
 
-        # 4. Compile
-        java_files = glob.glob(os.path.join(tmpdir, "*.java"))
+        # 3. Compile
+        if explicit_compile_files:
+            # Compile only the explicitly specified files
+            java_files = [os.path.join(tmpdir, f) for f in explicit_compile_files if os.path.exists(os.path.join(tmpdir, f))]
+        else:
+            # Compile all .java files in tmpdir
+            java_files = glob.glob(os.path.join(tmpdir, "*.java"))
         if not java_files:
             outcome = 'FAILURE'
             reason = 'nothing to compile'

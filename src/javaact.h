@@ -2578,6 +2578,15 @@ void Parser::InitRuleAction()
     void MakeDiamondType();
 #endif
 
+// Rule 582: ClassInstanceCreationExpression ::= Primary '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+// Rule 583: ClassInstanceCreationExpression ::= Name '.' 'new' TypeArgumentsopt 'Identifier' '<' '>' Arguments ClassBodyopt
+#ifndef HEADERS
+    rule_action[582] = &Parser::MakeQualifiedNewDiamond;
+    rule_action[583] = &Parser::MakeQualifiedNewDiamond;
+#else
+    void MakeQualifiedNewDiamond();
+#endif
+
 #ifndef HEADERS
     return;
 }
