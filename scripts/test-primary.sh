@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Primary test suite - runs semantic/bytecode tests with target version matrix
-# All tests use -source 1.7, targets: 1.5, 1.6, 1.7
+# All tests use -source 1.7, targets: 1.5, 1.6
 #
 # Usage: test-primary.sh [OPTIONS]
 #   --clean        Remove build directory and do a full clean rebuild
@@ -85,11 +85,11 @@ echo "JamVM: ${USE_JAMVM}"
 echo ""
 
 # Target versions to test
-# Note: Target 1.7 has known StackMapTable limitations with complex boolean
-# expressions used as method arguments. Tests pass with targets 1.5 and 1.6.
+# Note: Target 1.7 excluded due to known OOM issue in StackMapTable generation
+# for complex tests with many boolean method arguments (see NumericBitwiseBoxingTest)
 if $QUICK_MODE; then
-    TARGETS=("1.5")
-    echo "Mode: Quick (target 1.5 only)"
+    TARGETS=("1.6")
+    echo "Mode: Quick (target 1.6 only)"
 else
     TARGETS=("1.5" "1.6")
     echo "Mode: Full matrix (targets 1.5, 1.6)"
@@ -119,7 +119,7 @@ RESULTS=()
 
 for TARGET in "${TARGETS[@]}"; do
     echo "========================================"
-    echo "  Testing with -source 1.7 -target ${TARGET}"
+    echo "  Testing with -target ${TARGET}"
     echo "========================================"
     echo ""
 

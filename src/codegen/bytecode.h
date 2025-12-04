@@ -223,7 +223,7 @@ public:
     //
     Tuple<VerificationType>* SaveStack() const
     {
-        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_stack.Length(), 8);
+        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_stack.Length());
         for (unsigned i = 0; i < current_stack.Length(); i++)
             saved->Next() = current_stack[i];
         return saved;
@@ -251,7 +251,7 @@ public:
     //
     Tuple<VerificationType>* SaveLocals() const
     {
-        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_locals.Length(), 8);
+        Tuple<VerificationType>* saved = new Tuple<VerificationType>(current_locals.Length());
         for (unsigned i = 0; i < current_locals.Length(); i++)
             saved->Next() = current_locals[i];
         return saved;

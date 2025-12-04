@@ -25,6 +25,26 @@ and is compiled with `-sourcepath runtime`, the generated class file is corrupte
 - Look at bridge method generation when compiling java.lang classes
 - The issue may be related to how the compiler handles self-referential generics in bootstrap mode
 
+### Target 1.7 StackMapTable generation OOM
+
+Compiling tests with `-target 1.7` causes out-of-memory errors on tests with many boolean method arguments (e.g., `NumericBitwiseBoxingTest.java` with ~47 test calls).
+
+**Reproduction:**
+```bash
+./build/src/jopa -source 1.7 -target 1.7 -classpath ./build/runtime/jopa-stub-rt.jar \
+    -d /tmp/out test/autoboxing/NumericBitwiseBoxingTest.java
+# Process consumes 18GB+ RAM before being killed
+```
+
+**Impact:**
+- Target 1.7 excluded from test matrix
+- StackMapTable generation for class version 51.0 has memory leak
+
+**To investigate:**
+- Memory leak is NOT in: SaveLocals, RecordFrame, PushType, SetLocal (debug confirmed reasonable counts)
+- Issue manifests when combining many int boxing tests with long boxing tests
+- Suspected: exponential growth in some path during type verification inference
+
 ## JDK 7 Compliance (In Progress)
 
 - **Status**: 77.4% (657/849 tests passed).
