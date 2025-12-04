@@ -198,7 +198,7 @@ def parse_test_file(file_path, blacklist=None):
     
     return None
 
-def scan_tests(roots, blacklist=None):
+def scan_tests(roots, blacklist=None, exclude_set=None):
     tests = []
     for root in roots:
         if not os.path.exists(root):
@@ -207,6 +207,13 @@ def scan_tests(roots, blacklist=None):
             for filename in filenames:
                 if filename.endswith('.java'):
                     full_path = os.path.join(dirpath, filename)
+                    
+                    # Check exclude set
+                    if exclude_set:
+                        # Check exact match or match with ./ prefix
+                        if full_path in exclude_set or f"./{full_path}" in exclude_set:
+                            continue
+
                     instructions = parse_test_file(full_path, blacklist)
                     if instructions:
                         tests.append(Test(full_path, instructions, instructions['reason']))
@@ -234,112 +241,155 @@ def run_single_test(test, compiler, jvm, compiler_args, timeout, mode, extra_cp=
     Returns: (outcome, reason, stdout, stderr, temp_file_path)
     Outcome: 'SUCCESS', 'FAILURE', 'TIMEOUT', 'CRASH', 'SKIP'
     """
-    with tempfile.TemporaryDirectory(prefix="test_run_") as tmpdir:
-        dest_test_file = os.path.join(tmpdir, os.path.basename(test.file_path))
-        try:
-            # 1. Copy main test file
-            shutil.copy2(test.file_path, dest_test_file)
-            
-            # 2. Handle compile directives (copy extra files)
-            test_dir = os.path.dirname(test.file_path)
-            
-            for files in test.instructions['compile']:
-                for f in files:
-                    if f.startswith('-'): continue
-                    src = os.path.join(test_dir, f)
-                    if os.path.exists(src):
-                        shutil.copy2(src, os.path.join(tmpdir, os.path.basename(f)))
-                    else:
-                        pass
+    tmpdir = tempfile.mkdtemp(prefix="test_run_")
+    dest_test_file = os.path.join(tmpdir, os.path.basename(test.file_path))
+    outcome = 'CRASH'
+    reason = 'unknown'
+    stdout_str = ''
+    stderr_str = ''
 
-            # 3. Handle library directives
-            for lib in test.instructions.get('library', []):
-                src = os.path.join(test_dir, lib)
+    try:
+        # 1. Copy main test file
+        shutil.copy2(test.file_path, dest_test_file)
+        
+        # 2. Handle compile directives (copy extra files)
+        test_dir = os.path.dirname(test.file_path)
+        
+        for files in test.instructions['compile']:
+            for f in files:
+                if f.startswith('-'): continue
+                src = os.path.join(test_dir, f)
                 if os.path.exists(src):
-                    copy_recursive(src, tmpdir)
+                    shutil.copy2(src, os.path.join(tmpdir, os.path.basename(f)))
+                else:
+                    pass
 
-            # 4. Compile
-            java_files = glob.glob(os.path.join(tmpdir, "*.java"))
-            if not java_files:
-                return 'FAILURE', 'nothing to compile', '', '', dest_test_file
+        # 3. Handle library directives
+        for lib in test.instructions.get('library', []):
+            src = os.path.join(test_dir, lib)
+            if os.path.exists(src):
+                copy_recursive(src, tmpdir)
 
-            compile_cmd = [compiler] + (compiler_args if compiler_args else [])
-            if extra_cp:
-                compile_cmd += ['-bootclasspath', extra_cp]
-            compile_cmd += ['-d', '.'] + java_files
-            
-            if verbose:
-                print(f"Compiling: {' '.join(compile_cmd)}")
-            
-            stdout_str = ""
-            stderr_str = ""
-            
-            try:
+        # 4. Compile
+        java_files = glob.glob(os.path.join(tmpdir, "*.java"))
+        if not java_files:
+            outcome = 'FAILURE'
+            reason = 'nothing to compile'
+            return outcome, reason, stdout_str, stderr_str, dest_test_file
+
+        compile_cmd = [compiler] + (compiler_args if compiler_args else [])
+        if extra_cp:
+            compile_cmd += ['-bootclasspath', extra_cp]
+        compile_cmd += ['-d', '.'] + java_files
+        
+        if verbose:
+            print(f"Compiling: {' '.join(compile_cmd)}")
+        
+        javac_out_path = os.path.join(tmpdir, 'javac.out')
+        javac_err_path = os.path.join(tmpdir, 'javac.err')
+
+        try:
+            with open(javac_out_path, 'w') as f_out, open(javac_err_path, 'w') as f_err:
                 proc = subprocess.run(
                     compile_cmd,
                     cwd=tmpdir,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
+                    stdout=f_out,
+                    stderr=f_err,
                     timeout=timeout
                 )
-                stdout_str = proc.stdout.decode('utf-8', errors='replace')
-                stderr_str = proc.stderr.decode('utf-8', errors='replace')
-            except subprocess.TimeoutExpired:
-                return 'TIMEOUT', 'compiler timed out', '', '', dest_test_file
-            except Exception as e:
-                return 'CRASH', f'compiler crashed: {e}', '', '', dest_test_file
             
-            if proc.returncode != 0:
-                if verbose:
-                    print(f"Compilation failed for {test.name}:\n{stderr_str}")
-                return 'FAILURE', 'compiler failed (exit code not 0)', stdout_str, stderr_str, dest_test_file
+            # Read back for reporting
+            with open(javac_out_path, 'r', errors='replace') as f: stdout_str = f.read()
+            with open(javac_err_path, 'r', errors='replace') as f: stderr_str = f.read()
 
-            # 5. Run
-            if not test.instructions['run'] or mode == 'compile':
-                return 'SUCCESS', 'compiled', stdout_str, stderr_str, dest_test_file
+        except subprocess.TimeoutExpired:
+            outcome = 'TIMEOUT'
+            reason = 'compiler timed out'
+            return outcome, reason, stdout_str, stderr_str, dest_test_file
+        except Exception as e:
+            outcome = 'CRASH'
+            reason = f'compiler crashed: {e}'
+            return outcome, reason, stdout_str, stderr_str, dest_test_file
+        
+        if proc.returncode != 0:
+            if verbose:
+                print(f"Compilation failed for {test.name}:\n{stderr_str}")
+            outcome = 'FAILURE'
+            reason = 'compiler failed (exit code not 0)'
+            return outcome, reason, stdout_str, stderr_str, dest_test_file
 
-            last_stdout = stdout_str
-            last_stderr = stderr_str
+        # 5. Run
+        if not test.instructions['run'] or mode == 'compile':
+            outcome = 'SUCCESS'
+            reason = 'compiled'
+            return outcome, reason, stdout_str, stderr_str, dest_test_file
 
-            for run_args in test.instructions['run']:
-                main_class = run_args[0]
-                app_args = run_args[1:]
-                
-                cp = '.'
-                if extra_cp:
-                    cp = f'.{os.pathsep}{extra_cp}'
-                
-                jvm_cmd = [jvm] + ['-cp', cp, f'-Dtest.src={tmpdir}'] + [main_class] + app_args
-                
-                if verbose:
-                    print(f"Running: {' '.join(jvm_cmd)}")
+        # Reuse output strings for test execution
+        last_stdout = stdout_str
+        last_stderr = stderr_str
 
-                try:
+        test_out_path = os.path.join(tmpdir, 'test.out')
+        test_err_path = os.path.join(tmpdir, 'test.err')
+
+        for run_args in test.instructions['run']:
+            main_class = run_args[0]
+            app_args = run_args[1:]
+            
+            cp = '.'
+            if extra_cp:
+                cp = f'.{os.pathsep}{extra_cp}'
+            
+            jvm_cmd = [jvm] + ['-cp', cp, f'-Dtest.src={tmpdir}'] + [main_class] + app_args
+            
+            if verbose:
+                print(f"Running: {' '.join(jvm_cmd)}")
+
+            try:
+                with open(test_out_path, 'w') as f_out, open(test_err_path, 'w') as f_err:
                     proc = subprocess.run(
                         jvm_cmd,
                         cwd=tmpdir,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
+                        stdout=f_out,
+                        stderr=f_err,
                         timeout=timeout
                     )
-                    last_stdout = proc.stdout.decode('utf-8', errors='replace')
-                    last_stderr = proc.stderr.decode('utf-8', errors='replace')
-                except subprocess.TimeoutExpired:
-                    return 'TIMEOUT', 'test timed out', last_stdout, last_stderr, dest_test_file
-                except Exception as e:
-                    return 'CRASH', f'test crashed: {e}', last_stdout, last_stderr, dest_test_file
                 
-                if proc.returncode != 0:
-                    if verbose:
-                        print(f"Execution failed for {test.name} ({main_class}):\n{last_stderr}")
-                    return 'FAILURE', 'exit code not 0', last_stdout, last_stderr, dest_test_file
-            
-            return 'SUCCESS', 'exit code 0', last_stdout, last_stderr, dest_test_file
+                with open(test_out_path, 'r', errors='replace') as f: last_stdout = f.read()
+                with open(test_err_path, 'r', errors='replace') as f: last_stderr = f.read()
 
-        except Exception as e:
-            if verbose:
-                print(f"Crash in {test.name}: {e}")
-            return 'CRASH', f'harness crashed: {e}', '', '', dest_test_file
+            except subprocess.TimeoutExpired:
+                outcome = 'TIMEOUT'
+                reason = 'test timed out'
+                return outcome, reason, last_stdout, last_stderr, dest_test_file
+            except Exception as e:
+                outcome = 'CRASH'
+                reason = f'test crashed: {e}'
+                return outcome, reason, last_stdout, last_stderr, dest_test_file
+            
+            if proc.returncode != 0:
+                if verbose:
+                    print(f"Execution failed for {test.name} ({main_class}):\n{last_stderr}")
+                outcome = 'FAILURE'
+                reason = 'exit code not 0'
+                return outcome, reason, last_stdout, last_stderr, dest_test_file
+        
+        outcome = 'SUCCESS'
+        reason = 'exit code 0'
+        return outcome, reason, last_stdout, last_stderr, dest_test_file
+
+    except Exception as e:
+        if verbose:
+            print(f"Crash in {test.name}: {e}")
+        outcome = 'CRASH'
+        reason = f'harness crashed: {e}'
+        return outcome, reason, '', '', dest_test_file
+    
+    finally:
+        if outcome == 'SUCCESS' and os.path.exists(tmpdir):
+            try:
+                shutil.rmtree(tmpdir)
+            except OSError as e:
+                print(f"Error removing {tmpdir}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="Compliance Test Tool")
@@ -356,6 +406,7 @@ def main():
     parser.add_argument('--verbose-failures', action='store_true', help="Print output for failed tests")
     parser.add_argument('--verbose', action='store_true', help="Verbose output")
     parser.add_argument('--blacklist', action='append', help="Blacklist file (can be used multiple times)")
+    parser.add_argument('--exclude', help="Exclude file")
     parser.add_argument('--classpath', help="Classpath to use: 'stub', 'gnucp', or path. Default: gnucp")
     parser.add_argument('--mode', choices=['run', 'compile'], default='run', help="Test mode: 'run' (default) or 'compile' (only compile)")
     
@@ -387,8 +438,26 @@ def main():
             elif args.blacklist: # Only warn if explicitly provided
                  print(f"Warning: Blacklist file {bl_file} not found")
 
+        exclude_set = set()
+        exclude_file = args.exclude if args.exclude else f"./scripts/jdk{args.jdk}-exclude.txt"
+        if os.path.exists(exclude_file):
+            try:
+                with open(exclude_file, 'r') as f:
+                    for line in f:
+                        # Strip comments and whitespace
+                        clean_line = line.split('#')[0].strip()
+                        if not clean_line:
+                            continue
+                        # Strip optional leading @
+                        if clean_line.startswith('@'):
+                            clean_line = clean_line[1:].strip()
+                        exclude_set.add(clean_line)
+                print(f"Loaded {len(exclude_set)} exclude items from {exclude_file}")
+            except Exception as e:
+                print(f"Error reading exclude file {exclude_file}: {e}")
+
         print("Scanning for tests...")
-        tests = scan_tests(roots, blacklist)
+        tests = scan_tests(roots, blacklist, exclude_set)
         
         # Determine output file for prepare mode
         outfile = args.testlist
@@ -489,8 +558,15 @@ def main():
                     
                     if outcome == 'SUCCESS' and args.no_success:
                         continue
-                        
-                    print(f"[{i+1}/{len(tests)}] {test.file_path} ({tmp_path}): {outcome} ({reason})")
+                    
+                    log_msg = f"[{i+1}/{len(tests)}] {test.file_path} ({tmp_path}): {outcome} ({reason})"
+                    if outcome != 'SUCCESS':
+                        log_dir = os.path.dirname(tmp_path)
+                        if 'compiler' in reason:
+                            log_msg += f" javac log: {os.path.join(log_dir, 'javac.err')}"
+                        else:
+                            log_msg += f" test log: {os.path.join(log_dir, 'test.err')}"
+                    print(log_msg)
                     
                     if outcome != 'SUCCESS' and args.verbose_failures:
                         if out:

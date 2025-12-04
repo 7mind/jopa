@@ -125,8 +125,14 @@ Executes the tests using the specified compiler and JVM.
     - `gnucp`: Use JOPA-built GNU Classpath (default).
     - `stub`: Use the JOPA stub runtime jar.
     - `<path>`: Custom path to a classpath entry (jar or directory).
-- `--compiler <path>`: Path to the javac-like compiler (default: `javac`).
-- `--jvm <path>`: Path to the java runtime (default: `java`).
+- `--compiler <path>`: Path to the javac-like compiler. Options:
+    - `jopa`: Use the locally built JOPA compiler (default).
+    - `system`: Use `javac` from the system PATH.
+    - `<path>`: Absolute or relative path to a compiler binary.
+- `--jvm <path>`: Path to the java runtime. Options:
+    - `jamvm`: Use the locally built JamVM (default).
+    - `system`: Use `java` from the system PATH.
+    - `<path>`: Absolute or relative path to a java binary.
 - `--arg <value>`: Pass arguments to the compiler (can be used multiple times).
 - `--no-success`: Suppress logs for successful tests.
 - `--verbose-failures`: Print stdout/stderr for failed tests.
@@ -134,11 +140,12 @@ Executes the tests using the specified compiler and JVM.
 **Example:**
 ```bash
 # Run 50 random tests for JDK 7 using JOPA with stub runtime
-./scripts/compliance_tester.py --test --jdk 7 --limit 50 --compiler ./build/src/jopa --timeout 10 --no-success --verbose-failures --classpath stub
+./scripts/compliance_tester.py --test --jdk 7 --limit 50 --compiler jopa --timeout 10 --no-success --verbose-failures --classpath stub
 ```
 
 ### Output Format
 The tool provides feedback on the execution progress and results:
-- **Progress Log:** `[Index/Total] TestPath (TempPath): OUTCOME (Reason)`
+- **Progress Log:** `[Index/Total] TestPath (TempPath): OUTCOME (Reason) [javac log: <path> | test log: <path>]`
+  - When a test fails, the path to the relevant log file (containing stdout/stderr) in the temporary directory is printed.
 - **Outcomes:** `SUCCESS`, `FAILURE`, `TIMEOUT`, `CRASH`.
 - **Summary:** Total counts, success/failure rates, and a breakdown of failure reasons (e.g., "compiler failed", "test timed out").

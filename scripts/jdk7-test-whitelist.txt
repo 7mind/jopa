@@ -686,7 +686,6 @@ assets/jdk7u-langtools/test/tools/javac/tree/JavacTreeScannerTest.java
 assets/jdk7u-langtools/test/tools/javac/varargs/T7013865.java
 assets/jdk7u-langtools/test/tools/javac/varargs/Anon.java
 assets/jdk7u-langtools/test/tools/javac/varargs/BadSyntax2.java
-assets/jdk7u-langtools/test/tools/javac/varargs/Varargs1.java
 assets/jdk7u-langtools/test/tools/javac/varargs/5088429/T5088429Pos01.java
 assets/jdk7u-langtools/test/tools/javac/varargs/5088429/T5088429Pos02.java
 assets/jdk7u-langtools/test/tools/javac/varargs/warning/Warn1.java
