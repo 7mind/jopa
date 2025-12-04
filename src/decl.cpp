@@ -1669,6 +1669,12 @@ static void CheckAndCreateBridge(
     if (! need_bridge)
         return;
 
+    // If inherited_method is final, we cannot create a bridge that would override it.
+    // A bridge method has the same signature as inherited_method, and placing it in
+    // the subclass would constitute an illegal override of a final method.
+    if (inherited_method -> ACC_FINAL())
+        return;
+
     // Check if we already have a bridge with this signature
     for (unsigned b = 0; b < method -> NumGeneratedBridges(); b++)
     {
@@ -1742,7 +1748,11 @@ void Semantic::GenerateBridgeMethods(TypeSymbol* type)
 
         // Skip constructors, static methods, private methods, and already-bridge methods
         // Also skip abstract methods - bridges are only for concrete implementations
-        if (method -> Identity() == control.init_name_symbol ||
+        // IMPORTANT: Only process methods defined in THIS type, not inherited methods.
+        // Inherited methods already had their bridges generated in their defining class.
+        // Processing inherited methods here would create duplicate bridges with wrong targets.
+        if (method -> containing_type != type ||
+            method -> Identity() == control.init_name_symbol ||
             method -> ACC_STATIC() ||
             method -> ACC_PRIVATE() ||
             method -> IsBridge() ||
