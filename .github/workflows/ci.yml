@@ -523,3 +523,161 @@ jobs:
           name: build-legacy-log
           path: /tmp/build-legacy.log
           retention-days: 7
+
+  openjdk-compliance-jdk7:
+    name: OpenJDK Compliance (JDK7)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA and DevJopaK
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -j$(nproc)
+            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build-devjopak --target devjopak -j$(nproc)
+          '
+
+      - name: Prepare JDK7 Tests
+        run: |
+          nix develop --command python3 scripts/compliance_tester.py --prepare --jdk 7
+
+      - name: Run JDK7 Compliance Tests
+        run: |
+          nix develop --command python3 scripts/compliance_tester.py \
+            --test --jdk 7 \
+            --classpath gnucp \
+            --timeout 30 \
+            --mode run \
+            --no-success 2>&1 | tee /tmp/jdk7-compliance.log
+
+      - name: Check Results
+        run: |
+          # Extract results from log
+          TOTAL=$(grep "^Total:" /tmp/jdk7-compliance.log | awk '{print $2}')
+          SUCCESS=$(grep "^Success:" /tmp/jdk7-compliance.log | awk '{print $2}')
+          FAILURE=$(grep "^Failure:" /tmp/jdk7-compliance.log | awk '{print $2}')
+          TIMEOUT=$(grep "^Timeout:" /tmp/jdk7-compliance.log | awk '{print $2}')
+          CRASH=$(grep "^Crash:" /tmp/jdk7-compliance.log | awk '{print $2}')
+
+          echo "## OpenJDK JDK7 Compliance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success | $SUCCESS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failure | $FAILURE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timeout | $TIMEOUT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Crash | $CRASH |" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any test failed
+          if [ "$FAILURE" != "0" ] || [ "$TIMEOUT" != "0" ] || [ "$CRASH" != "0" ]; then
+            echo ""
+            echo "FAILURE: Some tests did not pass"
+            exit 1
+          fi
+
+          echo ""
+          echo "SUCCESS: All $TOTAL tests passed"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-compliance-jdk7-log
+          path: /tmp/jdk7-compliance.log
+          retention-days: 7
+
+  openjdk-compliance-jdk8:
+    name: OpenJDK Compliance (JDK8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+        with:
+          logger: pretty
+          log-directives: nix_installer=debug
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build JOPA and DevJopaK
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build -j$(nproc)
+            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
+            cmake --build build-devjopak --target devjopak -j$(nproc)
+          '
+
+      - name: Prepare JDK8 Tests
+        run: |
+          nix develop --command python3 scripts/compliance_tester.py --prepare --jdk 8
+
+      - name: Run JDK8 Compliance Tests
+        run: |
+          nix develop --command python3 scripts/compliance_tester.py \
+            --test --jdk 8 \
+            --classpath gnucp \
+            --timeout 30 \
+            --mode run \
+            --no-success 2>&1 | tee /tmp/jdk8-compliance.log
+
+      - name: Check Results
+        run: |
+          # Extract results from log
+          TOTAL=$(grep "^Total:" /tmp/jdk8-compliance.log | awk '{print $2}')
+          SUCCESS=$(grep "^Success:" /tmp/jdk8-compliance.log | awk '{print $2}')
+          FAILURE=$(grep "^Failure:" /tmp/jdk8-compliance.log | awk '{print $2}')
+          TIMEOUT=$(grep "^Timeout:" /tmp/jdk8-compliance.log | awk '{print $2}')
+          CRASH=$(grep "^Crash:" /tmp/jdk8-compliance.log | awk '{print $2}')
+
+          echo "## OpenJDK JDK8 Compliance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success | $SUCCESS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failure | $FAILURE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timeout | $TIMEOUT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Crash | $CRASH |" >> $GITHUB_STEP_SUMMARY
+
+          # Fail if any test failed
+          if [ "$FAILURE" != "0" ] || [ "$TIMEOUT" != "0" ] || [ "$CRASH" != "0" ]; then
+            echo ""
+            echo "FAILURE: Some tests did not pass"
+            exit 1
+          fi
+
+          echo ""
+          echo "SUCCESS: All $TOTAL tests passed"
+
+      - name: Upload test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openjdk-compliance-jdk8-log
+          path: /tmp/jdk8-compliance.log
+          retention-days: 7
