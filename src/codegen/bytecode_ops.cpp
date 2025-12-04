@@ -1629,7 +1629,7 @@ void ByteCode::DefineLabel(Label& lab)
 
             // Create merged locals
             Tuple<StackMapGenerator::VerificationType>* merged_locals =
-                new Tuple<StackMapGenerator::VerificationType>(max_len + 4, 8);
+                new Tuple<StackMapGenerator::VerificationType>(max_len + 4);
 
             for (unsigned i = 0; i < max_len; i++)
             {
@@ -1791,7 +1791,7 @@ void ByteCode::UseLabel(Label& lab, int _length, int _op_offset)
 
             // Create new merged locals tuple
             Tuple<StackMapGenerator::VerificationType>* merged_locals =
-                new Tuple<StackMapGenerator::VerificationType>(max_len + 4, 8);
+                new Tuple<StackMapGenerator::VerificationType>(max_len + 4);
 
             // Merge: use TOP where types differ
             for (unsigned i = 0; i < max_len; i++)

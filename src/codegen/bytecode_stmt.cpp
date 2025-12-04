@@ -475,7 +475,9 @@ bool ByteCode::EmitBlockStatement(AstBlock* block)
     method_stack -> Push(block);
     bool abrupt = false;
     for (unsigned i = 0; i < block -> NumStatements() && ! abrupt; i++)
+    {
         abrupt = EmitStatement(block -> Statement(i));
+    }
 
     //
     // Clear block-scoped variables in StackMapGenerator before defining any labels.

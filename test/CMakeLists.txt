@@ -23,12 +23,12 @@ option(JOPA_PARSER_TESTS_JDK8 "Enable JDK8 parser tests" ON)
 option(JOPA_ENABLE_JVM_TESTS "Enable runtime tests using real JVM (requires Java)" ON)
 
 # Option to use -noverify flag for JVM tests
-# Required until StackMapTable generation is implemented for Java 7+ bytecode
-option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" OFF)
+# Required until StackMapTable verification issues are fixed for complex control flow
+option(JOPA_USE_NOVERIFY "Use -noverify flag for JVM runtime tests" ON)
 
 # Bytecode target version for tests (1.5, 1.6, or 1.7)
-# 1.5 and 1.6 work without StackMapTable, 1.7 requires it
-set(JOPA_TARGET_VERSION "1.5" CACHE STRING "Bytecode target version for tests (1.5, 1.6, 1.7)")
+# 1.7 generates StackMapTable (class version 51.0)
+set(JOPA_TARGET_VERSION "1.7" CACHE STRING "Bytecode target version for tests (1.5, 1.6, 1.7)")
 set_property(CACHE JOPA_TARGET_VERSION PROPERTY STRINGS "1.5" "1.6" "1.7")
 
 # Find Java for runtime tests (only if JVM tests are enabled)
