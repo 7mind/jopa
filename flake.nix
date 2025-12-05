@@ -99,12 +99,22 @@
 
           src = ./.;
 
-          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs;
+          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
+            pkgs.openjdk8  # Required for JOPA tests
+            pkgs.python3   # Required for parser header post-processing
+          ];
 
           buildInputs = with pkgs; [
             libffi
             zlib
           ];
+
+          # Disable automatic cmake configure - we do it manually in buildPhase
+          dontConfigure = true;
+
+          postPatch = ''
+            patchShebangs vendor/*.sh devjopak/*.sh
+          '';
 
           buildPhase = ''
             export HOME=$TMPDIR
@@ -202,12 +212,21 @@
 
           src = ./.;
 
-          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs;
+          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
+            pkgs.openjdk8  # Required for JOPA tests
+            pkgs.python3   # Required for parser header post-processing
+          ];
 
           buildInputs = with pkgs; [
             libffi
             zlib
           ];
+
+          dontConfigure = true;
+
+          postPatch = ''
+            patchShebangs vendor/*.sh devjopak/*.sh
+          '';
 
           buildPhase = ''
             export HOME=$TMPDIR
@@ -254,12 +273,21 @@
 
           src = ./.;
 
-          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs;
+          nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
+            pkgs.openjdk8  # Required for JOPA tests
+            pkgs.python3   # Required for parser header post-processing
+          ];
 
           buildInputs = with pkgs; [
             libffi
             zlib
           ];
+
+          dontConfigure = true;
+
+          postPatch = ''
+            patchShebangs vendor/*.sh devjopak/*.sh
+          '';
 
           buildPhase = ''
             export HOME=$TMPDIR

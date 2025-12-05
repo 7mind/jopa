@@ -26,9 +26,6 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
       - name: Build and test JOPA (${{ matrix.variant }})
         run: |
           if [ "${{ matrix.variant }}" = "debug" ]; then
@@ -74,21 +71,14 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
       - name: Build ${{ matrix.name }}
         run: |
           nix build .#${{ matrix.name }} --print-build-logs
 
-          # Verify the build
-          echo "Build output:"
-          ls -la result/
-
-          # Test basic functionality
-          export PATH="$(pwd)/result/bin:$PATH"
-          java -version
-          javac -version || javac -help | head -1
+      - name: Validate ${{ matrix.name }}
+        run: |
+          # Use the bundled validation script
+          ./result/bin/devjopak-validate
 
       - name: Create distribution tarball
         run: |
@@ -133,9 +123,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: Run JDK${{ matrix.jdk }} Parser Tests
         run: |
@@ -198,9 +185,6 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
       - name: Run JDK${{ matrix.jdk }} Compliance Tests
         run: |
           nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-compliance.sh --build
@@ -258,9 +242,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: Build DevJopaK
         run: |
@@ -327,9 +308,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
 
       - name: Build JOPA and GNU Classpath 0.93
         run: |
