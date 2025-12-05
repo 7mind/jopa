@@ -143,12 +143,14 @@ if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
 
         # Delete prebuilt classes.zip, then configure with JOPA as compiler
         # Use GNU Classpath's glibj.zip as bootclasspath for JamVM classes
+        # Use GCC for JamVM - clang 17+ rejects computed gotos into statement expressions
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E rm -f "${JAMVM_PREBUILT_CLASSES}"
         COMMAND ${CMAKE_COMMAND} -E env
             ${CLEAN_JAVA_ENV_VARS}
             "UBSAN_OPTIONS=halt_on_error=0"
             "ASAN_OPTIONS=detect_leaks=0"
             "JAVAC=${JOPA_EXECUTABLE} --nowarn:unchecked -bootclasspath ${CLASSPATH_INSTALL_DIR}/share/classpath/glibj.zip"
+            "CC=gcc"
             <SOURCE_DIR>/configure
                 --prefix=<INSTALL_DIR>
                 --with-java-runtime-library=gnuclasspath
