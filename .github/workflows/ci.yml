@@ -126,13 +126,15 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Build JOPA (${{ matrix.variant }})
+      - name: Build JOPA with Parser Tests (${{ matrix.variant }})
         run: |
           BUILD_TYPE=${{ matrix.variant == 'debug' && 'Debug' || 'Release' }}
+          JDK_FLAG=${{ matrix.jdk == 7 && '-DJOPA_PARSER_TESTS_JDK7=ON' || '-DJOPA_PARSER_TESTS_JDK8=ON' }}
           nix develop --command bash -c "
             cmake -S . -B build -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+              -DJOPA_ENABLE_JDK_PARSER_TESTS=ON ${JDK_FLAG} \
               ${{ matrix.variant == 'debug' && '-DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF' || '' }}
-            cmake --build build --target jopa jopa-stub-rt -j\$(nproc)
+            cmake --build build --target jopa -j\$(nproc)
           "
 
       - name: Run JDK${{ matrix.jdk }} Parser Tests (${{ matrix.variant }})
