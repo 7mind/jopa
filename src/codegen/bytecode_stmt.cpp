@@ -1205,8 +1205,20 @@ void ByteCode::CloseSwitchLocalVariables(AstBlock* switch_block,
 //   +0: primary_exception (set by catch-all handler if try throws)
 //   +2: close_exception (accumulated close exceptions in normal path)
 //
-void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_index)
+void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_index,
+                                   Tuple<StackMapTableAttribute::VerificationTypeInfo>* passed_saved_locals)
 {
+    // saved_locals is passed from EmitTryStatement and contains the locals state
+    // at try block start (after helper variables are initialized)
+    // If NULL (from ProcessAbruptExit), capture current state as fallback
+    Tuple<StackMapTableAttribute::VerificationTypeInfo>* saved_locals = passed_saved_locals;
+    bool owns_saved_locals = false;
+    if (!saved_locals && stack_map_generator)
+    {
+        saved_locals = stack_map_generator->SaveLocals();
+        owns_saved_locals = true;
+    }
+
     // Close resources in reverse order
     for (int r = statement -> NumResources() - 1; r >= 0; r--)
     {
@@ -1252,12 +1264,18 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             u2 catch_handler_pc = code_attribute -> CodeLength();
 
             // Record StackMapTable frame for exception handler entry
-            if (stack_map_generator)
+            // At exception handler entry, stack has exactly 1 item: the caught exception
+            // Use saved locals from cleanup start for consistent frame
+            // Use RecordFrameWithLocalsAndStack to explicitly set both locals and stack
+            // This ensures correct frame encoding even if previous frames have wrong locals
+            if (stack_map_generator && saved_locals)
             {
+                stack_map_generator->RecordFrameWithLocalsAndStack(
+                    catch_handler_pc, saved_locals, control.Throwable());
+                // Sync stack_map_generator's current state to match what we recorded
+                stack_map_generator->RestoreLocals(saved_locals);
                 stack_map_generator->ClearStack();
                 stack_map_generator->PushType(control.Throwable());
-                stack_map_generator->RecordFrame(catch_handler_pc);
-                stack_map_generator->ClearStack(); // Reset for subsequent non-handler code
             }
 
             stack_depth = 1;  // caught exception is on stack
@@ -1276,8 +1294,7 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             // Load primary_exception and check if non-null
             // Stack: [caught]
             LoadLocal(variable_index, control.Throwable());
-            if (stack_map_generator)
-                stack_map_generator->PushType(control.Throwable());
+            // Note: LoadLocal already pushes to stack_map_generator
             // Stack: [caught, primary]
             PutOp(OP_DUP);
             if (stack_map_generator)
@@ -1328,8 +1345,7 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
 
             // Load close_exception and check if non-null
             LoadLocal(variable_index + 2, control.Throwable());
-            if (stack_map_generator)
-                stack_map_generator->PushType(control.Throwable());
+            // Note: LoadLocal already pushes to stack_map_generator
             // Stack: [caught, close]
             PutOp(OP_DUP);
             if (stack_map_generator)
@@ -1443,6 +1459,9 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
     }
     DefineLabel(done_cleanup);
     CompleteLabel(done_cleanup);
+    // Clean up saved_locals only if we captured it locally
+    if (owns_saved_locals && saved_locals)
+        delete saved_locals;
 }
 
 //
@@ -1730,7 +1749,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                     // Emit inlined finally code
                     if (has_resources)
                     {
-                        EmitResourceCleanup(statement, variable_index);
+                        EmitResourceCleanup(statement, variable_index, saved_locals);
                     }
                     if (emit_explicit_finally)
                     {
@@ -1748,7 +1767,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                         stack_map_generator->PopType();
                     if (has_resources)
                     {
-                        EmitResourceCleanup(statement, variable_index);
+                        EmitResourceCleanup(statement, variable_index, saved_locals);
                     }
                     if (emit_explicit_finally)
                     {
@@ -1770,33 +1789,25 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 // For normal completion path, emit inlined finally code
                 if (IsLabelUsed(end_label))
                 {
-                    // Reset stack_map_generator's local state for normal path
-                    // The exception handler set variable_index to Throwable,
-                    // but the normal path (GOTO from try body) doesn't have it set
-                    if (stack_map_generator)
-                    {
-                        // Reset exception-handler-specific locals to Top
-                        stack_map_generator->SetLocal(variable_index,
-                            StackMapTableAttribute::VerificationTypeInfo(
-                                StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
-                        // Also reset the return address slot if it was used
-                        stack_map_generator->SetLocal(variable_index + 1,
-                            StackMapTableAttribute::VerificationTypeInfo(
-                                StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
-                        if (has_resources)
-                        {
-                            // Reset close_exception slot too
-                            stack_map_generator->SetLocal(variable_index + 2,
-                                StackMapTableAttribute::VerificationTypeInfo(
-                                    StackMapTableAttribute::VerificationTypeInfo::TYPE_Top));
-                        }
-                        stack_map_generator->ClearStack();
-                    }
+                    // Don't let DefineLabel record a frame - we need to record it
+                    // manually with the correct locals state (saved_locals).
+                    end_label.no_frame = true;
                     DefineLabel(end_label);
                     CompleteLabel(end_label);
+
+                    // Restore locals to the state at try block start.
+                    // For try-with-resources, this has helper variables set to Throwable.
+                    // Record a frame at this point so subsequent exception handlers
+                    // see the correct locals state.
+                    if (stack_map_generator && saved_locals)
+                    {
+                        stack_map_generator->RestoreLocals(saved_locals);
+                        stack_map_generator->ClearStack();
+                        stack_map_generator->RecordFrame(code_attribute->CodeLength());
+                    }
                     if (has_resources)
                     {
-                        EmitResourceCleanup(statement, variable_index);
+                        EmitResourceCleanup(statement, variable_index, saved_locals);
                     }
                     if (emit_explicit_finally)
                     {
@@ -1858,7 +1869,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 // Java 7: Emit close() calls for resources before explicit finally
                 if (has_resources)
                 {
-                    EmitResourceCleanup(statement, variable_index);
+                    EmitResourceCleanup(statement, variable_index, saved_locals);
                 }
 
                 // Emit explicit finally block if present
@@ -1918,7 +1929,7 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         {
             int variable_index = method_stack -> TopBlock() ->
                 block_symbol -> helper_variable_index;
-            EmitResourceCleanup(statement, variable_index);
+            EmitResourceCleanup(statement, variable_index, saved_locals);
         }
         if (emit_explicit_finally)
             EmitBlockStatement(statement -> finally_clause_opt -> block);
@@ -1989,7 +2000,8 @@ bool ByteCode::ProcessAbruptExit(unsigned level, u2 width,
                     ! IsNop(try_stmt -> finally_clause_opt -> block);
                 if (has_resources)
                 {
-                    EmitResourceCleanup(try_stmt, var_index);
+                    // Pass NULL for saved_locals - will capture from current state
+                    EmitResourceCleanup(try_stmt, var_index, NULL);
                 }
                 if (emit_explicit_finally)
                 {
@@ -2024,7 +2036,8 @@ bool ByteCode::ProcessAbruptExit(unsigned level, u2 width,
                     ! IsNop(try_stmt -> finally_clause_opt -> block);
                 if (has_resources)
                 {
-                    EmitResourceCleanup(try_stmt, var_index);
+                    // Pass NULL for saved_locals - will capture from current state
+                    EmitResourceCleanup(try_stmt, var_index, NULL);
                 }
                 if (emit_explicit_finally)
                 {
