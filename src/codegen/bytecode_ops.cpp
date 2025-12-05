@@ -1087,6 +1087,9 @@ void ByteCode::EmitThisInvocation(AstThisCall* this_call)
 
     PutOp(OP_INVOKESPECIAL);
     ChangeStack(-stack_words);
+    // After this() call, 'this' is initialized
+    if (stack_map_generator)
+        stack_map_generator->MarkSuperCalled();
 
     PutU2(RegisterMethodref(unit_type, this_call -> symbol));
 }
@@ -1131,6 +1134,9 @@ void ByteCode::EmitSuperInvocation(AstSuperCall* super_call)
 
     PutOp(OP_INVOKESPECIAL);
     ChangeStack(-stack_words);
+    // After super() call, 'this' is initialized
+    if (stack_map_generator)
+        stack_map_generator->MarkSuperCalled();
     PutU2(RegisterMethodref(unit_type -> super, super_call -> symbol));
 }
 
@@ -1669,8 +1675,13 @@ void ByteCode::DefineLabel(Label& lab)
             delete current_locals;
             stack_map_generator->RecordFrameWithSavedLocalsAndStack(
                 lab.definition, merged_locals, lab.saved_stack_types);
-            // Restore current_stack to match what was recorded
+            // Restore current state to match what was recorded
+            // This is critical: subsequent code must track from the MERGED state,
+            // not the pre-merge state. Otherwise, variables defined only in some
+            // paths (like loop bodies) will incorrectly appear as defined.
             stack_map_generator->RestoreStack(lab.saved_stack_types);
+            stack_map_generator->RestoreLocals(merged_locals);
+            // Now safe to delete after restoring
             delete merged_locals;
         }
         else if (lab.stack_saved && lab.saved_stack_types)
