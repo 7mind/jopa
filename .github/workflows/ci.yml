@@ -109,6 +109,8 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
+        jdk: [7, 8]
+        variant: [release, debug]
         include:
           - jdk: 7
             threshold: 97.5
@@ -124,14 +126,23 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Run JDK${{ matrix.jdk }} Parser Tests
+      - name: Build JOPA (${{ matrix.variant }})
         run: |
-          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-parser.sh --build
+          BUILD_TYPE=${{ matrix.variant == 'debug' && 'Debug' || 'Release' }}
+          nix develop --command bash -c "
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+              ${{ matrix.variant == 'debug' && '-DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF' || '' }}
+            cmake --build build --target jopa jopa-stub-rt -j\$(nproc)
+          "
+
+      - name: Run JDK${{ matrix.jdk }} Parser Tests (${{ matrix.variant }})
+        run: |
+          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-parser.sh
 
       - name: Check Success Threshold (${{ matrix.threshold }}%)
         run: |
           source build/parser_jdk${{ matrix.jdk }}_results.env
-          echo "JDK${{ matrix.jdk }} Parser Results:"
+          echo "JDK${{ matrix.jdk }} Parser Results (${{ matrix.variant }}):"
           echo "  Passed: ${PARSER_PASSED}"
           echo "  Whitelisted: ${PARSER_WHITELISTED}"
 
@@ -157,7 +168,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: parser-results-jdk${{ matrix.jdk }}
+          name: parser-results-jdk${{ matrix.jdk }}-${{ matrix.variant }}
           path: |
             build/parser_results.txt
             build/parser_jdk${{ matrix.jdk }}_results.env
@@ -170,6 +181,8 @@ jobs:
     needs: build-and-test
     strategy:
       matrix:
+        jdk: [7, 8]
+        variant: [release, debug]
         include:
           - jdk: 7
             threshold: 96.5
@@ -185,14 +198,23 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Run JDK${{ matrix.jdk }} Compliance Tests
+      - name: Build JOPA (${{ matrix.variant }})
         run: |
-          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-compliance.sh --build
+          BUILD_TYPE=${{ matrix.variant == 'debug' && 'Debug' || 'Release' }}
+          nix develop --command bash -c "
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+              ${{ matrix.variant == 'debug' && '-DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF' || '' }}
+            cmake --build build --target jopa jopa-stub-rt -j\$(nproc)
+          "
+
+      - name: Run JDK${{ matrix.jdk }} Compliance Tests (${{ matrix.variant }})
+        run: |
+          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-compliance.sh
 
       - name: Check Success Threshold (${{ matrix.threshold }}%)
         run: |
           source build/compliance_jdk${{ matrix.jdk }}_results.env
-          echo "JDK${{ matrix.jdk }} Compliance Results:"
+          echo "JDK${{ matrix.jdk }} Compliance Results (${{ matrix.variant }}):"
           echo "  Passed: ${COMPLIANCE_PASSED}"
           echo "  Whitelisted: ${COMPLIANCE_WHITELISTED}"
 
@@ -218,7 +240,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compliance-results-jdk${{ matrix.jdk }}
+          name: compliance-results-jdk${{ matrix.jdk }}-${{ matrix.variant }}
           path: |
             build/compliance_jdk${{ matrix.jdk }}/results.txt
             build/compliance_jdk${{ matrix.jdk }}/failed.txt
@@ -233,6 +255,7 @@ jobs:
     strategy:
       matrix:
         jdk: [7, 8]
+        variant: [release, debug]
 
     steps:
       - name: Checkout repository
@@ -243,15 +266,16 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Build DevJopaK
+      - name: Build DevJopaK (${{ matrix.variant }})
         run: |
-          nix build .#devjopak-gnucp099-jopa201 --print-build-logs
+          PACKAGE="devjopak-gnucp099-jopa201${{ matrix.variant == 'debug' && '-debug' || '' }}"
+          nix build .#${PACKAGE} --print-build-logs
 
       - name: Prepare JDK${{ matrix.jdk }} Tests
         run: |
           nix develop --command python3 scripts/compliance_tester.py --prepare --jdk ${{ matrix.jdk }}
 
-      - name: Run JDK${{ matrix.jdk }} Compliance Tests
+      - name: Run JDK${{ matrix.jdk }} Compliance Tests (${{ matrix.variant }})
         run: |
           # Set up paths to use built devjopak
           export DEVJOPAK_HOME="$(pwd)/result"
@@ -261,17 +285,17 @@ jobs:
             --classpath gnucp \
             --timeout 30 \
             --mode run \
-            --no-success 2>&1 | tee /tmp/jdk${{ matrix.jdk }}-compliance.log
+            --no-success 2>&1 | tee /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log
 
       - name: Check Results
         run: |
-          TOTAL=$(grep "^Total:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
-          SUCCESS=$(grep "^Success:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
-          FAILURE=$(grep "^Failure:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
-          TIMEOUT=$(grep "^Timeout:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
-          CRASH=$(grep "^Crash:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+          TOTAL=$(grep "^Total:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
+          SUCCESS=$(grep "^Success:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
+          FAILURE=$(grep "^Failure:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
+          TIMEOUT=$(grep "^Timeout:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
+          CRASH=$(grep "^Crash:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
 
-          echo "## OpenJDK JDK${{ matrix.jdk }} Compliance Results" >> $GITHUB_STEP_SUMMARY
+          echo "## OpenJDK JDK${{ matrix.jdk }} Compliance Results (${{ matrix.variant }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
@@ -290,8 +314,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: openjdk-compliance-jdk${{ matrix.jdk }}-log
-          path: /tmp/jdk${{ matrix.jdk }}-compliance.log
+          name: openjdk-compliance-jdk${{ matrix.jdk }}-${{ matrix.variant }}-log
+          path: /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log
           retention-days: 7
 
   # Legacy Classpath 0.93 build
