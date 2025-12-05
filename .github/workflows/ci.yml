@@ -16,6 +16,7 @@ jobs:
     strategy:
       matrix:
         variant: [release, debug]
+        target: ['1.5', '1.6', '1.7']
 
     steps:
       - name: Checkout repository
@@ -26,21 +27,24 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
 
-      - name: Build and test JOPA (${{ matrix.variant }})
+      - name: Build and test JOPA (${{ matrix.variant }}, target ${{ matrix.target }})
         run: |
-          if [ "${{ matrix.variant }}" = "debug" ]; then
-            nix build .#jopa-debug --print-build-logs
-          else
-            nix build .#jopa --print-build-logs
-          fi
+          BUILD_TYPE=${{ matrix.variant == 'debug' && 'Debug' || 'Release' }}
+          nix develop --command bash -c "
+            cmake -S . -B build -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
+              -DJOPA_TARGET_VERSION=${{ matrix.target }} \
+              ${{ matrix.variant == 'debug' && '-DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF' || '' }}
+            cmake --build build -j\$(nproc)
+            ctest --test-dir build --output-on-failure -j\$(nproc)
+          "
 
       - name: Generate test summary
         if: always()
         run: |
-          echo "## ${{ matrix.variant }} Build" >> $GITHUB_STEP_SUMMARY
+          echo "## ${{ matrix.variant }} Build (target ${{ matrix.target }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -L result ]; then
-            echo "Build successful: $(readlink result)" >> $GITHUB_STEP_SUMMARY
+          if [ -d build ]; then
+            echo "Build completed" >> $GITHUB_STEP_SUMMARY
           else
             echo "Build failed" >> $GITHUB_STEP_SUMMARY
           fi
