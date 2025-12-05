@@ -219,7 +219,7 @@ ulimit -s unlimited
 
     # --- JUnit 3.8.2 (Source Build) ---
     ExternalProject_Add(junit
-        URL "https://repo1.maven.org/maven2/junit/junit/3.8.2/junit-3.8.2-sources.jar"
+        URL "${CMAKE_CURRENT_SOURCE_DIR}/junit-3.8.2-sources.jar"
         PREFIX "${CMAKE_CURRENT_BINARY_DIR}/junit-prefix"
         INSTALL_DIR "${VENDOR_PREFIX}/junit"
         DEPENDS gnu_classpath
