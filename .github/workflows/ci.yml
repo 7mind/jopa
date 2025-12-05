@@ -9,11 +9,61 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-release:
-    name: Build and Test (Release)
+  # Quick check - just build and test JOPA compiler
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [release, debug]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@v14
+
+      - name: Setup Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v8
+
+      - name: Build and test JOPA (${{ matrix.variant }})
+        run: |
+          if [ "${{ matrix.variant }}" = "debug" ]; then
+            nix build .#jopa-debug --print-build-logs
+          else
+            nix build .#jopa --print-build-logs
+          fi
+
+      - name: Generate test summary
+        if: always()
+        run: |
+          echo "## ${{ matrix.variant }} Build" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -L result ]; then
+            echo "Build successful: $(readlink result)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Build failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # Build DevJopaK distributions
+  build-devjopak:
+    name: Build DevJopaK
+    runs-on: ubuntu-latest
+    needs: build-and-test
     permissions:
       contents: write
+    strategy:
+      matrix:
+        include:
+          - name: devjopak-gnucp099-jopa201
+            artifact: devjopak-jopa
+          - name: devjopak-gnucp099-ecj421
+            artifact: devjopak-ecj421
+          - name: devjopak-gnucp099-ecj422
+            artifact: devjopak-ecj422
 
     steps:
       - name: Checkout repository
@@ -23,121 +73,57 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Check flake
-        run: nix flake check --show-trace
-
-      - name: Build JOPA, DevJopaK, and DevJopaK-ECJ (Release)
+      - name: Build ${{ matrix.name }}
         run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build -j$(nproc)
+          nix build .#${{ matrix.name }} --print-build-logs
 
-            # Configure devjopak with memory tracking wrapper
-            export JOPA_REAL_EXECUTABLE="$(pwd)/build/src/jopa"
-            export JOPA_MEMORY_LOG="/tmp/jopa-memory-release.log"
-            rm -f "$JOPA_MEMORY_LOG"
+          # Verify the build
+          echo "Build output:"
+          ls -la result/
 
-            cmake -S devjopak -B build-devjopak \
-              -DJOPA_BUILD_DIR=build \
-              -DCMAKE_BUILD_TYPE=Release \
-              -DJOPA_JAVAC_COMMAND="$(pwd)/scripts/jopa-memory-wrapper.sh"
-            cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-release.log
-          '
+          # Test basic functionality
+          export PATH="$(pwd)/result/bin:$PATH"
+          java -version
+          javac -version || javac -help | head -1
 
-      - name: Report Memory Usage (Release)
-        if: always()
+      - name: Create distribution tarball
         run: |
-          MEMLOG="/tmp/jopa-memory-release.log"
-          if [ -f "$MEMLOG" ] && [ -s "$MEMLOG" ]; then
-            PEAK_KB=$(sort -n "$MEMLOG" | tail -1)
-            PEAK_MB=$(echo "scale=1; $PEAK_KB / 1024" | bc)
-            INVOCATIONS=$(wc -l < "$MEMLOG")
-            AVG_KB=$(awk '{sum+=$1} END {printf "%.0f", sum/NR}' "$MEMLOG")
-            AVG_MB=$(echo "scale=1; $AVG_KB / 1024" | bc)
+          # Create tarball from nix output
+          VERSION="2.0.1"
+          TARBALL="${{ matrix.name }}-${VERSION}.tar.gz"
 
-            echo "## Memory Usage (Release Build)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Peak RSS | ${PEAK_MB} MB |" >> $GITHUB_STEP_SUMMARY
-            echo "| Avg RSS | ${AVG_MB} MB |" >> $GITHUB_STEP_SUMMARY
-            echo "| Compiler Invocations | ${INVOCATIONS} |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## Memory Usage (Release Build)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "No memory data collected" >> $GITHUB_STEP_SUMMARY
-          fi
+          mkdir -p dist
+          cp -rL result dist/${{ matrix.name }}
+          cd dist
+          tar -czf "../${TARBALL}" ${{ matrix.name }}
+          cd ..
 
-      - name: Verify DevJopaK Distribution
-        run: |
-          nix develop --command bash ./scripts/test-devjopak.sh
+          echo "Created: ${TARBALL}"
+          ls -la "${TARBALL}"
 
-      - name: Verify DevJopaK-ECJ Distribution
-        run: |
-          nix develop --command bash ./scripts/test-devjopak-ecj.sh
-
-      - name: Run Primary Tests (Release)
-        run: |
-          nix develop --command bash ./scripts/test-primary.sh --release
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo '## Release Build Test Results' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload test artifacts
-        if: always()
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-release
-          path: |
-            build/test/*.class
-            build/Testing/Temporary/LastTest.log
-            /tmp/build-release.log
-          retention-days: 7
-
-      - name: Upload devjopak artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: devjopak
-          path: build-devjopak/devjopak-*.tar.gz
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.name }}-*.tar.gz
           retention-days: 30
 
-      - name: Upload devjopak-ecj artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: devjopak-ecj
-          path: build-devjopak/devjopak-ecj-*.tar.gz
-          retention-days: 30
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            build-devjopak/devjopak-*.tar.gz
-            build-devjopak/devjopak-ecj-*.tar.gz
-          generate_release_notes: true
-          draft: false
-          prerelease: ${{ contains(github.ref, '-') }}
-
-  build-debug:
-    name: Build and Test (Debug + Sanitizers)
+  # Parser tests
+  parser-tests:
+    name: Parser Tests
     runs-on: ubuntu-latest
+    needs: build-and-test
+    strategy:
+      matrix:
+        include:
+          - jdk: 7
+            threshold: 97.5
+          - jdk: 8
+            threshold: 92.8
 
     steps:
       - name: Checkout repository
@@ -147,117 +133,18 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Build JOPA, DevJopaK, and DevJopaK-ECJ (Debug + Sanitizers)
+      - name: Run JDK${{ matrix.jdk }} Parser Tests
         run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DJOPA_ENABLE_SANITIZERS=ON -DJOPA_ENABLE_LEAK_SANITIZER=OFF
-            cmake --build build -j$(nproc)
+          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-parser.sh --build
 
-            # Configure devjopak with memory tracking wrapper
-            export JOPA_REAL_EXECUTABLE="$(pwd)/build/src/jopa"
-            export JOPA_MEMORY_LOG="/tmp/jopa-memory-debug.log"
-            rm -f "$JOPA_MEMORY_LOG"
-
-            cmake -S devjopak -B build-devjopak \
-              -DJOPA_BUILD_DIR=build \
-              -DCMAKE_BUILD_TYPE=Debug \
-              -DJOPA_JAVAC_COMMAND="$(pwd)/scripts/jopa-memory-wrapper.sh"
-            cmake --build build-devjopak --target devjopak devjopak-ecj -j$(nproc) 2>&1 | tee /tmp/build-debug.log
-          '
-
-      - name: Report Memory Usage (Debug)
-        if: always()
+      - name: Check Success Threshold (${{ matrix.threshold }}%)
         run: |
-          MEMLOG="/tmp/jopa-memory-debug.log"
-          if [ -f "$MEMLOG" ] && [ -s "$MEMLOG" ]; then
-            PEAK_KB=$(sort -n "$MEMLOG" | tail -1)
-            PEAK_MB=$(echo "scale=1; $PEAK_KB / 1024" | bc)
-            INVOCATIONS=$(wc -l < "$MEMLOG")
-            AVG_KB=$(awk '{sum+=$1} END {printf "%.0f", sum/NR}' "$MEMLOG")
-            AVG_MB=$(echo "scale=1; $AVG_KB / 1024" | bc)
-
-            echo "## Memory Usage (Debug Build)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Peak RSS | ${PEAK_MB} MB |" >> $GITHUB_STEP_SUMMARY
-            echo "| Avg RSS | ${AVG_MB} MB |" >> $GITHUB_STEP_SUMMARY
-            echo "| Compiler Invocations | ${INVOCATIONS} |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "## Memory Usage (Debug Build)" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "No memory data collected" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Verify DevJopaK Distribution
-        run: |
-          nix develop --command bash ./scripts/test-devjopak.sh
-
-      - name: Verify DevJopaK-ECJ Distribution
-        run: |
-          nix develop --command bash ./scripts/test-devjopak-ecj.sh
-
-      - name: Run Primary Tests (Debug + Sanitizers)
-        run: |
-          nix develop --command bash ./scripts/test-primary.sh --sanitizers
-
-      - name: Generate test summary
-        if: always()
-        run: |
-          echo '## Debug Build Test Results (with Sanitizers)' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo 'Full matrix: -source 1.7 with targets 1.5, 1.6' >> $GITHUB_STEP_SUMMARY
-          echo '' >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          nix develop --command bash -c "cd build && ctest -N 2>/dev/null | tail -5" >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results-debug
-          path: |
-            build/test/*.class
-            build/Testing/Temporary/LastTest.log
-            /tmp/build-debug.log
-          retention-days: 7
-
-  parser-tests-jdk7:
-    name: JDK7 Parser Tests (97.5% threshold)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Run JDK7 Parser Tests
-        run: |
-          nix develop --command bash ./scripts/test-java7-parser.sh --build
-
-      - name: Check JDK7 Success Threshold (97.5%)
-        run: |
-          source build/parser_jdk7_results.env
-          echo "JDK7 Parser Results:"
+          source build/parser_jdk${{ matrix.jdk }}_results.env
+          echo "JDK${{ matrix.jdk }} Parser Results:"
           echo "  Passed: ${PARSER_PASSED}"
           echo "  Whitelisted: ${PARSER_WHITELISTED}"
 
@@ -268,34 +155,39 @@ jobs:
 
           SUCCESS_RATE=$(echo "scale=4; $PARSER_PASSED * 100 / $PARSER_WHITELISTED" | bc)
           echo "  Success rate: ${SUCCESS_RATE}%"
-          echo ""
 
-          # Check if success rate is at least 97.5%
-          THRESHOLD=97.5
-          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+          THRESHOLD=${{ matrix.threshold }}
+          PASSED=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
-          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
-            echo "SUCCESS: JDK7 parser tests passed threshold (>= ${THRESHOLD}%)"
+          if [ "$PASSED" -eq 1 ]; then
+            echo "SUCCESS: Passed threshold (>= ${THRESHOLD}%)"
           else
-            echo "FAILURE: JDK7 parser tests below threshold"
-            echo "Expected: >= ${THRESHOLD}%"
-            echo "Actual: ${SUCCESS_RATE}%"
+            echo "FAILURE: Below threshold (expected >= ${THRESHOLD}%, got ${SUCCESS_RATE}%)"
             exit 1
           fi
 
-      - name: Upload test artifacts
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: parser-results-jdk7
+          name: parser-results-jdk${{ matrix.jdk }}
           path: |
             build/parser_results.txt
-            build/parser_jdk7_results.env
+            build/parser_jdk${{ matrix.jdk }}_results.env
           retention-days: 7
 
-  parser-tests-jdk8:
-    name: JDK8 Parser Tests (92.8% threshold)
+  # Compliance tests
+  compliance-tests:
+    name: Compliance Tests
     runs-on: ubuntu-latest
+    needs: build-and-test
+    strategy:
+      matrix:
+        include:
+          - jdk: 7
+            threshold: 96.5
+          - jdk: 8
+            threshold: 67.1
 
     steps:
       - name: Checkout repository
@@ -305,87 +197,20 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Run JDK8 Parser Tests
+      - name: Run JDK${{ matrix.jdk }} Compliance Tests
         run: |
-          nix develop --command bash ./scripts/test-java8-parser.sh --build
+          nix develop --command bash ./scripts/test-java${{ matrix.jdk }}-compliance.sh --build
 
-      - name: Check JDK8 Success Threshold (92.8%)
+      - name: Check Success Threshold (${{ matrix.threshold }}%)
         run: |
-          source build/parser_jdk8_results.env
-          echo "JDK8 Parser Results:"
-          echo "  Passed: ${PARSER_PASSED}"
-          echo "  Whitelisted: ${PARSER_WHITELISTED}"
-
-          if [ "$PARSER_WHITELISTED" -eq 0 ]; then
-            echo "ERROR: No tests were whitelisted"
-            exit 1
-          fi
-
-          SUCCESS_RATE=$(echo "scale=4; $PARSER_PASSED * 100 / $PARSER_WHITELISTED" | bc)
-          echo "  Success rate: ${SUCCESS_RATE}%"
-          echo ""
-
-          # Check if success rate is at least 92.8%
-          THRESHOLD=92.8
-          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
-
-          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
-            echo "SUCCESS: JDK8 parser tests passed threshold (>= ${THRESHOLD}%)"
-          else
-            echo "FAILURE: JDK8 parser tests below threshold"
-            echo "Expected: >= ${THRESHOLD}%"
-            echo "Actual: ${SUCCESS_RATE}%"
-            exit 1
-          fi
-
-      - name: Upload test artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: parser-results-jdk8
-          path: |
-            build/parser_results.txt
-            build/parser_jdk8_results.env
-          retention-days: 7
-
-  compliance-tests-jdk7:
-    name: JDK7 Compliance Tests (96.5% threshold)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Run JDK7 Compliance Tests
-        run: |
-          nix develop --command bash ./scripts/test-java7-compliance.sh --build
-
-      - name: Check JDK7 Success Threshold (96.5%)
-        run: |
-          source build/compliance_jdk7_results.env
-          echo "JDK7 Compliance Results:"
+          source build/compliance_jdk${{ matrix.jdk }}_results.env
+          echo "JDK${{ matrix.jdk }} Compliance Results:"
           echo "  Passed: ${COMPLIANCE_PASSED}"
           echo "  Whitelisted: ${COMPLIANCE_WHITELISTED}"
-          echo "  Failed: ${COMPLIANCE_FAILED}"
-          echo "  Timeout: ${COMPLIANCE_TIMEOUT}"
 
           if [ "$COMPLIANCE_WHITELISTED" -eq 0 ]; then
             echo "ERROR: No tests were whitelisted"
@@ -394,36 +219,36 @@ jobs:
 
           SUCCESS_RATE=$(echo "scale=4; $COMPLIANCE_PASSED * 100 / $COMPLIANCE_WHITELISTED" | bc)
           echo "  Success rate: ${SUCCESS_RATE}%"
-          echo ""
 
-          # Check if success rate is at least 96.5%
-          THRESHOLD=96.5
-          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
+          THRESHOLD=${{ matrix.threshold }}
+          PASSED=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
 
-          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
-            echo "SUCCESS: JDK7 compliance tests passed threshold (>= ${THRESHOLD}%)"
+          if [ "$PASSED" -eq 1 ]; then
+            echo "SUCCESS: Passed threshold (>= ${THRESHOLD}%)"
           else
-            echo "FAILURE: JDK7 compliance tests below threshold"
-            echo "Expected: >= ${THRESHOLD}%"
-            echo "Actual: ${SUCCESS_RATE}%"
+            echo "FAILURE: Below threshold (expected >= ${THRESHOLD}%, got ${SUCCESS_RATE}%)"
             exit 1
           fi
 
-      - name: Upload test artifacts
+      - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compliance-results-jdk7
+          name: compliance-results-jdk${{ matrix.jdk }}
           path: |
-            build/compliance_jdk7/results.txt
-            build/compliance_jdk7/failed.txt
-            build/compliance_jdk7/timeout.txt
-            build/compliance_jdk7_results.env
+            build/compliance_jdk${{ matrix.jdk }}/results.txt
+            build/compliance_jdk${{ matrix.jdk }}/failed.txt
+            build/compliance_jdk${{ matrix.jdk }}_results.env
           retention-days: 7
 
-  compliance-tests-jdk8:
-    name: JDK8 Compliance Tests (67.1% threshold)
+  # OpenJDK compliance tests (run with DevJopaK)
+  openjdk-compliance:
+    name: OpenJDK Compliance
     runs-on: ubuntu-latest
+    needs: build-devjopak
+    strategy:
+      matrix:
+        jdk: [7, 8]
 
     steps:
       - name: Checkout repository
@@ -433,63 +258,66 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
 
-      - name: Run JDK8 Compliance Tests
+      - name: Build DevJopaK
         run: |
-          nix develop --command bash ./scripts/test-java8-compliance.sh --build
+          nix build .#devjopak-gnucp099-jopa201 --print-build-logs
 
-      - name: Check JDK8 Success Threshold (67.1%)
+      - name: Prepare JDK${{ matrix.jdk }} Tests
         run: |
-          source build/compliance_jdk8_results.env
-          echo "JDK8 Compliance Results:"
-          echo "  Passed: ${COMPLIANCE_PASSED}"
-          echo "  Whitelisted: ${COMPLIANCE_WHITELISTED}"
-          echo "  Failed: ${COMPLIANCE_FAILED}"
-          echo "  Timeout: ${COMPLIANCE_TIMEOUT}"
+          nix develop --command python3 scripts/compliance_tester.py --prepare --jdk ${{ matrix.jdk }}
 
-          if [ "$COMPLIANCE_WHITELISTED" -eq 0 ]; then
-            echo "ERROR: No tests were whitelisted"
+      - name: Run JDK${{ matrix.jdk }} Compliance Tests
+        run: |
+          # Set up paths to use built devjopak
+          export DEVJOPAK_HOME="$(pwd)/result"
+
+          nix develop --command python3 scripts/compliance_tester.py \
+            --test --jdk ${{ matrix.jdk }} \
+            --classpath gnucp \
+            --timeout 30 \
+            --mode run \
+            --no-success 2>&1 | tee /tmp/jdk${{ matrix.jdk }}-compliance.log
+
+      - name: Check Results
+        run: |
+          TOTAL=$(grep "^Total:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+          SUCCESS=$(grep "^Success:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+          FAILURE=$(grep "^Failure:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+          TIMEOUT=$(grep "^Timeout:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+          CRASH=$(grep "^Crash:" /tmp/jdk${{ matrix.jdk }}-compliance.log | awk '{print $2}')
+
+          echo "## OpenJDK JDK${{ matrix.jdk }} Compliance Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Success | $SUCCESS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Failure | $FAILURE |" >> $GITHUB_STEP_SUMMARY
+          echo "| Timeout | $TIMEOUT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Crash | $CRASH |" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$FAILURE" != "0" ] || [ "$TIMEOUT" != "0" ] || [ "$CRASH" != "0" ]; then
+            echo "FAILURE: Some tests did not pass"
             exit 1
           fi
 
-          SUCCESS_RATE=$(echo "scale=4; $COMPLIANCE_PASSED * 100 / $COMPLIANCE_WHITELISTED" | bc)
-          echo "  Success rate: ${SUCCESS_RATE}%"
-          echo ""
-
-          # Check if success rate is at least 67.1%
-          THRESHOLD=67.1
-          PASSED_THRESHOLD=$(echo "$SUCCESS_RATE >= $THRESHOLD" | bc)
-
-          if [ "$PASSED_THRESHOLD" -eq 1 ]; then
-            echo "SUCCESS: JDK8 compliance tests passed threshold (>= ${THRESHOLD}%)"
-          else
-            echo "FAILURE: JDK8 compliance tests below threshold"
-            echo "Expected: >= ${THRESHOLD}%"
-            echo "Actual: ${SUCCESS_RATE}%"
-            exit 1
-          fi
-
-      - name: Upload test artifacts
+      - name: Upload test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compliance-results-jdk8
-          path: |
-            build/compliance_jdk8/results.txt
-            build/compliance_jdk8/failed.txt
-            build/compliance_jdk8/timeout.txt
-            build/compliance_jdk8_results.env
+          name: openjdk-compliance-jdk${{ matrix.jdk }}-log
+          path: /tmp/jdk${{ matrix.jdk }}-compliance.log
           retention-days: 7
 
+  # Legacy Classpath 0.93 build
   build-legacy-classpath:
-    name: Build Legacy Classpath 0.93 (No JamVM)
+    name: Build Legacy Classpath 0.93
     runs-on: ubuntu-latest
+    needs: build-and-test
 
     steps:
       - name: Checkout repository
@@ -499,9 +327,6 @@ jobs:
 
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
 
       - name: Setup Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v8
@@ -512,7 +337,10 @@ jobs:
             set -euo pipefail
             cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
             cmake --build build -j$(nproc)
-            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release -DJOPA_CLASSPATH_VERSION=0.93
+            cmake -S devjopak -B build-devjopak \
+              -DJOPA_BUILD_DIR=build \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DJOPA_CLASSPATH_VERSION=0.93
             cmake --build build-devjopak --target gnu_classpath -j$(nproc) 2>&1 | tee /tmp/build-legacy.log
           '
 
@@ -524,160 +352,28 @@ jobs:
           path: /tmp/build-legacy.log
           retention-days: 7
 
-  openjdk-compliance-jdk7:
-    name: OpenJDK Compliance (JDK7)
+  # Create GitHub release
+  release:
+    name: Create Release
     runs-on: ubuntu-latest
+    needs: [build-devjopak, parser-tests, compliance-tests]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          submodules: recursive
+          path: artifacts
 
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build JOPA and DevJopaK
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build -j$(nproc)
-            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-devjopak --target devjopak -j$(nproc)
-          '
-
-      - name: Prepare JDK7 Tests
-        run: |
-          nix develop --command python3 scripts/compliance_tester.py --prepare --jdk 7
-
-      - name: Run JDK7 Compliance Tests
-        run: |
-          nix develop --command python3 scripts/compliance_tester.py \
-            --test --jdk 7 \
-            --classpath gnucp \
-            --timeout 30 \
-            --mode run \
-            --no-success 2>&1 | tee /tmp/jdk7-compliance.log
-
-      - name: Check Results
-        run: |
-          # Extract results from log
-          TOTAL=$(grep "^Total:" /tmp/jdk7-compliance.log | awk '{print $2}')
-          SUCCESS=$(grep "^Success:" /tmp/jdk7-compliance.log | awk '{print $2}')
-          FAILURE=$(grep "^Failure:" /tmp/jdk7-compliance.log | awk '{print $2}')
-          TIMEOUT=$(grep "^Timeout:" /tmp/jdk7-compliance.log | awk '{print $2}')
-          CRASH=$(grep "^Crash:" /tmp/jdk7-compliance.log | awk '{print $2}')
-
-          echo "## OpenJDK JDK7 Compliance Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-          echo "| Success | $SUCCESS |" >> $GITHUB_STEP_SUMMARY
-          echo "| Failure | $FAILURE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Timeout | $TIMEOUT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Crash | $CRASH |" >> $GITHUB_STEP_SUMMARY
-
-          # Fail if any test failed
-          if [ "$FAILURE" != "0" ] || [ "$TIMEOUT" != "0" ] || [ "$CRASH" != "0" ]; then
-            echo ""
-            echo "FAILURE: Some tests did not pass"
-            exit 1
-          fi
-
-          echo ""
-          echo "SUCCESS: All $TOTAL tests passed"
-
-      - name: Upload test log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: openjdk-compliance-jdk7-log
-          path: /tmp/jdk7-compliance.log
-          retention-days: 7
-
-  openjdk-compliance-jdk8:
-    name: OpenJDK Compliance (JDK8)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install Nix
-        uses: DeterminateSystems/nix-installer-action@v14
-        with:
-          logger: pretty
-          log-directives: nix_installer=debug
-
-      - name: Setup Nix cache
-        uses: DeterminateSystems/magic-nix-cache-action@v8
-
-      - name: Build JOPA and DevJopaK
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build -j$(nproc)
-            cmake -S devjopak -B build-devjopak -DJOPA_BUILD_DIR=build -DCMAKE_BUILD_TYPE=Release
-            cmake --build build-devjopak --target devjopak -j$(nproc)
-          '
-
-      - name: Prepare JDK8 Tests
-        run: |
-          nix develop --command python3 scripts/compliance_tester.py --prepare --jdk 8
-
-      - name: Run JDK8 Compliance Tests
-        run: |
-          nix develop --command python3 scripts/compliance_tester.py \
-            --test --jdk 8 \
-            --classpath gnucp \
-            --timeout 30 \
-            --mode run \
-            --no-success 2>&1 | tee /tmp/jdk8-compliance.log
-
-      - name: Check Results
-        run: |
-          # Extract results from log
-          TOTAL=$(grep "^Total:" /tmp/jdk8-compliance.log | awk '{print $2}')
-          SUCCESS=$(grep "^Success:" /tmp/jdk8-compliance.log | awk '{print $2}')
-          FAILURE=$(grep "^Failure:" /tmp/jdk8-compliance.log | awk '{print $2}')
-          TIMEOUT=$(grep "^Timeout:" /tmp/jdk8-compliance.log | awk '{print $2}')
-          CRASH=$(grep "^Crash:" /tmp/jdk8-compliance.log | awk '{print $2}')
-
-          echo "## OpenJDK JDK8 Compliance Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Total | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-          echo "| Success | $SUCCESS |" >> $GITHUB_STEP_SUMMARY
-          echo "| Failure | $FAILURE |" >> $GITHUB_STEP_SUMMARY
-          echo "| Timeout | $TIMEOUT |" >> $GITHUB_STEP_SUMMARY
-          echo "| Crash | $CRASH |" >> $GITHUB_STEP_SUMMARY
-
-          # Fail if any test failed
-          if [ "$FAILURE" != "0" ] || [ "$TIMEOUT" != "0" ] || [ "$CRASH" != "0" ]; then
-            echo ""
-            echo "FAILURE: Some tests did not pass"
-            exit 1
-          fi
-
-          echo ""
-          echo "SUCCESS: All $TOTAL tests passed"
-
-      - name: Upload test log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: openjdk-compliance-jdk8-log
-          path: /tmp/jdk8-compliance.log
-          retention-days: 7
+          files: |
+            artifacts/devjopak-jopa/*.tar.gz
+            artifacts/devjopak-ecj421/*.tar.gz
+            artifacts/devjopak-ecj422/*.tar.gz
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}

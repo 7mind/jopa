@@ -2,9 +2,15 @@
 # Eclipse Compiler for Java (ECJ) Build
 # ============================================================================
 if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
-    set(ECJ_VERSION "4.2.1")
+    # ECJ version - can be overridden on command line
+    set(ECJ_VERSION "4.2.1" CACHE STRING "ECJ version to use (4.2.1 or 4.2.2)")
     # Use local source JAR from vendor directory
     set(ECJ_SOURCE_JAR "${CMAKE_CURRENT_SOURCE_DIR}/../vendor/ecjsrc-${ECJ_VERSION}.jar")
+
+    if(NOT EXISTS "${ECJ_SOURCE_JAR}")
+        message(FATAL_ERROR "ECJ source JAR not found at ${ECJ_SOURCE_JAR}. Available versions: 4.2.1, 4.2.2")
+    endif()
+    message(STATUS "ECJ version: ${ECJ_VERSION}")
     
     set(ECJ_BUILD_DIR "${CMAKE_BINARY_DIR}/ecj-build")
     set(ECJ_INSTALL_DIR "${VENDOR_PREFIX}/ecj")
@@ -62,11 +68,12 @@ find \"$1\" -name '*.java' > \"$2\"
 
     add_custom_target(ecj DEPENDS "${ECJ_JAR}")
 
-    # ============================================================================ 
+    # ============================================================================
     # DevJopaK-ECJ Distribution
-    # ============================================================================ 
+    # ============================================================================
+    # Tarball naming: devjopak-{jopa_version}-gnucp-{cp_version}-ecj-{ecj_version}
     set(DEVJOPAK_ECJ_DIR "${CMAKE_BINARY_DIR}/devjopak-ecj")
-    set(DEVJOPAK_ECJ_ARCHIVE "devjopak-ecj-${JOPA_VERSION}.tar.gz")
+    set(DEVJOPAK_ECJ_ARCHIVE "devjopak-${JOPA_VERSION}-gnucp-${JOPA_CLASSPATH_VERSION}-ecj-${ECJ_VERSION}.tar.gz")
     set(JAVAC_ECJ_WRAPPER "${DEVJOPAK_ECJ_DIR}/bin/javac")
     
     add_custom_command(
