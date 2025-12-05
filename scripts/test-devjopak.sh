@@ -7,37 +7,49 @@ BUILD_DIR="$ROOT_DIR/build"
 DEVJOPAK_BUILD_DIR="$ROOT_DIR/build-devjopak"
 TEST_DIR="$DEVJOPAK_BUILD_DIR/test-devjopak"
 
-# Clean up previous builds to ensure fresh state
-# rm -rf "$DEVJOPAK_BUILD_DIR"
-
-echo "Building JOPA Compiler..."
-cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
-cmake --build "$BUILD_DIR" --target jopa jopa-stub-rt
-
-echo "Building DevJopaK Distribution..."
-# Configure devjopak build, pointing to the jopa build artifacts
-cmake -S "$ROOT_DIR/devjopak" -B "$DEVJOPAK_BUILD_DIR" \
-    -DJOPA_BUILD_DIR="$BUILD_DIR" \
-    -DCMAKE_BUILD_TYPE=Release
-
-cmake --build "$DEVJOPAK_BUILD_DIR" --target devjopak
-
-# Find the archive (handling version variations, but strictly excluding ecj variant)
-DIST_ARCHIVE=$(find "$DEVJOPAK_BUILD_DIR" -name "devjopak-*.tar.gz" ! -name "*ecj*" | head -n 1)
-if [ -z "$DIST_ARCHIVE" ]; then
-    echo "Error: Could not find devjopak-*.tar.gz in $DEVJOPAK_BUILD_DIR"
-    exit 1
+# Check if we should use nix build
+USE_NIX=false
+if [ "$1" = "--nix" ]; then
+    USE_NIX=true
+    shift
 fi
-echo "Found archive: $DIST_ARCHIVE"
 
-echo "Setting up test environment in $TEST_DIR..."
-rm -rf "$TEST_DIR"
-mkdir -p "$TEST_DIR"
-tar -xzf "$DIST_ARCHIVE" -C "$TEST_DIR"
+if [ "$USE_NIX" = true ]; then
+    echo "Building DevJopaK via Nix..."
+    cd "$ROOT_DIR"
+    nix build .#devjopak-gnucp099-jopa201 --print-build-logs
 
-DEVJOPAK_HOME="$TEST_DIR/devjopak"
-# Ensure binaries are executable (cmake -E tar might not preserve permissions perfectly in all envs)
-chmod -R +x "$DEVJOPAK_HOME/bin"
+    DEVJOPAK_HOME="$ROOT_DIR/result"
+else
+    echo "Building JOPA Compiler..."
+    cmake -S "$ROOT_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release
+    cmake --build "$BUILD_DIR" --target jopa jopa-stub-rt
+
+    echo "Building DevJopaK Distribution..."
+    cmake -S "$ROOT_DIR/devjopak" -B "$DEVJOPAK_BUILD_DIR" \
+        -DJOPA_BUILD_DIR="$BUILD_DIR" \
+        -DCMAKE_BUILD_TYPE=Release
+
+    cmake --build "$DEVJOPAK_BUILD_DIR" --target devjopak
+
+    # Find the archive (handling version variations)
+    # New naming: devjopak-{version}-gnucp-{version}-jopa-{version}.tar.gz
+    DIST_ARCHIVE=$(find "$DEVJOPAK_BUILD_DIR" -name "devjopak-*-jopa-*.tar.gz" | head -n 1)
+    if [ -z "$DIST_ARCHIVE" ]; then
+        echo "Error: Could not find devjopak-*-jopa-*.tar.gz in $DEVJOPAK_BUILD_DIR"
+        exit 1
+    fi
+    echo "Found archive: $DIST_ARCHIVE"
+
+    echo "Setting up test environment in $TEST_DIR..."
+    rm -rf "$TEST_DIR"
+    mkdir -p "$TEST_DIR"
+    tar -xzf "$DIST_ARCHIVE" -C "$TEST_DIR"
+
+    DEVJOPAK_HOME="$TEST_DIR/devjopak"
+    # Ensure binaries are executable
+    chmod -R +x "$DEVJOPAK_HOME/bin"
+fi
 
 export JAVA_HOME="$DEVJOPAK_HOME"
 export ANT_HOME="$DEVJOPAK_HOME"
@@ -54,13 +66,17 @@ echo "Using: $(which ant)"
 ant -version
 echo "------------------------------------------------"
 
+# Create test directory
+TEST_WORK_DIR="${TEST_DIR:-/tmp/test-devjopak-$$}"
+mkdir -p "$TEST_WORK_DIR"
+
 # Create Hello.java
-cat > "$TEST_DIR/Hello.java" <<EOF
+cat > "$TEST_WORK_DIR/Hello.java" <<EOF
 public class Hello {
     public static void main(String[] args) {
         System.out.println("Hello from DevJopaK!");
     }
-    
+
     public String getMessage() {
         return "Hello";
     }
@@ -68,7 +84,7 @@ public class Hello {
 EOF
 
 # Create HelloTest.java (JUnit 3)
-cat > "$TEST_DIR/HelloTest.java" <<EOF
+cat > "$TEST_WORK_DIR/HelloTest.java" <<EOF
 import junit.framework.TestCase;
 
 public class HelloTest extends TestCase {
@@ -80,7 +96,7 @@ public class HelloTest extends TestCase {
 EOF
 
 # Create build.xml
-cat > "$TEST_DIR/build.xml" <<EOF
+cat > "$TEST_WORK_DIR/build.xml" <<EOF
 <project name="TestDevJopaK" default="test" basedir=".">
     <target name="init">
         <mkdir dir="classes"/>
@@ -126,7 +142,7 @@ cat > "$TEST_DIR/build.xml" <<EOF
 </project>
 EOF
 
-cd "$TEST_DIR"
+cd "$TEST_WORK_DIR"
 echo "Running Ant run..."
 ant run
 

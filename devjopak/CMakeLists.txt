@@ -4,7 +4,7 @@ project(devjopak NONE)
 
 # Read version from flake.nix
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../flake.nix" FLAKE_NIX_CONTENT)
-string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+)" _ "${FLAKE_NIX_CONTENT}")
+string(REGEX MATCH "version = \"([0-9]+\\.[0-9]+\\.[0-9]+)" _ "${FLAKE_NIX_CONTENT}")
 set(JOPA_VERSION "${CMAKE_MATCH_1}")
 if(NOT JOPA_VERSION)
     message(FATAL_ERROR "Could not extract version from flake.nix")
@@ -228,8 +228,9 @@ endif()
 # DevJopaK Distribution
 # ============================================================================ 
 if(NOT JOPA_CLASSPATH_VERSION STREQUAL "0.93")
+    # Tarball naming: devjopak-{jopa_version}-gnucp-{cp_version}-jopa-{jopa_version}
     set(DEVJOPAK_DIR "${CMAKE_BINARY_DIR}/devjopak")
-    set(DEVJOPAK_ARCHIVE "devjopak-${JOPA_VERSION}.tar.gz")
+    set(DEVJOPAK_ARCHIVE "devjopak-${JOPA_VERSION}-gnucp-${JOPA_CLASSPATH_VERSION}-jopa-${JOPA_VERSION}.tar.gz")
 
     set(JAVAC_WRAPPER "${DEVJOPAK_DIR}/bin/javac")
     set(JAVA_WRAPPER "${DEVJOPAK_DIR}/bin/java")
