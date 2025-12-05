@@ -1225,7 +1225,7 @@ void SemanticError::InitializeMessages()
         "The file \"%1\" is not a valid directory.";
     messages[PACKAGE_NOT_FOUND] =
         "You need to modify your classpath, sourcepath, bootclasspath, "
-        "and/or extdirs setup. Jikes could not find %P1 in: %C";
+        "and/or extdirs setup. JOPA could not find %P1 in: %C";
     messages[CANNOT_OPEN_DIRECTORY] = "Unable to open directory \"%1\".";
     messages[BAD_INPUT_FILE] =
         "The input file \"%1\" does not have the \".java\" extension.";

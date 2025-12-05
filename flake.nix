@@ -102,6 +102,7 @@
           nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
             pkgs.openjdk8  # Required for JOPA tests
             pkgs.python3   # Required for parser header post-processing
+            pkgs.gcc       # Required for JamVM (clang 17+ rejects its computed gotos)
           ];
 
           buildInputs = with pkgs; [
@@ -215,6 +216,7 @@
           nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
             pkgs.openjdk8  # Required for JOPA tests
             pkgs.python3   # Required for parser header post-processing
+            pkgs.gcc       # Required for JamVM (clang 17+ rejects its computed gotos)
           ];
 
           buildInputs = with pkgs; [
@@ -276,6 +278,7 @@
           nativeBuildInputs = jopaBuildInputs ++ bootstrapBuildInputs ++ [
             pkgs.openjdk8  # Required for JOPA tests
             pkgs.python3   # Required for parser header post-processing
+            pkgs.gcc       # Required for JamVM (clang 17+ rejects its computed gotos)
           ];
 
           buildInputs = with pkgs; [
