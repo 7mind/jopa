@@ -2592,6 +2592,8 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
 
             // Generate: newarray/anewarray <component_type> with count 0
             PutOp(OP_ICONST_0);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             if (control.IsPrimitive(component_type))
             {
                 PutOp(OP_NEWARRAY);
@@ -2608,6 +2610,12 @@ int ByteCode::EmitMethodInvocation(AstMethodInvocation* expression,
             {
                 PutOp(OP_ANEWARRAY);
                 PutU2(RegisterClass(component_type));
+            }
+            // newarray/anewarray pops count, pushes array
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopType(); // pop count
+                stack_map_generator->PushType(varargs_type); // push array
             }
             ChangeStack(0); // iconst_0 (+1), newarray/anewarray uses it and produces array (+0 net)
             stack_words++;

@@ -1284,6 +1284,8 @@ void ByteCode::InitializeArray(const TypeSymbol* type,
     if (need_value)
     {
         LoadImmediateInteger(array_initializer -> NumVariableInitializers());
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.int_type);
         EmitNewArray(1, type); // make the array
     }
     for (unsigned i = 0;
@@ -1317,7 +1319,11 @@ void ByteCode::InitializeArray(const TypeSymbol* type,
         if (need_value)
         {
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
             LoadImmediateInteger(i);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
         }
         if (expr)
              EmitExpression(expr, need_value);

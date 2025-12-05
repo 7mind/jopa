@@ -1224,6 +1224,8 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             Label skip_close;
             Label after_catch;
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
             int stack_at_branch = stack_depth;  // = 2
 
             EmitBranch(OP_IFNULL, skip_close);
@@ -1238,6 +1240,8 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             PutU1(1);  // 1 argument (just 'this')
             PutU1(0);  // reserved
             // After close(): stack = 0
+            if (stack_map_generator)
+                stack_map_generator->PopType();  // pop object ref consumed by close()
 
             // Record end of try block
             u2 close_try_end = code_attribute -> CodeLength();
@@ -1272,8 +1276,12 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             // Load primary_exception and check if non-null
             // Stack: [caught]
             LoadLocal(variable_index, control.Throwable());
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.Throwable());
             // Stack: [caught, primary]
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
             // Stack: [caught, primary, primary]
             EmitBranch(OP_IFNULL, check_close_exception);
             // Stack: [caught, primary]
@@ -1284,14 +1292,20 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             {
                 // Stack: [caught, primary]
                 PutOp(OP_POP2);  // discard both
+                if (stack_map_generator)
+                    stack_map_generator->PopTypes(2);
                 // Stack: []
             }
             else
             {
                 PutOp(OP_SWAP);
+                if (stack_map_generator)
+                    stack_map_generator->Swap();
                 // Stack: [primary, caught]
                 PutOp(OP_INVOKEVIRTUAL);
                 PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+                if (stack_map_generator)
+                    stack_map_generator->PopTypes(2);  // pops object + arg, void return
                 // Stack: []
             }
             EmitBranch(OP_GOTO, after_catch, statement);
@@ -1308,12 +1322,18 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             DefineLabel(check_close_exception);
             CompleteLabel(check_close_exception);
             PutOp(OP_POP);  // pop null (was primary)
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             // Stack: [caught]
 
             // Load close_exception and check if non-null
             LoadLocal(variable_index + 2, control.Throwable());
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.Throwable());
             // Stack: [caught, close]
             PutOp(OP_DUP);
+            if (stack_map_generator)
+                stack_map_generator->Dup();
             // Stack: [caught, close, close]
             EmitBranch(OP_IFNULL, first_close_exception);
             // Stack: [caught, close]
@@ -1324,14 +1344,20 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             {
                 // Stack: [caught, close]
                 PutOp(OP_POP2);  // discard both
+                if (stack_map_generator)
+                    stack_map_generator->PopTypes(2);
                 // Stack: []
             }
             else
             {
                 PutOp(OP_SWAP);
+                if (stack_map_generator)
+                    stack_map_generator->Swap();
                 // Stack: [close, caught]
                 PutOp(OP_INVOKEVIRTUAL);
                 PutU2(RegisterLibraryMethodref(control.Throwable_addSuppressedMethod()));
+                if (stack_map_generator)
+                    stack_map_generator->PopTypes(2);  // pops object + arg, void return
                 // Stack: []
             }
             EmitBranch(OP_GOTO, after_catch, statement);
@@ -1348,6 +1374,8 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             DefineLabel(first_close_exception);
             CompleteLabel(first_close_exception);
             PutOp(OP_POP);  // pop null (was close)
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             // Stack: [caught]
             StoreLocal(variable_index + 2, control.Throwable());
             // Stack: []
@@ -1364,6 +1392,8 @@ void ByteCode::EmitResourceCleanup(AstTryStatement* statement, int variable_inde
             DefineLabel(skip_close);
             CompleteLabel(skip_close);
             PutOp(OP_POP);  // pop the null reference
+            if (stack_map_generator)
+                stack_map_generator->PopType();
             // Stack: []
 
             // After all paths converge
@@ -1454,8 +1484,12 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
         int variable_index = method_stack -> TopBlock() ->
             block_symbol -> helper_variable_index;
         PutOp(OP_ACONST_NULL);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.null_type);
         StoreLocal(variable_index, control.Throwable());  // primary_exception = null
         PutOp(OP_ACONST_NULL);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.null_type);
         StoreLocal(variable_index + 2, control.Throwable());  // close_exception = null
     }
 
@@ -1588,7 +1622,12 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 StoreLocal(parameter_symbol -> LocalVariableIndex(),
                            parameter_symbol -> Type());
             }
-            else PutOp(OP_POP);
+            else
+            {
+                PutOp(OP_POP);
+                if (stack_map_generator)
+                    stack_map_generator->PopType();
+            }
             u2 handler_type = RegisterClass(parameter_symbol -> Type());
             for (int j = handler_starts.Length(); --j >= 0; )
             {
@@ -1705,6 +1744,8 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                 {
                     // Finally cannot complete normally, just pop exception
                     PutOp(OP_POP);
+                    if (stack_map_generator)
+                        stack_map_generator->PopType();
                     if (has_resources)
                     {
                         EmitResourceCleanup(statement, variable_index);
@@ -1782,6 +1823,8 @@ void ByteCode::EmitTryStatement(AstTryStatement* statement)
                     // the finally clause overrides it.
                     //
                     PutOp(OP_POP);
+                    if (stack_map_generator)
+                        stack_map_generator->PopType();
                 }
                 method_stack -> TopHandlerRangeEnd().Push(special_end_pc);
                 unsigned count = method_stack -> TopHandlerRangeStart().Length();
