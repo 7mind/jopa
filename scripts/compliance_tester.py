@@ -15,9 +15,19 @@ import time
 DEFAULT_COMPILER = "jopa"
 DEFAULT_JVM = "jamvm"
 STUB_RT_PATH = "build/runtime/jopa-stub-rt.jar"
-GNUCP_PATH = "build-devjopak/vendor-install/classpath/share/classpath/glibj.zip"
-JOPA_PATH = "build/src/jopa"
-JAMVM_PATH = "build-devjopak/vendor-install/jamvm/bin/jamvm"
+
+# Support DEVJOPAK_HOME environment variable for nix-built devjopak
+DEVJOPAK_HOME = os.environ.get("DEVJOPAK_HOME")
+if DEVJOPAK_HOME:
+    # Nix-built devjopak - use bin/ wrappers which set up paths correctly
+    GNUCP_PATH = os.path.join(DEVJOPAK_HOME, "lib/glibj.zip")
+    JOPA_PATH = os.path.join(DEVJOPAK_HOME, "bin/javac")
+    JAMVM_PATH = os.path.join(DEVJOPAK_HOME, "bin/java")
+else:
+    # Local cmake build paths
+    GNUCP_PATH = "build-devjopak/vendor-install/classpath/share/classpath/glibj.zip"
+    JOPA_PATH = "build/src/jopa"
+    JAMVM_PATH = "build-devjopak/vendor-install/jamvm/bin/jamvm"
 
 class Test:
     def __init__(self, file_path, instructions, reason):
