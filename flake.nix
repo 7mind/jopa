@@ -44,7 +44,7 @@
         ];
 
         # Helper function to build JOPA compiler
-        mkJopa = { debug ? false }: pkgs.stdenv.mkDerivation {
+        mkJopa = { debug ? false }: pkgs.clangStdenv.mkDerivation {
           pname = "jopa${if debug then "-debug" else ""}";
           version = "2.0.1";
 
@@ -53,10 +53,12 @@
           nativeBuildInputs = with pkgs; [
             cmake
             pkg-config
+            openjdk8  # Required for running tests
+            zip       # Required for building stub runtime
+            python3   # Required for post-processing parser headers
           ];
 
           buildInputs = with pkgs; [
-            clang
             libzip
             cpptrace
           ];
@@ -91,7 +93,7 @@
         jopa-debug = mkJopa { debug = true; };
 
         # Helper function to build devjopak variants
-        mkDevjopak = { name, ecjVersion ? null, debug ? false }: pkgs.stdenv.mkDerivation {
+        mkDevjopak = { name, ecjVersion ? null, debug ? false }: pkgs.clangStdenv.mkDerivation {
           pname = name;
           version = "2.0.1";
 
@@ -194,7 +196,7 @@
         };
 
         # ECJ standalone builds
-        mkEcj = { ecjVersion, debug ? false }: pkgs.stdenv.mkDerivation {
+        mkEcj = { ecjVersion, debug ? false }: pkgs.clangStdenv.mkDerivation {
           pname = "ecj${if debug then "-debug" else ""}";
           version = ecjVersion;
 
@@ -246,7 +248,7 @@
         ecj_422-debug = mkEcj { ecjVersion = "4.2.2"; debug = true; };
 
         # Apache Ant built with JOPA
-        mkAnt = { debug ? false }: pkgs.stdenv.mkDerivation {
+        mkAnt = { debug ? false }: pkgs.clangStdenv.mkDerivation {
           pname = "ant-jopa${if debug then "-debug" else ""}";
           version = "1.8.4";
 
