@@ -91,6 +91,7 @@ core.*
 *.tgz
 *.zip
 *.jar
+!vendor/*.jar
 
 # Nix
 result
