@@ -222,7 +222,16 @@ target_include_directories(jopa PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/codegen"
     "${CMAKE_BINARY_DIR}/generated"
 )
+# Silence third-party header warnings.
+if(LIBZIP_INCLUDE_DIRS)
+    target_include_directories(jopa SYSTEM PRIVATE ${LIBZIP_INCLUDE_DIRS})
+endif()
 target_link_libraries(jopa PRIVATE ${JOPA_LIBS})
+
+# Suppress nullability extension noise from libzip headers when using Clang.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(jopa PRIVATE -Wno-nullability-extension)
+endif()
 
 # Depend on grammar generation if available
 if(TARGET generate_parser)

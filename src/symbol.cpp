@@ -1037,8 +1037,8 @@ void DirectorySymbol::ReadDirectory()
                 {
                     int len = DirectoryNameLength() + strlen(entry -> d_name);
                     char* filename = new char[len + 2]; // +2 for '/', NUL
-                    sprintf(filename, "%s/%s", DirectoryName(),
-                            entry -> d_name);
+                    snprintf(filename, len + 2, "%s/%s", DirectoryName(),
+                             entry -> d_name);
                     struct stat status;
                     if(JopaAPI::getInstance() -> stat(filename, &status) == 0)
                         entries -> InsertEntry(this, entry -> d_name, length);

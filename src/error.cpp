@@ -112,7 +112,7 @@ ErrorString& ErrorString::operator<<(const char* s)
 ErrorString& ErrorString::operator<<(int n)
 {
     char buf[64];
-    sprintf(buf, "%d", n);
+    snprintf(buf, sizeof(buf), "%d", n);
 
     return (*this << buf);
 }

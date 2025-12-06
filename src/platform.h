@@ -98,13 +98,13 @@
 # include STD_LIB_NAME(errno)
 #endif
 
-#ifndef HAVE_WINT_T
-/* On some systems the type wint_t is not defined in wchar.h */
-typedef unsigned int wint_t;
-#endif
-
 #ifdef HAVE_WCHAR_H
 # include STD_LIB_NAME(wchar)
+#endif
+
+#if !defined(HAVE_WINT_T) && !defined(_WINT_T)
+/* On some systems the type wint_t is not defined in wchar.h */
+typedef unsigned int wint_t;
 #endif
 
 #ifdef HAVE_CTYPE_H
