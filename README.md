@@ -17,8 +17,7 @@ A totally Claude'd effort in modernizing [`jikes`](https://github.com/daveshield
 - **Christ, does this thing even work?** Yes, it can compile many complex Java projects of that era and the compiled code executes.
 - **How compliant it is with Java specifications?** That's a mystery bubblewrapped in an enigma. Usually JOPA spits out bytecode which looks like bytecode, runs like bytecode and even validates like bytecode, but its typer is an abyss, don't stare into it. I think my dog is more compliant with Java specifications, he would definitely refuse any non-compliant Java code. But somehow JOPA works and builds complex projects.
 - **How many bugs are there in JOPA?** Plenty, probably. Currently we have 200+ end-to-end tests which run real programs compiled with JOPA on real Hotspot JVM without `noverify`.
-Also we partially check for JDK [compliance](#jdk-compliance-snapshot). Also it can build GNU Classpath, Apache ANT and Eclipse ECJ. But the parser, the typer and the bytecode generator are definitely buggy.
-The original compiler had many bugs too.
+Also we partially check for JDK [parser and typer compliance](#jdk-compliance-snapshot) and we run successfully run all the positive testcases from OpenJDK test kit which can run on GNU Classpath and without annotation processor (APT). Also it can build GNU Classpath, Apache ANT and Eclipse ECJ. But the parser, the typer and the bytecode generator are definitely buggy. The original compiler had many bugs too. At least we made some improvements in terms of memory safety.
 - **What does JOPA mean?** Javac One Patch Away (from completeness).
 - **But?..** No.
 - **Why?!1** [Read this](EXPLANATION.md).
@@ -27,7 +26,7 @@ The original compiler had many bugs too.
 
 JOPA has successfully achieved a significant milestone in bootstrapping:
 
--   **Eclipse Compiler for Java (ECJ) 4.2.1**
+-   **Eclipse Compiler for Java (ECJ) 4.2.1 and 4.2.2**
 -   **Apache Ant 1.8.4**
 
 Both are built from source using JOPA and run on **JamVM 2.0.0** with **GNU Classpath 0.99**. This demonstrates that JOPA is a capable and viable stage in a full-source bootstrap chain, bridging the gap between C++ and a fully featured Java 7 compiler environment.
