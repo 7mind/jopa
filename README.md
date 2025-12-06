@@ -205,6 +205,15 @@ The compiler fully supports complex generic type signatures including:
 - `-target 1.6` → class file version 50.0 (runs on Java 6+)
 - `-target 1.7` → class file version 51.0 with StackMapTable (runs on Java 7+)
 
+## What's next?
+
+I see at least some further improvements:
+
+- We may try to use JOPA as bootstrap compiler for OpenJDK 7 directly, removing ECJ from the chain. There is a chance that JOPA might be more compliant than ECJ, but that's something to be explored.
+- We may fix all the sanitizer issues in Jikespg too. Why? Because why not.
+- We may fix all the sanitizer issues in JamVM and port it from GCC to Clang (this was already done in [IX](https://github.com/pg83/ix/blob/main/pkgs/bld/java/boot/jamvm/t/ix.sh)).
+- We may try to port the whole toolchain to some other platforms (it would be definitely funny to see this running on RISC-V under some niche OS).
+
 ## Building
 
 ### Requirements
