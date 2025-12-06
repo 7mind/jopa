@@ -46,7 +46,7 @@
         # Helper function to build JOPA compiler
         mkJopa = { debug ? false }: pkgs.clangStdenv.mkDerivation {
           pname = "jopa${if debug then "-debug" else ""}";
-          version = "2.0.1";
+          version = "2.0.2";
 
           src = ./.;
 
