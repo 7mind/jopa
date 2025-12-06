@@ -528,6 +528,7 @@ assets/jdk8u_langtools/test/tools/javac/4880220/T4880220.java
 assets/jdk8u_langtools/test/tools/javac/T6356217/T6356217.java
 assets/jdk8u_langtools/test/tools/javac/T8029179/CompileErrorForValidBooleanExpTest.java
 assets/jdk8u_langtools/test/tools/javac/CyclicInheritance6/Main.java
+assets/jdk8u_langtools/test/tools/javac/boxing/T6348760.java
 assets/jdk8u_langtools/test/tools/javac/boxing/T6369051.java
 assets/jdk8u_langtools/test/tools/javac/boxing/BoxedForeach.java
 assets/jdk8u_langtools/test/tools/javac/OverrideChecks/InterfaceImplements.java

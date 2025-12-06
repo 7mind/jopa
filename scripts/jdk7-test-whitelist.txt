@@ -397,6 +397,7 @@ assets/jdk7u-langtools/test/tools/javac/6996626/Main.java
 assets/jdk7u-langtools/test/tools/javac/inheritAccess/PvtMbrsNotInherit1.java
 assets/jdk7u-langtools/test/tools/javac/6835430/T6835430.java
 assets/jdk7u-langtools/test/tools/javac/6948381/T6948381.java
+assets/jdk7u-langtools/test/tools/javac/boxing/T6348760.java
 assets/jdk7u-langtools/test/tools/javac/boxing/BoxedForeach.java
 assets/jdk7u-langtools/test/tools/javac/boxing/T6369051.java
 assets/jdk7u-langtools/test/tools/javac/miranda/T4279316d.java

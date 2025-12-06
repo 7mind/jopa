@@ -262,6 +262,7 @@ jobs:
       matrix:
         jdk: [7, 8]
         variant: [release, debug]
+        target: ['1.5', '1.6', '1.7']
 
     steps:
       - name: Checkout repository
@@ -281,7 +282,7 @@ jobs:
         run: |
           nix develop --command python3 scripts/compliance_tester.py --prepare --jdk ${{ matrix.jdk }}
 
-      - name: Run JDK${{ matrix.jdk }} Compliance Tests (${{ matrix.variant }})
+      - name: Run JDK${{ matrix.jdk }} Compliance Tests (${{ matrix.variant }}, target ${{ matrix.target }})
         run: |
           # Set up paths to use built devjopak
           export DEVJOPAK_HOME="$(pwd)/result"
@@ -291,17 +292,19 @@ jobs:
             --classpath gnucp \
             --timeout 30 \
             --mode run \
-            --no-success 2>&1 | tee /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log
+            --arg="-target" --arg="${{ matrix.target }}" \
+            --no-success 2>&1 | tee /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-target${{ matrix.target }}-compliance.log
 
       - name: Check Results
         run: |
-          TOTAL=$(grep "^Total:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
-          SUCCESS=$(grep "^Success:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
-          FAILURE=$(grep "^Failure:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
-          TIMEOUT=$(grep "^Timeout:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
-          CRASH=$(grep "^Crash:" /tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-compliance.log | awk '{print $2}')
+          LOG="/tmp/jdk${{ matrix.jdk }}-${{ matrix.variant }}-target${{ matrix.target }}-compliance.log"
+          TOTAL=$(grep "^Total:" $LOG | awk '{print $2}')
+          SUCCESS=$(grep "^Success:" $LOG | awk '{print $2}')
+          FAILURE=$(grep "^Failure:" $LOG | awk '{print $2}')
+          TIMEOUT=$(grep "^Timeout:" $LOG | awk '{print $2}')
+          CRASH=$(grep "^Crash:" $LOG | awk '{print $2}')
 
-          echo "## OpenJDK JDK${{ matrix.jdk }} Compliance Results (${{ matrix.variant }})" >> $GITHUB_STEP_SUMMARY
+          echo "## OpenJDK JDK${{ matrix.jdk }} Compliance Results (${{ matrix.variant }}, target ${{ matrix.target }})" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
           echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
