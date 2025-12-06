@@ -392,7 +392,8 @@ static void options(void)
 
     while (parm[i] != '\0')     /* Repeat until parm line is exhausted */
     {
-        strcpy(parm, parm + i);       /* Remove garbage in front */
+        /* Use memmove because source and destination overlap. */
+        memmove(parm, parm + i, strlen(parm + i) + 1);       /* Remove garbage in front */
 
         i = 0;
 
@@ -442,7 +443,8 @@ static void options(void)
             {                                  /* prefix?         */
                 flag = FALSE;
                 len = len-2;
-                strcpy(token, token + 2);  /* get rid of "NO" prefix */
+                /* Overlapping copy; memmove keeps it defined. */
+                memmove(token, token + 2, strlen(token + 2) + 1);  /* get rid of "NO" prefix */
             }
             else
                 flag = TRUE;
