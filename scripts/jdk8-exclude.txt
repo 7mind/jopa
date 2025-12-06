@@ -146,7 +146,6 @@ api/TestOperators.java
 api/TestResolveError.java
 api/TestResolveIdent.java
 binaryCompat/T1.java
-boxing/T6348760.java
 cast/intersection/model/Model01.java
 classfiles/InnerClasses/SyntheticClasses.java
 classfiles/InnerClasses/T8068517.java

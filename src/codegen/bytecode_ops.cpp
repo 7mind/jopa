@@ -969,67 +969,143 @@ void ByteCode::EmitPreUnaryIncrementExpressionField(VariableCategory kind,
         if (control.IsSimpleIntegerValueType(unboxed_type))
         {
             PutOp(OP_ICONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.int_type);
             PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
                   ? OP_IADD : OP_ISUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.int_type);
+            }
             EmitCast(unboxed_type, control.int_type);
         }
         else if (unboxed_type == control.long_type)
         {
             PutOp(OP_LCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.long_type);
             PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
                   ? OP_LADD : OP_LSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.long_type);
+            }
         }
         else if (unboxed_type == control.float_type)
         {
             PutOp(OP_FCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.float_type);
             PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
                   ? OP_FADD : OP_FSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.float_type);
+            }
         }
         else if (unboxed_type == control.double_type)
         {
             PutOp(OP_DCONST_1);
+            if (stack_map_generator)
+                stack_map_generator->PushType(control.double_type);
             PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
                   ? OP_DADD : OP_DSUB);
+            if (stack_map_generator)
+            {
+                stack_map_generator->PopTypes(2);
+                stack_map_generator->PushType(control.double_type);
+            }
         }
 
         // Rebox the result back to wrapper
         EmitBoxingConversion(unboxed_type, expression_type);
 
         if (need_value)
+        {
             PutOp(OP_DUP_X1);
+            if (stack_map_generator)
+                stack_map_generator->DupX1();
+        }
     }
     else if (control.IsSimpleIntegerValueType(expression_type))
     {
         PutOp(OP_ICONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.int_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_IADD : OP_ISUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.int_type);
+        }
         EmitCast(expression_type, control.int_type);
         if (need_value)
+        {
             PutOp(OP_DUP_X1);
+            if (stack_map_generator)
+                stack_map_generator->DupX1();
+        }
     }
     else if (expression_type == control.long_type)
     {
         PutOp(OP_LCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.long_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_LADD : OP_LSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.long_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP2_X1);
+            if (stack_map_generator)
+                stack_map_generator->Dup2X1();
+        }
     }
     else if (expression_type == control.float_type)
     {
         PutOp(OP_FCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.float_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_FADD : OP_FSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.float_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP_X1);
+            if (stack_map_generator)
+                stack_map_generator->DupX1();
+        }
     }
     else if (expression_type == control.double_type)
     {
         PutOp(OP_DCONST_1);
+        if (stack_map_generator)
+            stack_map_generator->PushType(control.double_type);
         PutOp(expression -> Tag() == AstPreUnaryExpression::PLUSPLUS
               ? OP_DADD : OP_DSUB);
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopTypes(2);
+            stack_map_generator->PushType(control.double_type);
+        }
         if (need_value)
+        {
             PutOp(OP_DUP2_X1);
+            if (stack_map_generator)
+                stack_map_generator->Dup2X1();
+        }
     }
     else assert(false && "unsupported PreUnary type");
 
@@ -1044,6 +1120,14 @@ void ByteCode::EmitPreUnaryIncrementExpressionField(VariableCategory kind,
         PutOp(OP_PUTFIELD);
         if (control.IsDoubleWordType(expression_type))
             ChangeStack(-1);
+        // PUTFIELD pops objectref and value
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType();  // pop value
+            if (control.IsDoubleWordType(expression_type))
+                stack_map_generator->PopType();  // pop second slot for wide types
+            stack_map_generator->PopType();  // pop objectref
+        }
 
         VariableSymbol* sym = (VariableSymbol*) expression -> symbol;
         PutU2(RegisterFieldref(VariableTypeResolution(expression ->

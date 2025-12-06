@@ -245,13 +245,4 @@ T6180021/AbstractSub.java # tests missing type resilience
 # blocks, the code explosion from deeply nested try-finally is much worse.
 FinallyNesting.java # deeply nested try-finally stress test requires JSR/RET
 
-# ============================================================================
-# StackMapTable generation limitations
-# ============================================================================
-# T6348760 tests boxing operations on generic fields. The test requires proper
-# StackMapTable frames at branch targets for boolean-to-value conversion patterns.
-# The current StackMapTable generator doesn't track all stack operations during
-# expression evaluation, so it can't generate correct frames for these patterns.
-# Fixing this requires comprehensive stack type tracking throughout EmitExpression.
-T6348760.java # StackMapTable generation incomplete for boolean-to-value patterns
 

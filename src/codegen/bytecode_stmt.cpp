@@ -2180,6 +2180,12 @@ void ByteCode::EmitBranchIfExpression(AstExpression* p, bool cond, Label& lab,
         EmitExpression(p);
         PutOp(OP_INVOKEVIRTUAL);
         PutU2(RegisterLibraryMethodref(control.Boolean_booleanValueMethod()));
+        // INVOKEVIRTUAL booleanValue(): pops Boolean, pushes int
+        if (stack_map_generator)
+        {
+            stack_map_generator->PopType();  // pop Boolean
+            stack_map_generator->PushType(control.int_type);  // push int (boolean result)
+        }
         if (cond)
             EmitBranch(OP_IFNE, lab, over);  // branch if true
         else

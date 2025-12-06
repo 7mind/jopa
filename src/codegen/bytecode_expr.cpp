@@ -259,6 +259,19 @@ void ByteCode::EmitFieldAccessLhs(AstExpression* expression)
         stack_map_generator->PopType();  // pop object ref consumed by GETFIELD
         stack_map_generator->PushType(expression->Type());  // push field value
     }
+
+    // For generic fields, the declared field type may be Object (erased)
+    // but the expression type may be a specific type (e.g., Integer).
+    // In this case, we need to emit a checkcast.
+    TypeSymbol* expression_type = expression->Type();
+    TypeSymbol* field_type = sym -> Type();
+    if (field_type == control.Object() &&
+        expression_type != control.Object() &&
+        ! expression_type -> Primitive())
+    {
+        PutOp(OP_CHECKCAST);
+        PutU2(RegisterClass(expression_type));
+    }
 }
 
 
@@ -679,6 +692,15 @@ void ByteCode::EmitBoxingConversion(TypeSymbol* source_type, TypeSymbol* target_
     PutOp(OP_INVOKESTATIC);
     PutU2(RegisterMethodref(wrapper_type, valueOf_method));
     ChangeStack(1); // Push the wrapper object reference (always 1 word)
+
+    // Update stack_map_generator: pop primitive, push wrapper
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopType();  // pop primitive (or second slot for long/double)
+        if (arg_words > 1)
+            stack_map_generator->PopType();  // pop first slot for long/double
+        stack_map_generator->PushType(wrapper_type);  // push wrapper object
+    }
 }
 
 
@@ -704,11 +726,18 @@ void ByteCode::EmitUnboxingConversion(TypeSymbol* source_type, TypeSymbol* targe
 
     // Call wrapper.primitiveValue()
     // Wrapper object is already on stack
-    // INVOKEVIRTUAL automatically pops 'this' (-1), so we only adjust for return value
+    // INVOKEVIRTUAL pops 'this' and pushes the primitive result
     PutOp(OP_INVOKEVIRTUAL);
     PutU2(RegisterMethodref(source_type, unbox_method));
     int result_words = GetTypeWords(target_type);
     ChangeStack(result_words); // Push the primitive result
+
+    // Update stack_map_generator: pop wrapper, push primitive
+    if (stack_map_generator)
+    {
+        stack_map_generator->PopType();  // pop wrapper object
+        stack_map_generator->PushType(target_type);  // push primitive result
+    }
 }
 
 
@@ -1111,11 +1140,15 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
                                    : assignment_expression -> Type());
 
             // Java 5: Handle wrapper types by unboxing
+            TypeSymbol* wrapper_type = NULL;  // Remember wrapper for re-boxing
             TypeSymbol* unboxed_op_type = op_type -> UnboxedType(control);
             if (unboxed_op_type != op_type && (control.IsNumeric(unboxed_op_type) ||
                                                unboxed_op_type == control.boolean_type))
             {
+                wrapper_type = op_type;  // Save wrapper type for later boxing
                 op_type = unboxed_op_type;
+                // Unbox the LHS value that was loaded by EmitFieldAccessLhs or LoadVariable
+                EmitUnboxingConversion(wrapper_type, op_type);
             }
 
             if (control.IsSimpleIntegerValueType(op_type) ||
@@ -1272,6 +1305,10 @@ int ByteCode::EmitAssignmentExpression(AstAssignmentExpression* assignment_expre
 
             if (casted_left_hand_side) // now cast result back to type of result
                 EmitCast(left_type, casted_left_hand_side -> Type());
+
+            // Java 5: Re-box the result if we unboxed the LHS earlier
+            if (wrapper_type)
+                EmitBoxingConversion(op_type, wrapper_type);
         }
     }
 
